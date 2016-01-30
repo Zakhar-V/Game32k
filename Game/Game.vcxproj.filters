@@ -1,0 +1,68 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="GameMain.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
+    <ClCompile Include="OpenGL.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="Base.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="Window.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="BuiltinData.cpp">
+      <Filter>Assets</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Game">
+      <UniqueIdentifier>{8b60dc05-c735-4632-87cf-515d93e36b31}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine">
+      <UniqueIdentifier>{5246302f-2c4e-485b-b9d0-3d5c511e0ba7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Build">
+      <UniqueIdentifier>{15b1c5d1-72df-4110-82b3-e946a5945285}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Assets">
+      <UniqueIdentifier>{5d94416d-1ab4-4d71-a350-12de6607e734}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Game.h">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="OpenGL.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="Base.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="Math.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="Window.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="_temp.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="Project.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\Build\crinkler.bat">
+      <Filter>Build</Filter>
+    </None>
+  </ItemGroup>
+</Project>
