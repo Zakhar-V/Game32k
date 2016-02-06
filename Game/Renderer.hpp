@@ -46,11 +46,40 @@ protected:
 // 
 //----------------------------------------------------------------------------//
 
+struct RenderOp
+{
+	float distance;
+	//Geometry* geom;
+	//Material* material;
+};
+
+/*
+
+
+*/
+
+//struct
+
+//----------------------------------------------------------------------------//
+// 
+//----------------------------------------------------------------------------//
+
 class Renderer : public Singleton<Renderer>
 {
 public:
 	Renderer(void);
 	~Renderer(void);
+
+	void BeginFrame(void);
+	void EndFrame(void);
+
+	void BeginScene(void);
+	void EndScene(void);
+
+	
+	//void Begin2D(void);
+	//void End2D(void);
+
 
 protected:
 };

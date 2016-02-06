@@ -34,5 +34,8 @@
     <ClInclude Include="Shaders\Constants.h">
       <Filter>Assets\Shaders</Filter>
     </ClInclude>
+    <ClInclude Include="Shaders\VertexLib.h">
+      <Filter>Assets\Shaders</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

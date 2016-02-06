@@ -95,7 +95,7 @@
       <ExceptionHandling>false</ExceptionHandling>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
       <BufferSecurityCheck>false</BufferSecurityCheck>
-      <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet>NoExtensions</EnableEnhancedInstructionSet>
       <PreprocessToFile>false</PreprocessToFile>
     </ClCompile>
     <Link>
@@ -112,15 +112,18 @@
       <GenerateMapFile>true</GenerateMapFile>
       <AdditionalLibraryDirectories>$(SolutionDir)Build\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
+      <MinimumRequiredVersion />
     </Link>
     <CustomBuildStep>
       <Command>
       </Command>
     </CustomBuildStep>
     <PostBuildEvent>
-      <Command>md "$(SolutionDir)Bin\crinkler"
+      <Command>rem md /q "$(SolutionDir)Bin\crinkler"
 cd "$(SolutionDir)Build"
-"$(SolutionDir)Build\crinkler.bat" "$(IntDir)GameMain.obj" "$(SolutionDir)Bin\crinkler\$(TargetFileName)"</Command>
+"$(SolutionDir)Build\CompressExeFile.bat" "$(IntDir)GameMain.obj" "$(OutDir)$(TargetName)_crinkler$(TargetExt)"  "$(TargetPath)" "$(OutDir)$(TargetName)_upx$(TargetExt)"
+
+</Command>
     </PostBuildEvent>
     <FxCompile>
       <ShaderModel>2.0</ShaderModel>
@@ -154,6 +157,10 @@ cd "$(SolutionDir)Build"
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="Image.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="Renderer.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
@@ -172,6 +179,7 @@ cd "$(SolutionDir)Build"
     <ClInclude Include="BuiltinData.hpp" />
     <ClInclude Include="File.hpp" />
     <ClInclude Include="Geometry.hpp" />
+    <ClInclude Include="Image.hpp" />
     <ClInclude Include="Object.hpp" />
     <ClInclude Include="Renderer.hpp" />
     <ClInclude Include="Scene.hpp" />
@@ -186,7 +194,7 @@ cd "$(SolutionDir)Build"
     <Text Include="Project.txt" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\Build\crinkler.bat" />
+    <None Include="..\Build\CompressExeFile.bat" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

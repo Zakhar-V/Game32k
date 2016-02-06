@@ -10,6 +10,7 @@
 #include "Renderer.cpp"
 #include "BuiltinData.cpp"
 #include "Scene.cpp"
+#include "Image.cpp"
 
 //----------------------------------------------------------------------------//
 //
@@ -130,6 +131,23 @@ template <class F> F FuncCast(void* _func) { union { void* p; F f; }_fp = { _fun
 //
 //----------------------------------------------------------------------------//
 
+/*
+
+
+
+*/
+
+
+
+//----------------------------------------------------------------------------//
+//
+//----------------------------------------------------------------------------//
+
+
+//----------------------------------------------------------------------------//
+//
+//----------------------------------------------------------------------------//
+
 
 ////////////////////////////////////////////////////////////////////////////////
 //----------------------------------------------------------------------------//
@@ -158,15 +176,58 @@ void main(void)
 		Graphics _graphics;	  
 		Renderer _renderer;
 		{
-			VertexBuffer _vb(3 * sizeof(SimpleVertex));
-
-			SimpleVertex _vd[3] =  // xyz, tc, argb
+			/*Texture _tex(TT_2D, PF_RGB8);
+			const uint8 _img[2*2*3] =
 			{
-				{ Vec3(150.0f,  50.0f, 0.5f), Vec2(0.5f, 1.0f), 0xff0000ff, }, // t
-				{ Vec3(250.0f, 250.0f, 0.5f), Vec2(1.0f,0.0f), 0x00ff00ff, },  // r
-				{ Vec3(50.0f, 250.0f, 0.5f), Vec2(0.0f, 0.0f), 0x0000ffff, },  // l
+				0xff, 0x00, 0x00,  0xff, 0xff, 0xff,
+				//0x7f7f7fff, 0x7f7f7fff,
+				0x00, 0x00, 0x00,  0x00, 0x00, 0x00,
 			};
-			_vb.Write(_vd, 0, sizeof(_vd));
+			_tex.SetSize(2, 2, 1, 1);
+			_tex.SetData(_img);
+			_tex.GenerateLods(); */
+			
+			Texture _tex(TT_2D, PF_RGBA8);
+			FontInfo _fi;
+			ImagePtr _fnt = CreateBitmapFont(_fi, "Courier New TT", 32, 0.5f);
+			_tex.SetSize(_fnt->Size().x, _fnt->Size().y);
+			_tex.SetData(_fnt->Pixels());
+			_tex.GenerateLods();
+
+			VertexBuffer _vb(4 * sizeof(SimpleVertex));
+
+			{
+				Vec2 _p(100, 100);
+				Vec2 _s(512, 512);
+				/*SimpleVertex _vd[3] =  // xyz, tc, argb
+				{
+					{ Vec3(150.0f,  50.0f, 0.5f), Vec2(0.5f, 1.0f), 0xff0000ff, }, // t
+					{ Vec3(250.0f, 250.0f, 0.5f), Vec2(1.0f,0.0f), 0x00ff00ff, },  // r
+					{ Vec3(50.0f, 250.0f, 0.5f), Vec2(0.0f, 0.0f), 0x0000ffff, },  // l
+				};
+				_vb.Write(_vd, 0, sizeof(_vd));*/	
+
+				/*
+				1 0
+				3 2
+				*/
+				SimpleVertex _vd[4] =  // xyz, tc, rgba
+				{
+					//{ Vec3(_p.x,  _p.y, 0.5f), Vec2(0, 1), 0xff0000ff, }, // lt
+					//{ Vec3(_p.x,  _p.y + _s.y, 0.5f), Vec2(0, 0), 0xff0000ff, }, // lb
+					//{ Vec3(_p.x + _s.x,  _p.y, 0.5f), Vec2(1, 1), 0xff0000ff, }, // rt
+					//{ Vec3(_p.x + _s.x,  _p.y + _s.y, 0.5f), Vec2(1, 0), 0xff0000ff, }, // rb
+					
+					// argb xyzw
+					// rgba
+					{ Vec3(_p.x + _s.x,  _p.y, 0.5f), Vec2(1, 0), 0xff0000ff, }, // rt
+					{ Vec3(_p.x,  _p.y, 0.5f), Vec2(0, 0), 0xffffffff, }, // lt
+					{ Vec3(_p.x + _s.x,  _p.y + _s.y, 0.5f), Vec2(1, 1), 0x00ff00ff, }, // rb
+					{ Vec3(_p.x,  _p.y + _s.y, 0.5f), Vec2(0, 1), 0x0000ffff, }, // lb
+				};
+				_vb.Write(_vd, 0, sizeof(_vd));	
+
+			}
 
 			Mat44 _worldMatrix;
 			_worldMatrix.SetIdentity() ;
@@ -179,7 +240,7 @@ void main(void)
 
 				Vec2i _size = gWindow->Size();
 				_viewProjMatrix.CreateOrtho2D(_size.x, _size.y);
-				_viewProjMatrix.Inverse().Inverse() ;
+				_viewProjMatrix.Inverse().Inverse();
 				 
 				gGraphics->BeginFrame();
 				gGraphics->ClearFrameBuffers(FBT_Color, _clearColor);
@@ -190,7 +251,10 @@ void main(void)
 
 				gGraphicsDevice->SetVertexShaderConstantF(0, _viewProjMatrix.v, 4);
 
-				gGraphicsDevice->DrawPrimitive(D3DPT_TRIANGLELIST, 0, 1);
+				gGraphics->SetTexture(0, &_tex);
+
+
+				gGraphicsDevice->DrawPrimitive(D3DPT_TRIANGLESTRIP, 0, 2);
 				gGraphics->EndFrame();
 			}
 		}

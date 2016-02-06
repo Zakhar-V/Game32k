@@ -272,6 +272,7 @@ struct Color
 	operator Vec4 (void) const { return Vec4(ByteToFloat(r), ByteToFloat(g), ByteToFloat(b), ByteToFloat(a)); }
 
 	uint Argb(void) const { return (rgba >> 8) | (a << 24); }
+	uint Abgr(void) const { return (a << 24) | (b << 16) | (g << 8) | r; }
 
 	union
 	{

@@ -25,6 +25,9 @@
     <ClCompile Include="BuiltinData.cpp">
       <Filter>Assets</Filter>
     </ClCompile>
+    <ClCompile Include="Image.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Game">
@@ -80,12 +83,15 @@
     <ClInclude Include="BuiltinData.hpp">
       <Filter>Assets</Filter>
     </ClInclude>
+    <ClInclude Include="Image.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Text Include="Project.txt" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\Build\crinkler.bat">
+    <None Include="..\Build\CompressExeFile.bat">
       <Filter>Build</Filter>
     </None>
   </ItemGroup>

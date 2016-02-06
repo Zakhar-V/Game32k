@@ -2,6 +2,7 @@
 
 #include "Math.hpp"
 #include "Object.hpp"
+#include "Image.hpp"
 #include "Shaders/Constants.h"
 #include <d3d9.h>
 
@@ -134,6 +135,8 @@ protected:
 // Texture
 //----------------------------------------------------------------------------//
 
+typedef Ptr<class Texture> TexturePtr;
+
 enum TextureType
 {
 	TT_2D,
@@ -151,24 +154,17 @@ enum TextureType
 
 enum TextureUsage : uint
 {
-	TU_Default = D3DUSAGE_AUTOGENMIPMAP,
-	TU_Dynamic = D3DUSAGE_AUTOGENMIPMAP | D3DUSAGE_DYNAMIC,
-	TU_RenderTarget = D3DUSAGE_AUTOGENMIPMAP | D3DUSAGE_RENDERTARGET,
+	TU_Default = /*D3DUSAGE_AUTOGENMIPMAP*/ 0,
+	TU_Dynamic = /*D3DUSAGE_AUTOGENMIPMAP |*/ D3DUSAGE_DYNAMIC,
+	TU_RenderTarget = /*D3DUSAGE_AUTOGENMIPMAP |*/ D3DUSAGE_RENDERTARGET,
 };
 
-enum TextureFormat : uint
-{
-	TF_RGBA8 = D3DFMT_A8R8G8B8,
-	TF_D24S8 = D3DFMT_D24S8,
-	TF_DXT1 = D3DFMT_DXT1,
-	TF_DXT5 = D3DFMT_DXT5,
-};
 
 class Texture : public RefCounted
 {
 public:
 
-	Texture(TextureType _type, TextureFormat _format, TextureUsage _usage = TU_Default);
+	Texture(TextureType _type, PixelFormat _format, TextureUsage _usage = TU_Default);
 	~Texture(void);
 
 	void SetSize(uint _width, uint _height, uint _depth = 1, uint _lods = 0);
@@ -184,7 +180,7 @@ protected:
 
 	TextureType m_type;
 	TextureUsage m_usage;
-	TextureFormat m_format;
+	PixelFormat m_format;
 	Vec2i m_size;
 	uint m_depth;
 	uint m_lods;
@@ -226,6 +222,9 @@ public:
 	void SetVertexShader(uint _id);
 	void SetPixelShader(uint _id);
 
+	//void SetUniformVS(uint _index, const void* _data)
+
+	void SetTexture(uint _stage, Texture* _tex);
 
 protected:
 

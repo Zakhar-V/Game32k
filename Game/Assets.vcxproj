@@ -219,6 +219,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Shaders\Constants.h" />
+    <ClInclude Include="Shaders\VertexLib.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

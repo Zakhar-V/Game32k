@@ -100,8 +100,17 @@ void IndexBuffer::Write(const void* _data, uint _offset, uint _size)
 // Texture
 //----------------------------------------------------------------------------//
 
+const D3DFORMAT DXPixelFormat[] = 
+{
+	D3DFMT_X8R8G8B8, // PF_RGB8
+	D3DFMT_A8R8G8B8, // PF_RGBA8
+	D3DFMT_D24S8, // PF_D24S8
+	D3DFMT_DXT1, // PF_DXT1
+	D3DFMT_DXT5, // PF_DXT5
+};
+
 //----------------------------------------------------------------------------//
-Texture::Texture(TextureType _type, TextureFormat _format, TextureUsage _usage) :
+Texture::Texture(TextureType _type, PixelFormat _format, TextureUsage _usage) :
 	m_type(_type),
 	m_usage(_usage),
 	m_format(_format),
@@ -131,11 +140,8 @@ void Texture::SetData(const void* _data)
 	ASSERT(m_handle != nullptr);
 	ASSERT(_data != nullptr);
 
-	uint _bpp = 32;
-	if (m_format == TF_DXT1)
-		_bpp = 4;
-	else if (m_format == TF_DXT5)
-		_bpp = 8;
+	uint _bpp = BitsPerPixel(m_format);
+
 	if (m_type == TT_2D || m_type == TT_2DMultisample)
 	{
 		D3DLOCKED_RECT _dst;
@@ -147,18 +153,10 @@ void Texture::SetData(const void* _data)
 			
 		m_texture2d->LockRect(0, &_dst, &_rect, D3DLOCK_DISCARD);
 
-		if (m_format == TF_RGBA8)
-		{
-			const uint32* _srcp = (const uint32*)_data;
-			uint32* _dstp = (uint32*)_dst.pBits;
-			uint32* _dste = _dstp + m_size.x * m_size.y;
-			uint32 _color;
-			while (_dstp < _dste)
-			{
-				_color = *_srcp++;
-				*_dstp++ = (_color >> 8) | (_color << 24); // rgba --> argb
-			}
-		}
+		if (m_format == PF_RGBA8)
+			Image::RgbaToArgb(_dst.pBits, _data, m_size.x * m_size.y);
+		else if (m_format == PF_RGB8)
+			Image::RgbToXrgb(_dst.pBits, _data, m_size.x * m_size.y);
 		else
 			memcpy(_dst.pBits, _data, (m_size.x * m_size.y * _bpp) >> 3);
 
@@ -175,18 +173,19 @@ void Texture::_Create(void)
 {
 	_Destroy();
 
-	D3DFORMAT _format = (D3DFORMAT)m_format;
+	D3DFORMAT _format = DXPixelFormat[m_format];
 	D3DPOOL _pool = m_usage == TU_Default ? D3DPOOL_MANAGED : D3DPOOL_DEFAULT;
 	uint _usage = m_usage;
-	if (m_format == TF_D24S8)
+	if (m_format == PF_D24S8)
 		_usage |= D3DUSAGE_DEPTHSTENCIL;
 
 	uint _lods = 1;
-	for (int i = Max(m_size.x, m_size.y); i > 0; i >>= 1)
+	for (int i = FirstPow2(Max(m_size.x, m_size.y)); i > 1; i >>= 1)
 		++_lods;
-	//_lods = Log2i(Max(m_size.x, m_size.y));
-	if (m_desiredLods == 0 || m_lods > _lods)
-		m_lods = _lods;
+	if (m_desiredLods > 0 && _lods > m_desiredLods)
+		_lods = m_desiredLods;
+	m_lods = _lods;
+
 	switch (m_type)
 	{
 	case TT_2D:
@@ -206,6 +205,7 @@ void Texture::_Destroy(void)
 {
 	if (m_handle)
 		m_handle->Release();
+	m_handle = nullptr;
 	//if (m_target)
 	//	m_target->Release();
 }
@@ -298,6 +298,12 @@ void Graphics::LoadPixelShaders(const char** _assets)
 void Graphics::BeginFrame(void)
 {
 	m_device->BeginScene();
+
+	// reset state
+
+	m_device->SetRenderState(D3DRS_CULLMODE, D3DCULL_CW); // ccw == front face
+
+	// ...
 }
 //----------------------------------------------------------------------------//
 void Graphics::EndFrame(void)
@@ -338,6 +344,11 @@ void Graphics::SetPixelShader(uint _id)
 	ASSERT(m_pixelShaders[_id] != nullptr);
 
 	m_device->SetPixelShader(m_pixelShaders[_id]);
+}
+//----------------------------------------------------------------------------//
+void Graphics::SetTexture(uint _stage, Texture* _tex)
+{
+	m_device->SetTexture(_stage, _tex ? _tex->Handle() : nullptr);
 }
 //----------------------------------------------------------------------------//
 

@@ -5,24 +5,23 @@
 #	define cbuffer struct
 #	define float4x4 Mat44
 #	define REGISTER(T, I)
-#	define CBUFFER(Name, Index) enum : unsigned { CB_##Name = Index }; struct Name
+#	define CBUFFER(Name, Index) enum : unsigned { SP_##Name = Index }; struct Name
 #else // in hlsl
 #	define REGISTER(T, I) : register (T[I])
 #	define CBUFFER(Name, Index) cbuffer Name : register(c[Index])
 #endif
 
-#define SC_CameraVS 0
-#define SC_ObjectVS 4
-
-CBUFFER(CameraParamsVS, SC_CameraVS)
+CBUFFER(UCameraVS, 0)
 {
+	float4x4 ViewMatrix;
+	float4x4 ProjMatrix;
 };
 
 #ifdef HLSL
 uniform matrix<float, 4, 4> ViewProjMatrix : register(c0);
 #endif
 
-CBUFFER(ObjectParamsVS, SC_ObjectVS)
+CBUFFER(UObjectVS, 4)
 {
 	float4x4 WorldMatrix;
 };
