@@ -47,6 +47,8 @@ const char* g_usageText =
 	//"\t-unpack output_directory input_file\n"
 	"Do convert binary file to text:\n"
 	"\t-text output_file input_file\n"
+	"Save SDBM hash to file:\n"
+	"\t-hash output_file [input_file]\n"
 };
 
 //----------------------------------------------------------------------------//
@@ -791,6 +793,12 @@ bool Pack(const char** _srcFiles, size_t _numFiles, const char* _dstFile)
 	}
 
 	size_t _srcSize = _dst.Size();
+	if (_srcSize > MAX_FILESIZE)
+	{
+		LOG("Error: Pack is too big (size = %d KB, limit = %d KB)", _srcSize, MAX_FILESIZE / 1024);
+		return false;
+	}
+
 	size_t _dstSize = LZ4_COMPRESSBOUND(_srcSize);
 	Writer _pack;
 	_pack.Resize(sizeof(filesize_t) + _dstSize);
@@ -851,6 +859,31 @@ bool Text(const char* _srcFile, const char* _dstFile)
 	return _dst.Save(_dstFile);
 }
 
+bool Hash(const char* _srcFile, const char* _dstFile)
+{
+	LOG("Hash: \"%s\" -> \"%s\" ...", _srcFile, _dstFile);
+
+	Reader _src;
+	if (!_src.Load(_srcFile))
+		return false;
+
+	const char* s = _src.Base();
+	const char* e = _src.Base() + _src.Size();
+	unsigned int _hash = 0;
+	while (s < e)
+		_hash = uint8(*s++) + (_hash << 6) + (_hash << 16) - _hash;
+	LOG("Result: 0x%08x", _hash);
+
+	if (_dstFile && *_dstFile)
+	{
+		Writer _dst;
+		_dst.Write(_hash);
+		return _dst.Save(_dstFile);
+	}
+
+	return true;
+}
+
 //----------------------------------------------------------------------------//
 // App
 //----------------------------------------------------------------------------//
@@ -897,6 +930,10 @@ bool ExecCmds(void)
 	{
 		_r = Text(g_args[1], g_args[0]);
 	}
+	else if (!strcmp(g_mode, "hash"))
+	{
+		_r = Hash(g_args[1], g_args[0]);
+	}
 
 	g_mode = nullptr;
 	g_numArgs = 0;
@@ -917,7 +954,7 @@ bool SetMode(const char* _mode)
 	}
 
 	g_mode = _mode;
-	if (strcmp(g_mode, "encode") && strcmp(g_mode, "decode") && strcmp(g_mode, "pack") && strcmp(g_mode, "text"))
+	if (strcmp(g_mode, "encode") && strcmp(g_mode, "decode") && strcmp(g_mode, "pack") && strcmp(g_mode, "text") && strcmp(g_mode, "hash"))
 	{
 		LOG("Error: Unknown mode \"%s\"", g_mode);
 		return false;

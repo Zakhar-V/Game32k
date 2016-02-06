@@ -2,6 +2,45 @@
 
 #include "Graphics.hpp"
 #include "Window.hpp"
+#include "File.hpp"
+
+//----------------------------------------------------------------------------//
+// Vertex
+//----------------------------------------------------------------------------//
+
+static const D3DVERTEXELEMENT9 VF_Base_Desc[] =
+{
+	{ 0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0 },
+	D3DDECL_END(),
+};
+
+static const D3DVERTEXELEMENT9 VF_Simple_Desc[] =
+{
+	{ 0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0 },
+	{ 0, offsetof(SimpleVertex, texcoord), D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0 },
+	{ 0, offsetof(SimpleVertex, color), D3DDECLTYPE_UBYTE4N, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR, 0 },
+	D3DDECL_END(),
+};
+
+static const D3DVERTEXELEMENT9 VF_Static_Desc[] =
+{
+	{ 0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0 },
+	{ 0, offsetof(StaticVertex, texcoord), D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0 },
+	{ 0, offsetof(StaticVertex, normal), D3DDECLTYPE_UBYTE4N, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_NORMAL, 0 },
+	{ 0, offsetof(StaticVertex, tangent), D3DDECLTYPE_UBYTE4N, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TANGENT, 0 },
+	D3DDECL_END(),
+};
+
+static const D3DVERTEXELEMENT9 VF_Skinned_Desc[] =
+{
+	{ 0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0 },
+	{ 0, offsetof(SkinnedVertex, texcoord), D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0 },
+	{ 0, offsetof(SkinnedVertex, normal), D3DDECLTYPE_UBYTE4N, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_NORMAL, 0 },
+	{ 0, offsetof(SkinnedVertex, tangent), D3DDECLTYPE_UBYTE4N, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TANGENT, 0 },
+	{ 0, offsetof(SkinnedVertex, bones), D3DDECLTYPE_UBYTE4N, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_BLENDINDICES, 0 },
+	{ 0, offsetof(SkinnedVertex, weights), D3DDECLTYPE_UBYTE4N, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_BLENDWEIGHT, 0 },
+	D3DDECL_END(),
+};
 
 //----------------------------------------------------------------------------//
 // VertexBuffer
@@ -12,10 +51,8 @@ VertexBuffer::VertexBuffer(uint _size, BufferUsage _usage) :
 	m_size(_size),
 	m_handle(nullptr)
 {
-	HRESULT _r = gGraphicsDevice->CreateVertexBuffer(_size, _usage, 0, D3DPOOL_DEFAULT, &m_handle, nullptr);
+	HRESULT _r = gGraphicsDevice->CreateVertexBuffer(_size, _usage, 0, _usage == BU_Static ? D3DPOOL_MANAGED : D3DPOOL_DEFAULT, &m_handle, nullptr);
 	CHECK(_r >= 0, "Couldn't create vertex buffer");
-
-	//gGraphicsDevice->CreateIn
 }
 //----------------------------------------------------------------------------//
 VertexBuffer::~VertexBuffer(void)
@@ -33,6 +70,148 @@ void VertexBuffer::Write(const void* _data, uint _offset, uint _size)
 //----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
+// IndexBuffer
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+IndexBuffer::IndexBuffer(uint _size, IndexFormat _format, BufferUsage _usage) :
+	m_size(_size),
+	m_handle(nullptr)
+{
+	HRESULT _r = gGraphicsDevice->CreateIndexBuffer(_size, _usage, (D3DFORMAT)_format, _usage == BU_Static ? D3DPOOL_MANAGED : D3DPOOL_DEFAULT, &m_handle, nullptr);
+	CHECK(_r >= 0, "Couldn't create index buffer");
+}
+//----------------------------------------------------------------------------//
+IndexBuffer::~IndexBuffer(void)
+{
+	m_handle->Release();
+}
+//----------------------------------------------------------------------------//
+void IndexBuffer::Write(const void* _data, uint _offset, uint _size)
+{
+	void* _dst = nullptr;
+	m_handle->Lock(_offset, _size, &_dst, D3DLOCK_DISCARD);
+	memcpy(_dst, _data, _size);
+	m_handle->Unlock();
+}
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+// Texture
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+Texture::Texture(TextureType _type, TextureFormat _format, TextureUsage _usage) :
+	m_type(_type),
+	m_usage(_usage),
+	m_format(_format),
+	m_size(0),
+	m_depth(0),
+	m_lods(0),
+	m_desiredLods(0),
+	m_handle(nullptr)
+{
+}
+//----------------------------------------------------------------------------//
+Texture::~Texture(void)
+{
+	_Destroy();
+}
+//----------------------------------------------------------------------------//
+void Texture::SetSize(uint _width, uint _height, uint _depth, uint _lods)
+{
+	m_size.Set(_width, _height);
+	m_depth = _depth;
+	m_desiredLods = _lods;
+	_Create();
+}
+//----------------------------------------------------------------------------//
+void Texture::SetData(const void* _data)
+{
+	ASSERT(m_handle != nullptr);
+	ASSERT(_data != nullptr);
+
+	uint _bpp = 32;
+	if (m_format == TF_DXT1)
+		_bpp = 4;
+	else if (m_format == TF_DXT5)
+		_bpp = 8;
+	if (m_type == TT_2D || m_type == TT_2DMultisample)
+	{
+		D3DLOCKED_RECT _dst;
+		RECT _rect;
+		_rect.left = 0;
+		_rect.right = m_size.x;
+		_rect.top = 0;
+		_rect.bottom = m_size.y;
+			
+		m_texture2d->LockRect(0, &_dst, &_rect, D3DLOCK_DISCARD);
+
+		if (m_format == TF_RGBA8)
+		{
+			const uint32* _srcp = (const uint32*)_data;
+			uint32* _dstp = (uint32*)_dst.pBits;
+			uint32* _dste = _dstp + m_size.x * m_size.y;
+			uint32 _color;
+			while (_dstp < _dste)
+			{
+				_color = *_srcp++;
+				*_dstp++ = (_color >> 8) | (_color << 24); // rgba --> argb
+			}
+		}
+		else
+			memcpy(_dst.pBits, _data, (m_size.x * m_size.y * _bpp) >> 3);
+
+		m_texture2d->UnlockRect(0);
+	}
+}
+//----------------------------------------------------------------------------//
+void Texture::GenerateLods(void)
+{
+	m_handle->GenerateMipSubLevels();
+}
+//----------------------------------------------------------------------------//
+void Texture::_Create(void)
+{
+	_Destroy();
+
+	D3DFORMAT _format = (D3DFORMAT)m_format;
+	D3DPOOL _pool = m_usage == TU_Default ? D3DPOOL_MANAGED : D3DPOOL_DEFAULT;
+	uint _usage = m_usage;
+	if (m_format == TF_D24S8)
+		_usage |= D3DUSAGE_DEPTHSTENCIL;
+
+	uint _lods = 1;
+	for (int i = Max(m_size.x, m_size.y); i > 0; i >>= 1)
+		++_lods;
+	//_lods = Log2i(Max(m_size.x, m_size.y));
+	if (m_desiredLods == 0 || m_lods > _lods)
+		m_lods = _lods;
+	switch (m_type)
+	{
+	case TT_2D:
+	case TT_2DMultisample:
+		gGraphicsDevice->CreateTexture(m_size.x, m_size.y, m_lods, _usage, _format, _pool, &m_texture2d, nullptr);
+		break;
+
+	default:
+		break;
+	}
+
+	if (!m_handle)
+		Fatal("Couldn't create texture");
+}
+//----------------------------------------------------------------------------//
+void Texture::_Destroy(void)
+{
+	if (m_handle)
+		m_handle->Release();
+	//if (m_target)
+	//	m_target->Release();
+}
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
 // Graphics
 //----------------------------------------------------------------------------//
 
@@ -40,6 +219,12 @@ void VertexBuffer::Write(const void* _data, uint _offset, uint _size)
 Graphics::Graphics(void)
 {
 	LOG("Create Graphics");
+
+#ifdef _DEBUG
+	memset(m_vertexFormats, 0, sizeof(m_vertexFormats));
+	memset(m_vertexShaders, 0, sizeof(m_vertexShaders));
+	memset(m_pixelShaders, 0, sizeof(m_pixelShaders));
+#endif
 
 	ASSERT(gWindow != nullptr); // the window must be created before it
 
@@ -60,39 +245,53 @@ Graphics::Graphics(void)
 	{	 
 		DLOG("Create vertex declarations");
 
-		D3DVERTEXELEMENT9 _elems[7];
-		D3DVERTEXELEMENT9 _pos = { 0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0 }; // Vec3 position
-		D3DVERTEXELEMENT9 _tc = { 0, sizeof(Vec3), D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0 }; // Vec2 texcoord
-		D3DVERTEXELEMENT9 _end = D3DDECL_END();
-
-		memset(m_vertexTypes, 0, sizeof(m_vertexTypes));
-
-		// Vertex
-		_elems[0] = _pos;
-		_elems[1] = _end;
-		_r = m_device->CreateVertexDeclaration(_elems, &m_vertexTypes[VF_Base]);
+		_r = m_device->CreateVertexDeclaration(VF_Base_Desc, &m_vertexFormats[VF_Base]);
 		CHECK(_r >= 0, "Couldn't create vertex declaration");
-
-		// SimpleVertex
-		_elems[1] = _tc;
-		_elems[2] = { 0, offsetof(SimpleVertex, color), D3DDECLTYPE_UBYTE4N, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR, 0 };
-		_elems[3] = _end;
-		_r = m_device->CreateVertexDeclaration(_elems, &m_vertexTypes[VF_Simple]);
+		_r = m_device->CreateVertexDeclaration(VF_Simple_Desc, &m_vertexFormats[VF_Simple]);
 		CHECK(_r >= 0, "Couldn't create vertex declaration");
-
-		// StaticVertex
-		_elems[2] = { 0, offsetof(StaticVertex, normal), D3DDECLTYPE_UBYTE4N, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_NORMAL, 0 };
-		_elems[3] = { 0, offsetof(StaticVertex, tangent), D3DDECLTYPE_UBYTE4N, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TANGENT, 0 };
-		_elems[4] = _end;
-		_r = m_device->CreateVertexDeclaration(_elems, &m_vertexTypes[VF_Static]);
+		_r = m_device->CreateVertexDeclaration(VF_Static_Desc, &m_vertexFormats[VF_Static]);
 		CHECK(_r >= 0, "Couldn't create vertex declaration");
-
-		// SkinnedVertex
-		_elems[4] = { 0, offsetof(SkinnedVertex, bones), D3DDECLTYPE_UBYTE4N, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_BLENDINDICES, 0 };
-		_elems[5] = { 0, offsetof(SkinnedVertex, weights), D3DDECLTYPE_UBYTE4N, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_BLENDWEIGHT, 0 };
-		_elems[6] = _end;
-		_r = m_device->CreateVertexDeclaration(_elems, &m_vertexTypes[VF_Skinned]);
+		_r = m_device->CreateVertexDeclaration(VF_Skinned_Desc, &m_vertexFormats[VF_Skinned]);
 		CHECK(_r >= 0, "Couldn't create vertex declaration");
+	}
+}
+//----------------------------------------------------------------------------//
+Graphics::~Graphics(void)
+{
+	LOG("Destroy Graphics");
+}
+//----------------------------------------------------------------------------//
+void Graphics::LoadVertexShaders(const char** _assets)
+{
+	ASSERT(m_vertexShaders[0] == nullptr);
+
+	for (uint i = 0; *_assets; ++i)
+	{
+		ASSERT(i < MAX_VERTEX_SHADERS);
+
+		const char* _name = *_assets++;
+		LOG("Load VertexShader \"%s\"", _name);
+
+		RawData _bytecode = LoadFile(_name);
+		HRESULT _r = gGraphicsDevice->CreateVertexShader((const DWORD*)*_bytecode, m_vertexShaders + i);
+		CHECK(_r >= 0, "Couldn't create VertexShader");
+	}
+}
+//----------------------------------------------------------------------------//
+void Graphics::LoadPixelShaders(const char** _assets)
+{
+	ASSERT(m_pixelShaders[0] == nullptr);
+
+	for (uint i = 0; *_assets; ++i)
+	{
+		ASSERT(i < MAX_PIXEL_SHADERS);
+
+		const char* _name = *_assets++;
+		LOG("Load PixelShader \"%s\"", _name);
+
+		RawData _bytecode = LoadFile(_name);
+		HRESULT _r = gGraphicsDevice->CreatePixelShader((const DWORD*)*_bytecode, m_pixelShaders + i);
+		CHECK(_r >= 0, "Couldn't create PixelShader");
 	}
 }
 //----------------------------------------------------------------------------//
@@ -110,6 +309,35 @@ void Graphics::EndFrame(void)
 void Graphics::ClearFrameBuffers(uint _buffers, const Color& _color, float _depth, uint _stencil)
 {
 	m_device->Clear(0, nullptr, _buffers, _color.Argb(), _depth, _stencil);
+}
+//----------------------------------------------------------------------------//
+void Graphics::SetVertexFormat(VertexFormat _format)
+{
+	m_device->SetVertexDeclaration(m_vertexFormats[_format]);
+}
+//----------------------------------------------------------------------------//
+void Graphics::SetVertexBuffer(VertexBuffer* _buffer, uint _offset, uint _stride)
+{
+	ASSERT(_buffer != nullptr);
+	ASSERT(_offset < _buffer->Size());
+
+	m_device->SetStreamSource( 0, _buffer->Handle(), _offset, _stride);
+}
+//----------------------------------------------------------------------------//
+void Graphics::SetVertexShader(uint _id)
+{
+	ASSERT(_id < MAX_VERTEX_SHADERS);
+	ASSERT(m_vertexShaders[_id] != nullptr);
+
+	m_device->SetVertexShader(m_vertexShaders[_id]);
+}
+//----------------------------------------------------------------------------//
+void Graphics::SetPixelShader(uint _id)
+{
+	ASSERT(_id < MAX_PIXEL_SHADERS);
+	ASSERT(m_pixelShaders[_id] != nullptr);
+
+	m_device->SetPixelShader(m_pixelShaders[_id]);
 }
 //----------------------------------------------------------------------------//
 

@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef _MSC_VER
+//#	pragma warning(disable : 4996) // The POSIX name
+#endif
+
 #include <stdint.h>
 #include <stdio.h>
 #include <stddef.h>
@@ -55,7 +59,6 @@ typedef unsigned int uint;
 #	define LOG(msg, ...) {}
 #endif
 
-void InitLog(void);
 void LogMsg(const char* _msg, ...);
 void Fatal(const char* _error);
 
@@ -91,6 +94,32 @@ void operator delete[](void* _p) { if (_p) free(_p); }
 #endif // NDEBUG
 
 #endif // USE_CRT
+
+//----------------------------------------------------------------------------//
+// Hash
+//----------------------------------------------------------------------------//
+
+uint Hash(const void* _data, uint _size, uint _hash = 0)
+{
+	for (uint i = 0; i < _size; ++i)
+		_hash = ((const uint8*)_data)[i] + (_hash << 6) + (_hash << 16) - _hash;
+	return _hash;
+}
+
+uint StrHash(const char* _str, uint _hash = 0)
+{
+	if (_str)
+	{
+		while (*_str)
+			_hash = *_str++ + (_hash << 6) + (_hash << 16) - _hash;
+	}
+	return _hash;
+}
+
+/*constexpr uint ConstHash(const char* _str, uint _hash = 0)
+{
+return *_str ? ConstHash(_str + 1, *_str + (_hash << 6) + (_hash << 16) - _hash) : _hash;
+} */
 
 //----------------------------------------------------------------------------//
 // Rvalue
@@ -190,12 +219,12 @@ public:
 	T& Top(void)
 	{
 		ASSERT(m_used > 0);
-		return m_data + m_used - 1;
+		return m_data[m_used - 1];
 	}
 	const T& Top(void) const
 	{
 		ASSERT(m_used > 0);
-		return m_data + m_used - 1;
+		return m_data[m_used - 1];
 	}
 	uint Size(void) const
 	{
@@ -236,7 +265,7 @@ public:
 		m_used = _newUsed;
 		return *this;
 	}
-	Array& Pop(uint _count)
+	Array& Pop(uint _count = 1)
 	{
 		if (_count > m_used)
 			_count = m_used;
@@ -285,46 +314,6 @@ protected:
 	uint m_used = 0;
 	uint m_size = 0;
 };
-
-//----------------------------------------------------------------------------//
-// NonCopyable
-//----------------------------------------------------------------------------//
-
-class NonCopyable
-{
-public:
-	NonCopyable(void) { }
-	~NonCopyable(void) { }
-
-private:
-	NonCopyable(const NonCopyable&) = delete;
-	NonCopyable& operator = (const NonCopyable&) = delete;
-};
-
-//----------------------------------------------------------------------------//
-// Singleton
-//----------------------------------------------------------------------------//
-
-template <class T> class Singleton : public NonCopyable
-{
-public:
-
-	Singleton(void)
-	{
-		ASSERT(s_instance == nullptr);
-		s_instance = static_cast<T*>(this);
-	}
-	~Singleton(void)
-	{
-		s_instance = nullptr;
-	}
-	static T* Get(void) { return s_instance; }
-
-protected:
-	static T* s_instance;
-};
-
-template <class T> T* Singleton<T>::s_instance = nullptr;
 
 //----------------------------------------------------------------------------//
 // 

@@ -209,7 +209,13 @@
     <None Include="Assets.inc" />
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="Shaders\TestShader.hlsl" />
+    <FxCompile Include="Shaders\Test-PS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="Shaders\Test-VS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Shaders\Constants.h" />

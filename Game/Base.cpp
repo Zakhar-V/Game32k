@@ -10,13 +10,6 @@ FILE* g_log = nullptr;
 #endif
 
 //----------------------------------------------------------------------------//
-void InitLog(void)
-{
-#if USE_LOG	& 0x2
-	g_log = fopen("log.txt", "w");
-#endif
-}
-//----------------------------------------------------------------------------//
 void LogMsg(const char* _msg, ...)
 {
 #if USE_LOG
@@ -24,9 +17,16 @@ void LogMsg(const char* _msg, ...)
 	va_start(_args, _msg);
 
 #	if USE_LOG & 0x2
-	vfprintf(g_log, _msg, _args);
-	fwrite("\n", 1, 1, g_log);
-	fflush(g_log);
+	if(!g_log)
+		g_log = fopen("log.txt", "w");
+	if (g_log)
+	{
+		vfprintf(g_log, _msg, _args);
+		fwrite("\n", 1, 1, g_log);
+		fflush(g_log);
+	}
+	else
+		MessageBox(0, "Couldn't create log.txt", "Warning", MB_OK | MB_ICONWARNING | MB_APPLMODAL | MB_TOPMOST);
 #	endif
 
 #	if (USE_LOG & 0x1) && defined(_DEBUG)

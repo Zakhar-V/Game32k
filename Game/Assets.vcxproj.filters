@@ -23,7 +23,10 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="Shaders\TestShader.hlsl">
+    <FxCompile Include="Shaders\Test-PS.hlsl">
+      <Filter>Assets\Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\Test-VS.hlsl">
       <Filter>Assets\Shaders</Filter>
     </FxCompile>
   </ItemGroup>

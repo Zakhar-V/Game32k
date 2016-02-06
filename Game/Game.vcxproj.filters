@@ -4,9 +4,6 @@
     <ClCompile Include="GameMain.cpp">
       <Filter>Game</Filter>
     </ClCompile>
-    <ClCompile Include="OpenGL.cpp">
-      <Filter>Engine</Filter>
-    </ClCompile>
     <ClCompile Include="Base.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
@@ -14,6 +11,15 @@
       <Filter>Engine</Filter>
     </ClCompile>
     <ClCompile Include="Graphics.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="File.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
     <ClCompile Include="BuiltinData.cpp">
@@ -38,9 +44,6 @@
     <ClInclude Include="Game.h">
       <Filter>Game</Filter>
     </ClInclude>
-    <ClInclude Include="OpenGL.hpp">
-      <Filter>Engine</Filter>
-    </ClInclude>
     <ClInclude Include="Base.hpp">
       <Filter>Engine</Filter>
     </ClInclude>
@@ -55,6 +58,27 @@
     </ClInclude>
     <ClInclude Include="_temp.hpp">
       <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="File.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="Collision.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="Object.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="Geometry.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="BuiltinData.hpp">
+      <Filter>Assets</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

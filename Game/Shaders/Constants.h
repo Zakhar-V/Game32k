@@ -11,10 +11,20 @@
 #	define CBUFFER(Name, Index) cbuffer Name : register(c[Index])
 #endif
 
+#define SC_CameraVS 0
+#define SC_ObjectVS 4
 
-CBUFFER(PerFrame, 0)
+CBUFFER(CameraParamsVS, SC_CameraVS)
 {
-	float4x4 WorldMat;
+};
+
+#ifdef HLSL
+uniform matrix<float, 4, 4> ViewProjMatrix : register(c0);
+#endif
+
+CBUFFER(ObjectParamsVS, SC_ObjectVS)
+{
+	float4x4 WorldMatrix;
 };
 
 #endif//__ShaderConstants_h__

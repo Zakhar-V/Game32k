@@ -4,9 +4,12 @@
 //----------------------------------------------------------------------------//
 
 #include "Base.cpp"
+#include "File.cpp"
 #include "Window.cpp"
 #include "Graphics.cpp"
+#include "Renderer.cpp"
 #include "BuiltinData.cpp"
+#include "Scene.cpp"
 
 //----------------------------------------------------------------------------//
 //
@@ -18,64 +21,115 @@
 //----------------------------------------------------------------------------//
 ////////////////////////////////////////////////////////////////////////////////
 
+
+
+
 //----------------------------------------------------------------------------//
 //
 //----------------------------------------------------------------------------//
 
-class RefCounted : public NonCopyable
+class String
 {
 public:
-	virtual ~RefCounted(void) { }
-	void AddRef(void) const { ++m_refCount; }
-	void Release(void) const { if (!--m_refCount) delete this; }
 
 protected:
-	mutable int m_refCount = 0;
-};
-template <class T> class Ptr
-{
-public:
-	Ptr(void) : p(nullptr) { }
-	Ptr(const T* _p) : p(const_cast<T*>(_p)) { if (p) p->AddRef(); }
-	Ptr(const Ptr& _p) : Ptr(_p.p) {}
-	Ptr& operator = (const T* _p) { if (_p) _p->AddRef(); if (p) p->Release(); p = const_cast<T*>(_p); return *this; }
-	Ptr& operator = (const Ptr& _p) { return *this = _p.p; }
-	operator T* (void) const { return const_cast<T*>(p); }
-	T* operator & (void) const { return const_cast<T*>(p); }
-	T* operator -> (void) const { return const_cast<T*>(p); }
-	T& operator * (void) const { return *const_cast<T*>(p); }
 
-private:
-	T* p;
-};
-
-//----------------------------------------------------------------------------//
-//
-//----------------------------------------------------------------------------//
-
-typedef Array<uint8> DataBuffer;
-
-DataBuffer LoadFile(const char* _name)
-{
-	FILE* _file = fopen(_name, "rb");
-	Array<uint8> _buff;
-	if (_file)
+	struct Buffer
 	{
-		fseek(_file, 0, SEEK_END);
-		uint _size = (uint)ftell(_file);
-		fseek(_file, 0, SEEK_SET);
-		_buff.Resize(_size);
-		fread(*_buff, 1, _size, _file);
-		fclose(_file);
-	}
-	else
-		LOG("Couldn't open file \"%s\"", _name);
-	return Move(_buff);
-}
+		uint length = 0;
+		uint size = 1;
+		int refs = 1;
+		//char str[1] = { 0 };
+	};
+
+	static Buffer s_null;
+};
+
+String::Buffer String::s_null;
 
 //----------------------------------------------------------------------------//
 //
 //----------------------------------------------------------------------------//
+
+template <class F> void* FuncPtr(F _func) { union { F f; void* p; }_fp = { _func }; return _fp.p; }
+template <class F> F FuncCast(void* _func) { union { void* p; F f; }_fp = { _func }; return _fp.f; }
+/*
+	template <class F> struct Function;
+	template <class R, class... A> struct Function<R(A...)>
+	{
+		// TODO: calling convention
+		typedef R(*Invoke)(void*, void*, A&&...);
+
+		typedef R(*Ptr)(A...);
+		typedef R(Type)(A...);
+
+		Invoke invoke;
+		void* func;
+		void* self;
+
+		Function(void) : invoke(nullptr), func(nullptr), self(nullptr) { }
+		Function(R(*_func)(A...)) : invoke(InvokeFunc), func(FuncPtr(_func)), self(nullptr) { }
+		template <class C> Function(C* _self, R(C::*_func)(A...)) : invoke(InvokeMethod<C>), func(FuncPtr(_func)), self(_self) { ASSERT(_self != nullptr); }
+		template <class C> Function(const C* _self, R(C::*_func)(A...) const) : invoke(InvokeConstMethod<C>), func(FuncPtr(_func)), self(const_cast<C*>(_self)) { ASSERT(_self != nullptr); }
+		operator bool(void) const { return func != nullptr; }
+
+		R operator () (A... _args) const
+		{
+			ASSERT(func != nullptr);
+			return invoke(self, func, Forward<A>(_args)...);
+		}
+
+		static R InvokeFunc(void* _self, void* _func, A&&... _args)
+		{
+			typedef R(*Func)(A...);
+			return FuncCast<Func>(_func)(Forward<A>(_args)...);
+		}
+
+		template <class C> static R InvokeMethod(void* _self, void* _func, A&&... _args)
+		{
+			ASSERT(_self != nullptr);
+			typedef R(C::*Func)(A...);
+			return (*((C*)_self).*FuncCast<Func>(_func))(Move(_args)...);
+		}
+
+		template <class C> static R InvokeConstMethod(void* _self, void* _func, A&&... _args)
+		{
+			ASSERT(_self != nullptr);
+			typedef R(C::*Func)(A...) const;
+			return (*((const C*)_self).*FuncCast<Func>(_func))(Move(_args)...);
+		}
+	};
+
+	template <class R, class... A> Function<R(A...)> MakeFunction(R(*_func)(A...))
+	{
+		return Function<R(A...)>(_func);
+	}
+	template <class C, class R, class... A> Function<R(A...)> MakeFunction(C* _self, R(C::*_func)(A...))
+	{
+		return Function<R(A...)>(_self, _func);
+	}
+	template <class C, class R, class... A> Function<R(A...)> MakeFunction(const C* _self, R(C::*_func)(A...) const)
+	{
+		return Function<R(A...)>(_self, _func);
+	}
+
+*/
+
+//----------------------------------------------------------------------------//
+//
+//----------------------------------------------------------------------------//
+
+#define PRINT_SIZEOF(T) LOG("sizeof(%s) = %d", #T, sizeof(T))
+
+//----------------------------------------------------------------------------//
+//
+//----------------------------------------------------------------------------//
+
+
+//----------------------------------------------------------------------------//
+//
+//----------------------------------------------------------------------------//
+
 
 ////////////////////////////////////////////////////////////////////////////////
 //----------------------------------------------------------------------------//
@@ -85,28 +139,61 @@ DataBuffer LoadFile(const char* _name)
 
 void main(void)
 {
-	InitLog();
-
-	uint _hash = 0;
-	for (uint i = 0; i < sizeof(g_builtinData); ++i)
+	LOG("Startup ...");
+	LOG("Build %s", __DATE__);
+	CreateDirectory("Data", nullptr);
+	SetCurrentDirectory("Data");
+	bool _bdOutOfDate = ExtractBuiltinData();
+	if (_bdOutOfDate)
 	{
-		_hash = g_builtinData[i] + (_hash << 6) + (_hash << 16) - _hash;
+		LOG("Generate resources ...");
 	}
-	LOG("size = %d, hash = 0x%08x", sizeof(g_builtinData), _hash);
 
-	//DataBuffer _db = LoadFile("GameData.pack");
+	PRINT_SIZEOF(Node);
+	LOG("1KK nodes = %d mb", (sizeof(Node) * 1000000) / 1024 / 1024);
 
 	{
 		const Color _clearColor(0x7f7f9fff);
 		Window _window;
-		Graphics _graphics;
-		while (!gWindow->ShouldClose())
+		Graphics _graphics;	  
+		Renderer _renderer;
 		{
-			gWindow->PollEvents();
-			gGraphics->BeginFrame();
-			gGraphics->ClearFrameBuffers(FBT_Color, _clearColor);
-			gGraphics->EndFrame();
-		} 
+			VertexBuffer _vb(3 * sizeof(SimpleVertex));
+
+			SimpleVertex _vd[3] =  // xyz, tc, argb
+			{
+				{ Vec3(150.0f,  50.0f, 0.5f), Vec2(0.5f, 1.0f), 0xff0000ff, }, // t
+				{ Vec3(250.0f, 250.0f, 0.5f), Vec2(1.0f,0.0f), 0x00ff00ff, },  // r
+				{ Vec3(50.0f, 250.0f, 0.5f), Vec2(0.0f, 0.0f), 0x0000ffff, },  // l
+			};
+			_vb.Write(_vd, 0, sizeof(_vd));
+
+			Mat44 _worldMatrix;
+			_worldMatrix.SetIdentity() ;
+
+			Mat44 _viewProjMatrix;
+
+			while (!gWindow->ShouldClose())
+			{
+				gWindow->PollEvents();
+
+				Vec2i _size = gWindow->Size();
+				_viewProjMatrix.CreateOrtho2D(_size.x, _size.y);
+				_viewProjMatrix.Inverse().Inverse() ;
+				 
+				gGraphics->BeginFrame();
+				gGraphics->ClearFrameBuffers(FBT_Color, _clearColor);
+				gGraphics->SetVertexShader(0);
+				gGraphics->SetPixelShader(0);
+				gGraphics->SetVertexFormat(VF_Simple);
+				gGraphics->SetVertexBuffer(&_vb, 0, sizeof(SimpleVertex));
+
+				gGraphicsDevice->SetVertexShaderConstantF(0, _viewProjMatrix.v, 4);
+
+				gGraphicsDevice->DrawPrimitive(D3DPT_TRIANGLELIST, 0, 1);
+				gGraphics->EndFrame();
+			}
+		}
 	}
 
 #ifdef DEBUG
