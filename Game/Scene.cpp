@@ -7,14 +7,29 @@
 //----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
-Node::Node(Scene* _scene)
+Node::Node(void) :
+	m_scene(nullptr),
+	m_entity(nullptr),
+	m_layer(0),
+	m_group(0),
+	m_id(0),
+	m_parent(nullptr),
+	m_prev(nullptr),
+	m_next(nullptr),
+	m_child(nullptr),
+	m_position(VEC3_ZERO),
+	m_rotation(QUAT_IDENTITY),
+	m_scale(VEC3_ONE),
+	m_matrix(MAT44_IDENTITY),
+	m_physics(nullptr),
+	m_dbvtNode(nullptr)
 {
-
 }
 //----------------------------------------------------------------------------//
 Node::~Node(void)
 {
-
+	DetachAllChildren(true);
+	// TODO: remove physics, dbvt ... ?
 }
 //----------------------------------------------------------------------------//
 void Node::SetParent(Node* _parent)
@@ -23,27 +38,98 @@ void Node::SetParent(Node* _parent)
 	if (m_parent == _parent)
 		return;
 
+	if (!_parent && !m_scene)
+		AddRef();
+
 	if (m_parent)
 	{
+		_OnChangeParent(nullptr);
 		_Unlink(m_parent->m_child);
 	}
-	else
+	else if(m_scene)
 	{
-		// ...
+		_Unlink(m_scene->_Root());
 	}
 
-	// _UpdateWorldTM();
+	//TODO: update world TM
+
 	m_parent = _parent;
-	// _UpdateLocalTM();
 
 	if (m_parent)
 	{
 		_Link(m_parent->m_child);
+		_OnChangeParent(_parent);
+
+		if (m_parent->m_scene && m_parent->m_scene != m_scene)
+			_SetScene(m_parent->m_scene);
 	}
-	else
+	else if(m_scene)
 	{
-		// ...
+		_Link(m_scene->_Root());
 	}
+
+	if (!_parent && !m_scene)
+		Release();
+}
+//----------------------------------------------------------------------------//
+void Node::DetachAllChildren(bool _remove)
+{
+	for (Node *n, *i = m_child; i;)
+	{
+		n = i;
+		i = i->m_next;
+		if (_remove && !i->m_entity)
+			n->RemoveThis();
+		else
+			n->SetParent(nullptr);
+	}
+}
+//----------------------------------------------------------------------------//
+void Node::RemoveThis(void)
+{
+	NodePtr _addref(this);
+	SetParent(nullptr);
+	_SetScene(nullptr);
+}
+//----------------------------------------------------------------------------//
+void Node::_SetScene(Scene* _scene)
+{
+	if (!m_parent && !_scene)
+		AddRef();
+
+	Scene* _oldScene = m_scene;
+
+	if (m_scene != _scene)
+	{
+		if (m_scene)
+		{
+			_OnChangeScene(nullptr);
+
+			if (!m_parent)
+				_Unlink(m_scene->_Root());
+		}
+
+		m_scene = _scene;
+
+		if (m_scene)
+		{
+			if (!m_parent)
+				_Link(m_scene->_Root());
+
+			_OnChangeScene(m_scene);
+		}
+	}
+
+	if (_oldScene != m_scene || _scene == nullptr)
+	{
+		for (Node* i = m_child; i; i = i->m_next)
+		{
+			i->_SetScene(m_scene);
+		}
+	}
+
+	if (!m_parent && !_scene)
+		Release();
 }
 //----------------------------------------------------------------------------//
 void Node::_Link(Node*& _list)
@@ -91,6 +177,17 @@ void Node::_UpdateWorldTM(void)
 // Scene
 //----------------------------------------------------------------------------//
 
+//----------------------------------------------------------------------------//
+void Scene::AddNode(Node* _node)
+{
+	//if(!_node || !_node->m_scene)
+
+}
+//----------------------------------------------------------------------------//
+void Scene::RemoveNode(Node* _node)
+{
+
+}
 //----------------------------------------------------------------------------//
 uint Scene::_RegisterNode(Node* _node)
 {

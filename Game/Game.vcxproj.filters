@@ -7,9 +7,6 @@
     <ClCompile Include="Base.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
-    <ClCompile Include="Window.cpp">
-      <Filter>Engine</Filter>
-    </ClCompile>
     <ClCompile Include="Graphics.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
@@ -26,6 +23,9 @@
       <Filter>Assets</Filter>
     </ClCompile>
     <ClCompile Include="Image.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="Device.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
   </ItemGroup>
@@ -56,9 +56,6 @@
     <ClInclude Include="Math.hpp">
       <Filter>Engine</Filter>
     </ClInclude>
-    <ClInclude Include="Window.hpp">
-      <Filter>Engine</Filter>
-    </ClInclude>
     <ClInclude Include="_temp.hpp">
       <Filter>Engine</Filter>
     </ClInclude>
@@ -84,6 +81,9 @@
       <Filter>Assets</Filter>
     </ClInclude>
     <ClInclude Include="Image.hpp">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="Device.hpp">
       <Filter>Engine</Filter>
     </ClInclude>
   </ItemGroup>

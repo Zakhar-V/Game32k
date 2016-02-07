@@ -5,7 +5,7 @@
 
 #include "Base.cpp"
 #include "File.cpp"
-#include "Window.cpp"
+#include "Device.cpp"
 #include "Graphics.cpp"
 #include "Renderer.cpp"
 #include "BuiltinData.cpp"
@@ -170,9 +170,10 @@ void main(void)
 	PRINT_SIZEOF(Node);
 	LOG("1KK nodes = %d mb", (sizeof(Node) * 1000000) / 1024 / 1024);
 
+
 	{
 		const Color _clearColor(0x7f7f9fff);
-		Window _window;
+		Device _device;
 		Graphics _graphics;	  
 		Renderer _renderer;
 		{
@@ -189,9 +190,13 @@ void main(void)
 			
 			Texture _tex(TT_2D, PF_RGBA8);
 			FontInfo _fi;
-			ImagePtr _fnt = CreateBitmapFont(_fi, "Courier New TT", 32, 0.5f);
-			_tex.SetSize(_fnt->Size().x, _fnt->Size().y);
-			_tex.SetData(_fnt->Pixels());
+			//ImagePtr _img = CreateBitmapFont(_fi, "Courier New TT", 32, 0.5f);
+			ImagePtr _img = new Image;
+			//_img->CreateBitmapFont(_fi, "Courier New TT", 32, 0.5f);
+			//_img->CreateNoize(512, 0);
+			_img->CreatePerlin(256, 0.03f, 0, 777, 2);
+			_tex.SetSize(_img->Width(), _img->Height());
+			_tex.SetData(_img->RawData());
 			_tex.GenerateLods();
 
 			VertexBuffer _vb(4 * sizeof(SimpleVertex));
@@ -234,13 +239,13 @@ void main(void)
 
 			Mat44 _viewProjMatrix;
 
-			while (!gWindow->ShouldClose())
+			while (!gDevice->ShouldClose())
 			{
-				gWindow->PollEvents();
+				gDevice->PollEvents();
 
-				Vec2i _size = gWindow->Size();
+				Vec2 _size = gDevice->WindowSize();
 				_viewProjMatrix.CreateOrtho2D(_size.x, _size.y);
-				_viewProjMatrix.Inverse().Inverse();
+				//_viewProjMatrix.Inverse().Inverse();
 				 
 				gGraphics->BeginFrame();
 				gGraphics->ClearFrameBuffers(FBT_Color, _clearColor);

@@ -81,12 +81,22 @@ class Node : public Object
 {
 public:
 
-	Node(Scene* _scene);
+	Node(void);
 	~Node(void);
 
+	Scene* GetScene(void) { return m_scene; }
 	void SetParent(Node* _parent);
+	void DetachAllChildren(bool _remove = false);
+	void RemoveThis(void);
 
 protected:
+
+	void _SetScene(Scene* _scene);
+
+	virtual void _OnChangeScene(Scene* _scene) { }
+	virtual void _OnChangeParent(Node* _node) { }
+	virtual void _Register(void) { }
+	virtual void _Unregister(void) { }
 
 	void _Link(Node*& _list);
 	void _Unlink(Node*& _list);
@@ -94,6 +104,7 @@ protected:
 	void _UpdateWorldTM(void);
 
 	Scene* m_scene;
+	Entity* m_entity;
 	uint16 m_layer;
 	uint16 m_group;
 	uint m_id;
@@ -110,11 +121,22 @@ protected:
 
 	PhysicsEntity* m_physics;
 	DbvTreeNode* m_dbvtNode;
+
+	//bool m_removeAllChildrenWhenDestroy : 1; // default is true
 };
 
 //----------------------------------------------------------------------------//
 // 
 //----------------------------------------------------------------------------//
+
+class TerrainNode : public Node
+{
+public:
+
+protected:
+
+
+};
 
 //----------------------------------------------------------------------------//
 // 
@@ -124,12 +146,19 @@ class Scene : public NonCopyable
 {
 public:
 
+	void AddNode(Node* _node);
+	void RemoveNode(Node* _node);
+
 protected:
 
 	friend class Node;
 
+	Node*& _Root(void) { return m_rootNodes; }
+
 	uint _RegisterNode(Node* _node);
 	void _UnregisterNode(Node* _node);
+
+	Node* m_rootNodes;
 
 	Array<Node*> m_nodes;
 	Array<uint> m_freeIds;

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Graphics.hpp"
-#include "Window.hpp"
+#include "Device.hpp"
 #include "File.hpp"
 
 //----------------------------------------------------------------------------//
@@ -153,10 +153,8 @@ void Texture::SetData(const void* _data)
 			
 		m_texture2d->LockRect(0, &_dst, &_rect, D3DLOCK_DISCARD);
 
-		if (m_format == PF_RGBA8)
-			Image::RgbaToArgb(_dst.pBits, _data, m_size.x * m_size.y);
-		else if (m_format == PF_RGB8)
-			Image::RgbToXrgb(_dst.pBits, _data, m_size.x * m_size.y);
+		if (m_format == PF_RGBA8 || m_format == PF_RGBX8)
+			RgbaToArgb(_dst.pBits, _data, m_size.x * m_size.y);
 		else
 			memcpy(_dst.pBits, _data, (m_size.x * m_size.y * _bpp) >> 3);
 
@@ -226,7 +224,7 @@ Graphics::Graphics(void)
 	memset(m_pixelShaders, 0, sizeof(m_pixelShaders));
 #endif
 
-	ASSERT(gWindow != nullptr); // the window must be created before it
+	ASSERT(gDevice != nullptr); // the window must be created before it
 
 	m_d3d = Direct3DCreate9(D3D_SDK_VERSION);
 	if (!m_d3d)
@@ -238,7 +236,7 @@ Graphics::Graphics(void)
 	_pp.SwapEffect = D3DSWAPEFFECT_DISCARD;
 	_pp.BackBufferFormat = D3DFMT_UNKNOWN;
 
-	HRESULT _r = m_d3d->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, gWindow->Handle(), D3DCREATE_SOFTWARE_VERTEXPROCESSING, &_pp, &m_device);
+	HRESULT _r = m_d3d->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, gDevice->WindowHandle(), D3DCREATE_SOFTWARE_VERTEXPROCESSING, &_pp, &m_device);
 	_CHECK(_r >= 0, "Couldn't create IDirect3D9Device");
 
 	// create vertex types
@@ -261,15 +259,15 @@ Graphics::~Graphics(void)
 	LOG("Destroy Graphics");
 }
 //----------------------------------------------------------------------------//
-void Graphics::LoadVertexShaders(const char** _assets)
+void Graphics::LoadVertexShaders(const char** _names)
 {
 	ASSERT(m_vertexShaders[0] == nullptr);
 
-	for (uint i = 0; *_assets; ++i)
+	for (uint i = 0; *_names; ++i)
 	{
 		ASSERT(i < MAX_VERTEX_SHADERS);
 
-		const char* _name = *_assets++;
+		const char* _name = *_names++;
 		LOG("Load VertexShader \"%s\"", _name);
 
 		RawData _bytecode = LoadFile(_name);
@@ -278,15 +276,15 @@ void Graphics::LoadVertexShaders(const char** _assets)
 	}
 }
 //----------------------------------------------------------------------------//
-void Graphics::LoadPixelShaders(const char** _assets)
+void Graphics::LoadPixelShaders(const char** _names)
 {
 	ASSERT(m_pixelShaders[0] == nullptr);
 
-	for (uint i = 0; *_assets; ++i)
+	for (uint i = 0; *_names; ++i)
 	{
 		ASSERT(i < MAX_PIXEL_SHADERS);
 
-		const char* _name = *_assets++;
+		const char* _name = *_names++;
 		LOG("Load PixelShader \"%s\"", _name);
 
 		RawData _bytecode = LoadFile(_name);

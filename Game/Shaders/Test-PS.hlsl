@@ -9,7 +9,5 @@ sampler2D tex;
 
 float4 main(PS_INPUT _in) : COLOR
 {
-	//return _in.color.wzyx /* tex2D(tex, _in.tc * 4)*/;
-
-	return _in.color.wzyx * tex2D(tex, _in.tc);
+	return /*_in.color.wzyx */ tex2D(tex, _in.tc.xy).wzyx;
 }

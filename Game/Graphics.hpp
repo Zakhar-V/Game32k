@@ -208,8 +208,8 @@ public:
 	IDirect3D9* Direct3D(void) { return m_d3d; }
 	IDirect3DDevice9* Device(void) { return m_device; }
 
-	void LoadVertexShaders(const char** _assets);
-	void LoadPixelShaders(const char** _assets);
+	void LoadVertexShaders(const char** _names);
+	void LoadPixelShaders(const char** _names);
 
 	void BeginFrame(void);
 	void EndFrame(void);

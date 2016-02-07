@@ -3,6 +3,8 @@
 #include "Base.hpp"
 #include <math.h>
 
+//TODO: прибраться
+
 //----------------------------------------------------------------------------//
 // Constants
 //----------------------------------------------------------------------------//
@@ -33,6 +35,9 @@ inline float Abs(float _x) { return fabsf(_x); }
 float Radians(float _val) { return _val * RADIANS; }
 float Degrees(float _val) { return _val * DEGREES; }
 template <typename T> T Sqr(T _x) { return _x * _x; }
+
+// asm math partially ported from http://www.jbox.dk/sanos/source/lib/math/ 
+
 inline float Sqrt(float _x) 
 {
 #if USE_CRT_MATH
@@ -94,12 +99,129 @@ inline void SinCos(float _a, float& _s, float& _c)
 	_c = c;
 #endif
 }
-inline float Tan(float _x) { return tanf(_x); }
-inline float ASin(float _x) { return asinf(_x); }
-inline float ACos(float _x) { return acosf(_x); }
-inline float ATan2(float _y, float _x) { return atan2f(_y, _x); }
-//inline float Log2(float _x) { return log2(_x); }
-//inline int Log2i(int _x) { return (int)log2((float)_x); }
+inline float Tan(float _x)
+{ 
+#if USE_CRT_MATH
+	return tanf(_x);
+#else
+	float _r;
+	__asm fld _x
+	__asm fptan
+	__asm fstp _r
+	return _r;
+#endif
+}
+inline float ATan2(float _y, float _x) 
+{ 
+#if USE_CRT_MATH
+	return atan2f(_y, _x);
+#else
+	float _r;
+	__asm fld _y
+	__asm fld _x
+	__asm fpatan
+	__asm fstp _r
+	return _r;
+#endif
+}
+inline float ASin(float _x)
+{ 
+#if USE_CRT_MATH
+	return asinf(_x);
+#else
+	//return ATan2(_x, Sqrt(1 - _x * _x));
+	float _r;
+	__asm fld _x
+	__asm fld _x
+	__asm fmul st(0), st(0)
+	__asm fld1
+	__asm fsubr
+	__asm fsqrt
+	__asm fpatan
+	__asm fstp _r
+	return _r;
+#endif
+}
+inline float ACos(float _x) 
+{ 
+#if USE_CRT_MATH
+	return acosf(_x);
+#else
+	//return ATan2(Sqrt(1 - _x * _x), _x);
+	float _r;
+	__asm fld _x
+	__asm fmul st(0), st(0)
+	__asm fld1
+	__asm fsubr
+	__asm fsqrt
+	__asm fld _x
+	__asm fpatan
+	__asm fstp _r
+	return _r;
+#endif
+}
+inline float Log2(float _x)
+{ 
+#if USE_CRT_MATH
+	return log2(_x);
+#else
+	float _r;
+	__asm fldln2
+	__asm fld _x
+	__asm fyl2x
+	__asm fstp _r
+	return _r;
+#endif
+}
+
+inline int Log2i(int _x)
+{
+	return (int)Log2((float)_x);
+}
+
+float Floor(float _x)
+{
+#if USE_CRT_MATH
+	return floorf(_x);
+#else
+	float _r;
+	uint16 _ocw, _cw = 0x0763;
+	__asm fstcw _ocw
+	__asm fldcw _cw
+	__asm fld _x
+	__asm frndint
+	__asm fstp _r
+	__asm fldcw _ocw
+	return _r;
+#endif
+}
+
+float Ceil(float _x)
+{  
+#if USE_CRT_MATH
+	return ceilf(_x);
+#else
+	float _r;
+	uint16 _ocw, _cw = 0x0b63;
+	__asm fstcw _ocw
+	__asm fldcw _cw
+	__asm fld _x
+	__asm frndint
+	__asm fstp _r
+	__asm fldcw _ocw
+	return _r;
+#endif
+}
+
+float Wrap(float _x, float _l, float _u)
+{
+	float _y = _u - _l;
+	_x -= _u * floorf(_x / _u);
+	if (_x < _l)
+		_x = _l - _x;
+	return _x;
+}
+
 
 inline uint32_t FirstPow2(uint32_t _val)
 {
@@ -125,8 +247,13 @@ inline float HalfToFloat(uint16 _value)
 	return _fb.f;
 }
 
+inline float Cerp(float _a, float _b, float _t)
+{
+	return Mix(_a, _b, (1 - Cos(_t*PI))*0.5f);
+}
+
 //----------------------------------------------------------------------------//
-//
+// Vec2
 //----------------------------------------------------------------------------//
 
 struct Vec2
@@ -134,14 +261,35 @@ struct Vec2
 	Vec2(void) { }
 	Vec2(float _s) : x(_s), y(_s) { }
 	Vec2(float _x, float _y) : x(_x), y(_y) { }
+
+	Vec2 operator - (void) const { return Vec2(-x, -y); }
+	Vec2 operator + (const Vec2& _rhs) const { return Vec2(x + _rhs.x, y + _rhs.y); }
+	Vec2 operator - (const Vec2& _rhs) const { return Vec2(x - _rhs.x, y - _rhs.y); }
+	Vec2 operator * (const Vec2& _rhs) const { return Vec2(x * _rhs.x, y * _rhs.y); }
+	Vec2 operator / (const Vec2& _rhs) const { return Vec2(x / _rhs.x, y / _rhs.y); }
+	Vec2 operator * (float _rhs) const { return Vec2(x * _rhs, y * _rhs); }
+	Vec2 operator / (float _rhs) const { return Vec2(x / _rhs, y / _rhs); }
+	Vec2& operator += (const Vec2& _rhs) { x += _rhs.x, y += _rhs.y; return *this; }
+	Vec2& operator -= (const Vec2& _rhs) { x -= _rhs.x, y -= _rhs.y; return *this; }
+	Vec2& operator *= (const Vec2& _rhs) { x *= _rhs.x, y *= _rhs.y; return *this; }
+	Vec2& operator /= (const Vec2& _rhs) { x /= _rhs.x, y /= _rhs.y; return *this; }
+	Vec2& operator *= (float _rhs) { x *= _rhs, y *= _rhs; return *this; }
+	Vec2& operator /= (float _rhs) { x /= _rhs, y /= _rhs; return *this; }
+	friend Vec2 operator / (float _lhs, const Vec2& _rhs) { return Vec2(_lhs / _rhs.x, _lhs / _rhs.y); }
+	friend Vec2 operator * (float _lhs, const Vec2& _rhs) { return Vec2(_lhs * _rhs.x, _lhs * _rhs.y); }
+
+	bool operator == (const Vec2& _rhs) const { return x == _rhs.x && y == _rhs.y; }
+	bool operator != (const Vec2& _rhs) const { return x != _rhs.x || y != _rhs.y; }
+
 	Vec2& Set(const Vec2& _v) { return *this = _v; }
 	Vec2& Set(float _s) { x = _s, y = _s; return *this; }
 	Vec2& Set(float _x, float _y) { x = _x, y = _y; return *this; }
+
 	float x, y;
 };
 
 //----------------------------------------------------------------------------//
-//
+// Vec2i
 //----------------------------------------------------------------------------//
 
 struct Vec2i
@@ -151,6 +299,26 @@ struct Vec2i
 	Vec2i(int _x, int _y) : x(_x), y(_y) { }
 	Vec2i(const Vec2& _v) : x((int)_v.x), y((int)_v.y) { }
 	operator Vec2 (void) const { return Vec2((float)x, (float)y); }
+
+	Vec2i operator - (void) const { return Vec2i(-x, -y); }
+	Vec2i operator + (const Vec2i& _rhs) const { return Vec2i(x + _rhs.x, y + _rhs.y); }
+	Vec2i operator - (const Vec2i& _rhs) const { return Vec2i(x - _rhs.x, y - _rhs.y); }
+	Vec2i operator * (const Vec2i& _rhs) const { return Vec2i(x * _rhs.x, y * _rhs.y); }
+	Vec2i operator / (const Vec2i& _rhs) const { return Vec2i(x / _rhs.x, y / _rhs.y); }
+	Vec2i operator * (int _rhs) const { return Vec2i(x * _rhs, y * _rhs); }
+	Vec2i operator / (int _rhs) const { return Vec2i(x / _rhs, y / _rhs); }
+	Vec2i& operator += (const Vec2i& _rhs) { x += _rhs.x, y += _rhs.y; return *this; }
+	Vec2i& operator -= (const Vec2i& _rhs) { x -= _rhs.x, y -= _rhs.y; return *this; }
+	Vec2i& operator *= (const Vec2i& _rhs) { x *= _rhs.x, y *= _rhs.y; return *this; }
+	Vec2i& operator /= (const Vec2i& _rhs) { x /= _rhs.x, y /= _rhs.y; return *this; }
+	Vec2i& operator *= (int _rhs) { x *= _rhs, y *= _rhs; return *this; }
+	Vec2i& operator /= (int _rhs) { x /= _rhs, y /= _rhs; return *this; }
+	friend Vec2i operator / (int _lhs, const Vec2i& _rhs) { return Vec2i(_lhs / _rhs.x, _lhs / _rhs.y); }
+	friend Vec2i operator * (int _lhs, const Vec2i& _rhs) { return Vec2i(_lhs * _rhs.x, _lhs * _rhs.y); }
+
+	bool operator == (const Vec2i& _rhs) const { return x == _rhs.x && y == _rhs.y; }
+	bool operator != (const Vec2i& _rhs) const { return x != _rhs.x || y != _rhs.y; }
+
 	Vec2i& Set(const Vec2i& _v) { return *this = _v; }
 	Vec2i& Set(int _s) { x = _s, y = _s; return *this; }
 	Vec2i& Set(int _x, int _y) { x = _x, y = _y; return *this; }
@@ -159,7 +327,7 @@ struct Vec2i
 };
 
 //----------------------------------------------------------------------------//
-//
+// Vec3
 //----------------------------------------------------------------------------//
 
 struct Vec3
@@ -238,8 +406,11 @@ struct Vec3
 	float x, y, z;
 };
 
+const Vec3 VEC3_ZERO(0);
+const Vec3 VEC3_ONE(1);
+
 //----------------------------------------------------------------------------//
-//
+// Vec4
 //----------------------------------------------------------------------------//
 
 struct Vec4
@@ -259,7 +430,7 @@ struct Vec4
 };
 
 //----------------------------------------------------------------------------//
-//
+// Color
 //----------------------------------------------------------------------------//
 
 struct Color
@@ -284,8 +455,17 @@ struct Color
 	};
 };
 
+inline Color Mix(const Color& _a, const Color& _b, float _t)
+{
+	return Color(FloatToByte(Mix(_a.r * 255.f, _b.r * 255.f, _t)),
+		FloatToByte(Mix(_a.g * 255.f, _b.g * 255.f, _t)),
+		FloatToByte(Mix(_a.b * 255.f, _b.b * 255.f, _t)),
+		FloatToByte(Mix(_a.a * 255.f, _b.a * 255.f, _t)));
+}
+
+
 //----------------------------------------------------------------------------//
-//
+// Quat
 //----------------------------------------------------------------------------//
 
 struct Quat
@@ -495,6 +675,9 @@ inline Quat Mix(const Quat& _a, const Quat& _b, float _t)
 {
 	return _a.Slerp(_b, _t);
 }
+
+const Quat QUAT_ZERO(0);
+const Quat QUAT_IDENTITY(1);
 
 //----------------------------------------------------------------------------//
 // Mat44
@@ -841,6 +1024,9 @@ struct Mat44
 	};
 };
 
+const Mat44 MAT44_ZERO(1);
+const Mat44 MAT44_IDENTITY(1);
+
 //----------------------------------------------------------------------------//
 // Plane
 //----------------------------------------------------------------------------//
@@ -852,7 +1038,62 @@ struct Plane
 };
 
 //----------------------------------------------------------------------------//
+// Noise
+//----------------------------------------------------------------------------//
+
+inline uint IRand(int& _rseed)
+{
+	return (uint)(_rseed = 69069 * _rseed + 1);
+}
+inline float Rand(int& _rseed)
+{
+	return IRand(_rseed) * (1.0f / 0xffffffff);
+}
+inline float Noise2d(int _x, int _y, int _rseed)
+{
+	int _n = _x + _y * _rseed;
+	_n = (_n << 13) ^ _n;
+	return (1.0f - ((_n * (_n * _n * 15731 + 789221) + 1376312589) & 0x7fffffff) / 1073741824.0f);
+}
+inline float SmoothedNoise2d(int _x, int _y, int _rseed)
+{
+	float _n = 0;
+	_n += (Noise2d(_x - 1, _y - 1, _rseed) +
+		Noise2d(_x + 1, _y - 1, _rseed) +
+		Noise2d(_x - 1, _y + 1, _rseed) +
+		Noise2d(_x + 1, _y + 1, _rseed)) * 0.0625f; // corners 1/16
+	_n += (Noise2d(_x - 1, _y, _rseed) +
+		Noise2d(_x + 1, _y, _rseed) +
+		Noise2d(_x, _y - 1, _rseed) +
+		Noise2d(_x, _y + 1, _rseed)) *0.125f; // sides 1/8
+	_n += Noise2d(_x, _y, _rseed) * 0.25f; // center 1/4
+	return _n;
+}
+inline float InterpolatedNoise2d(float _x, float _y, int _rseed)
+{
+	int _ix = (int)_x, _iy = (int)_y;
+	float _fx = _x - _ix, _fy = _y - _iy;
+	float _v0 = SmoothedNoise2d(_ix, _iy, _rseed);
+	float _v1 = SmoothedNoise2d(_ix + 1, _iy, _rseed);
+	float _v2 = SmoothedNoise2d(_ix, _iy + 1, _rseed);
+	float _v3 = SmoothedNoise2d(_ix + 1, _iy + 1, _rseed);
+	return Cerp(Cerp(_v0, _v1, _fx), Cerp(_v2, _v3, _fx), _fy);
+}
+inline float Perlin2d(float _x, float _y, int _rseed, uint _iterations = 4)
+{
+	float _n = 0, _f = 1, _a = 1;
+	for (uint i = 0; i < _iterations; ++i)
+	{
+		_n += InterpolatedNoise2d(_x * _f, _y * _f, _rseed) * _a;
+		_a *= 0.5f;
+		_f *= 2;
+	}
+	return (1 - _n) * 0.5f;
+}
+
+//----------------------------------------------------------------------------//
 // 
 //----------------------------------------------------------------------------//
+
 
 

@@ -169,7 +169,7 @@ cd "$(SolutionDir)Build"
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="Window.cpp">
+    <ClCompile Include="Device.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
     </ClCompile>
@@ -188,7 +188,7 @@ cd "$(SolutionDir)Build"
     <ClInclude Include="Game.h" />
     <ClInclude Include="Graphics.hpp" />
     <ClInclude Include="Math.hpp" />
-    <ClInclude Include="Window.hpp" />
+    <ClInclude Include="Device.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="Project.txt" />

@@ -10,7 +10,7 @@ uint BitsPerPixel(PixelFormat _format)
 {
 	static const uint BPP[] =
 	{
-		24, // PF_RGB8
+		32, // PF_RGBX8
 		32, // PF_RGBA8
 		32, // PF_D24S8
 		4, // PF_DXT1
@@ -24,33 +24,7 @@ bool IsCompressed(PixelFormat _format)
 	return _format == PF_DXT1 || _format == PF_DXT5;
 }
 //----------------------------------------------------------------------------//
-
-//----------------------------------------------------------------------------//
-// Image
-//----------------------------------------------------------------------------//
-
-//----------------------------------------------------------------------------//
-Image::Image(void) :
-	m_format(PF_RGBA8),
-	m_size(0),
-	m_data(nullptr)
-{
-}
-//----------------------------------------------------------------------------//
-Image::~Image(void)
-{
-	delete[] m_data;
-}
-//----------------------------------------------------------------------------//
-void Image::Realloc(PixelFormat _format, uint _width, uint _height)
-{
-	delete[] m_data;
-	m_format = _format;
-	m_size.Set(_width, _height);
-	m_data = new uint8[(_width * _height * BitsPerPixel(_format)) >> 3];
-}
-//----------------------------------------------------------------------------//
-void Image::RgbaToArgb(void* _dst, const void* _src, uint _numPixels)
+void RgbaToArgb(void* _dst, const void* _src, uint _numPixels)
 {
 	uint32* _dstp = (uint32*)_dst;
 	uint32* _dste = _dstp + _numPixels;
@@ -62,7 +36,7 @@ void Image::RgbaToArgb(void* _dst, const void* _src, uint _numPixels)
 	}
 }
 //----------------------------------------------------------------------------//
-void Image::RgbToXrgb(void* _dst, const void* _src, uint _numPixels, uint8 _alpha)
+/*void RgbToXrgb(void* _dst, const void* _src, uint _numPixels, uint8 _alpha)
 {
 	uint32* _dstp = (uint32*)_dst;
 	uint32* _dste = _dstp + _numPixels;
@@ -76,15 +50,79 @@ void Image::RgbToXrgb(void* _dst, const void* _src, uint _numPixels, uint8 _alph
 		_srcp += 3;
 		*_dstp++ = (_r << 16) | (_g << 8) | _b | _a;
 	}
+}*/
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+// Image
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+Image::Image(void) :
+	m_format(PF_RGBA8),
+	m_width(0),
+	m_height(0),
+	m_invSize(0),
+	m_data(nullptr)
+{
 }
 //----------------------------------------------------------------------------//
+Image::~Image(void)
+{
+	delete[] m_data;
+}
+//----------------------------------------------------------------------------//
+void Image::Realloc(PixelFormat _format, uint _width, uint _height)
+{
+	delete[] m_data;
+	m_format = _format;
+	m_width = _width;
+	m_height = _height;
+	m_invSize.Set(1.0f / _width, 1.0f / _height);
+	m_data = new uint8[(_width * _height * BitsPerPixel(_format)) >> 3];
+}
+//----------------------------------------------------------------------------//
+Vec2i Image::GetCoord(const Vec2& _tc, bool _repeat)
+{
+	Vec2i _coord;
+	if (_repeat)
+	{
+		_coord.x = (int)(Wrap(_tc.x, 0.0f, 1.0f) * m_invSize.x);
+		_coord.y = (int)(Wrap(_tc.y, 0.0f, 1.0f) * m_invSize.y);
+	}
+	else
+	{
+		_coord.x = (int)(Clamp(_tc.x, 0.0f, 1.0f) * m_invSize.x);
+		_coord.y = (int)(Clamp(_tc.y, 0.0f, 1.0f) * m_invSize.y);
+	}
 
-//----------------------------------------------------------------------------//
-// Generator 
-//----------------------------------------------------------------------------//
+	ASSERT((uint)_coord.x < m_width);
+	ASSERT((uint)_coord.y < m_height);
 
+	return _coord;
+}
 //----------------------------------------------------------------------------//
-ImagePtr CreateBitmapFont(FontInfo& _info, const char* _name, uint _fheight, float _fwidth, bool _italic)
+Color Image::Sample(const Vec2& _tc, bool _smoothed, bool _repeat)
+{
+	ASSERT(m_format == PF_RGBA8 || m_format == PF_RGBX8);
+
+	if (_smoothed) // linear filter
+	{
+		Vec2 _fc(Floor(_tc.x), Floor(_tc.y));
+		Vec2 _cc(Ceil(_tc.x), Ceil(_tc.y));
+		Vec2i _lt = GetCoord(_fc, _repeat);
+		Vec2i _rb = GetCoord(_cc, _repeat);
+		float _tx = _cc.x - _fc.x;
+		Color _t = Mix(m_pixels[_lt.x + _lt.y * m_width], m_pixels[_rb.x + _lt.y * m_width], _tx);
+		Color _b = Mix(m_pixels[_lt.x + _rb.y * m_width], m_pixels[_rb.x + _rb.y * m_width], _tx);
+		return Mix(_t, _b, _cc.y - _fc.y);
+	}
+
+	Vec2i _coord = GetCoord(_tc, _repeat);
+	return m_pixels[_coord.x + _coord.y * m_width];
+}
+//----------------------------------------------------------------------------//
+void Image::CreateBitmapFont(FontInfo& _info, const char* _name, uint _fheight, float _fwidth, bool _italic)
 {
 	int _tw = int(_fwidth * 1000) / 100;
 	HFONT _fnt = CreateFontA(-int(_fheight), 0, 0, 0, _tw * 100, _italic, 0, 0, RUSSIAN_CHARSET, OUT_OUTLINE_PRECIS, CLIP_TT_ALWAYS, CLEARTYPE_NATURAL_QUALITY, DEFAULT_PITCH | FF_DONTCARE, _name);
@@ -168,9 +206,8 @@ ImagePtr CreateBitmapFont(FontInfo& _info, const char* _name, uint _fheight, flo
 	}
 	GdiFlush();
 
-	ImagePtr _img = new Image();
-	_img->Realloc(PF_RGBA8, _texWidth, _texHeight);
-	Color* _dstp = (Color*)_img->Pixels();
+	Realloc(PF_RGBA8, _texWidth, _texHeight);
+	Color* _dstp = m_pixels;
 	Color* _dste = _dstp + _texWidth * _texHeight;
 	while (_dstp < _dste)
 	{
@@ -181,10 +218,40 @@ ImagePtr CreateBitmapFont(FontInfo& _info, const char* _name, uint _fheight, flo
 	DeleteObject(_bm);
 	DeleteDC(_dc);
 	DeleteObject(_fnt);
-
-	return _img;
 }
 //----------------------------------------------------------------------------//
+int Image::CreateNoize(uint _size, int _rseed)
+{
+	Realloc(PF_RGBX8, _size, _size);
+	Color* _dstp = m_pixels;
+	Color* _dste = _dstp + _size * _size;
+	Color _color(0, 0, 0, 0xff);
+	while (_dstp < _dste)
+	{
+		_color.x = (uint8)(Rand(_rseed) * 255);
+		_color.y = (uint8)(Rand(_rseed) * 255);
+		_color.z = (uint8)(Rand(_rseed) * 255);
+		*_dstp++ = _color;
+	}
+	return _rseed;
+}
+//----------------------------------------------------------------------------//
+void Image::CreatePerlin(uint _size, float _scale, const Vec2& _offset, int _rseed, uint _iterations)
+{
+	Realloc(PF_RGBX8, _size, _size);
+	Color* _dst = m_pixels;
+	Color _color(0, 0, 0, 0xff);
+	for (uint y = 0; y < m_height; ++y)
+	{
+		for (uint x = 0; x < m_width; ++x)
+		{
+			_color.r = (uint8)(Perlin2d(x * _scale + _offset.x, y * _scale + _offset.y, _rseed, _iterations) * 255);
+			_color.g = _color.r;
+			_color.b = _color.r;
+			*_dst++ = _color;
+		}
+	}
+}
 
 //----------------------------------------------------------------------------//
 // 
