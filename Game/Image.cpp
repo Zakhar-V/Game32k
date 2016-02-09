@@ -82,18 +82,18 @@ void Image::Realloc(PixelFormat _format, uint _width, uint _height)
 	m_data = new uint8[(_width * _height * BitsPerPixel(_format)) >> 3];
 }
 //----------------------------------------------------------------------------//
-Vec2i Image::GetCoord(const Vec2& _tc, bool _repeat)
+Vec2 Image::GetCoord(const Vec2& _tc, bool _repeat)
 {
-	Vec2i _coord;
+	Vec2 _coord;
 	if (_repeat)
 	{
-		_coord.x = (int)(Wrap(_tc.x, 0.0f, 1.0f) * m_invSize.x);
-		_coord.y = (int)(Wrap(_tc.y, 0.0f, 1.0f) * m_invSize.y);
+		_coord.x = Wrap(_tc.x, 0.0f, 1.0f) * m_invSize.x;
+		_coord.y = Wrap(_tc.y, 0.0f, 1.0f) * m_invSize.y;
 	}
 	else
 	{
-		_coord.x = (int)(Clamp(_tc.x, 0.0f, 1.0f) * m_invSize.x);
-		_coord.y = (int)(Clamp(_tc.y, 0.0f, 1.0f) * m_invSize.y);
+		_coord.x = Clamp(_tc.x, 0.0f, 1.0f) * m_invSize.x;
+		_coord.y = Clamp(_tc.y, 0.0f, 1.0f) * m_invSize.y;
 	}
 
 	ASSERT((uint)_coord.x < m_width);
@@ -108,18 +108,54 @@ Color Image::Sample(const Vec2& _tc, bool _smoothed, bool _repeat)
 
 	if (_smoothed) // linear filter
 	{
-		Vec2 _fc(Floor(_tc.x), Floor(_tc.y));
-		Vec2 _cc(Ceil(_tc.x), Ceil(_tc.y));
-		Vec2i _lt = GetCoord(_fc, _repeat);
-		Vec2i _rb = GetCoord(_cc, _repeat);
-		float _tx = _cc.x - _fc.x;
-		Color _t = Mix(m_pixels[_lt.x + _lt.y * m_width], m_pixels[_rb.x + _lt.y * m_width], _tx);
-		Color _b = Mix(m_pixels[_lt.x + _rb.y * m_width], m_pixels[_rb.x + _rb.y * m_width], _tx);
-		return Mix(_t, _b, _cc.y - _fc.y);
+		Vec2 _coord = GetCoord(_tc, _repeat); // 0..1 --> 0..size
+		Vec2i _lt = _coord;
+		Vec2i _rb = _lt + 1;
+		Vec2 _coeff = _coord - _lt;
+		Color _t = Mix(m_pixels[_lt.x + _lt.y * m_width], m_pixels[_rb.x + _lt.y * m_width], _coeff.x);
+		Color _b = Mix(m_pixels[_lt.x + _rb.y * m_width], m_pixels[_rb.x + _rb.y * m_width], _coeff.x);
+		return Mix(_t, _b, _coeff.y);
 	}
 
 	Vec2i _coord = GetCoord(_tc, _repeat);
 	return m_pixels[_coord.x + _coord.y * m_width];
+}
+//----------------------------------------------------------------------------//
+ImagePtr Image::CreateLod(void)
+{
+	ASSERT(m_format == PF_RGBA8 || m_format == PF_RGBX8);
+
+	if (m_width + m_height < 2)	// no lod
+		return nullptr;
+
+	if (IsPow2(m_width) && IsPow2(m_height))
+	{
+		ImagePtr _lod = new Image;
+		_lod->Realloc(m_format, m_width > 1 ? (m_width >> 1) : 1, m_height > 1 ? (m_height >> 1) : 1);
+
+		if (m_width > 1 && m_height > 1) // min 2x2
+		{
+			for (uint y = 0, ly = 0; y < m_width; y += 2, ly += _lod->m_width)
+			{
+				uint y1 = y * m_width;
+				uint y2 = y * m_width + m_width;
+				for (uint x = 0, lx = 0; x < m_height; x += 2, ++lx)
+				{
+					uint x2 = x + 1;
+					_lod->m_pixels[lx + ly].Blend(m_pixels[x + y1], m_pixels[x2 + y1], m_pixels[x + y2], m_pixels[x2 + y2]);
+				}
+			}
+		}
+		else // 1x2 or 2x1
+			_lod->m_pixels[0].Blend(m_pixels[0], m_pixels[1]);
+		return _lod;
+	}
+	else
+	{
+		// TODO: ...
+	}
+
+	return nullptr;
 }
 //----------------------------------------------------------------------------//
 void Image::CreateBitmapFont(FontInfo& _info, const char* _name, uint _fheight, float _fwidth, bool _italic)

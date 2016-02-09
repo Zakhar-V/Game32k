@@ -70,6 +70,25 @@ void Device::PollEvents(void)
 	}
 }
 //----------------------------------------------------------------------------//
+void Device::SetCursorMode(CursorMode _mode)
+{
+	if (m_cursorMode != _mode)
+	{
+		if (m_cursorMode == CM_Default)
+			ShowCursor(false);
+		else //if(m_active)
+			ShowCursor(true);
+
+		m_cursorMode = _mode;
+
+		if (_mode == CM_Camera)
+		{
+			m_resetCameraDelta = true;
+			_CursorToCenter();
+		}
+	}
+}
+//----------------------------------------------------------------------------//
 void Device::_CursorToCenter(void)
 {
 	Vec2i _c(m_width >> 1, m_height >> 1);
@@ -97,6 +116,9 @@ LRESULT Device::_HandleMsg(UINT _msg, WPARAM _wParam, LPARAM _lParam)
 
 		m_resetCameraDelta = true;
 
+		if (m_cursorMode != CM_Default)
+			ShowCursor(false);
+
 		// todo: ...
 
 		//s_instance->OnDeactivate();
@@ -104,8 +126,11 @@ LRESULT Device::_HandleMsg(UINT _msg, WPARAM _wParam, LPARAM _lParam)
 
 	case WM_KILLFOCUS:
 		m_active = false;
+
 		ClipCursor(nullptr);
-		//s_instance->OnActivate();
+		if (m_cursorMode != CM_Default)
+			ShowCursor(true);
+
 		break;
 
 	case WM_CLOSE:

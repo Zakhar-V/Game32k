@@ -15,6 +15,8 @@
 
 #define MAX_VERTEX_SHADERS 256
 #define MAX_PIXEL_SHADERS 256
+#define MAX_SAMPLERS 256
+#define MAX_TEXTURE_UNITS 8
 
 enum FrameBufferType : uint
 {
@@ -154,9 +156,9 @@ enum TextureType
 
 enum TextureUsage : uint
 {
-	TU_Default = /*D3DUSAGE_AUTOGENMIPMAP*/ 0,
+	TU_Default = /*D3DUSAGE_AUTOGENMIPMAP*/0,
 	TU_Dynamic = /*D3DUSAGE_AUTOGENMIPMAP |*/ D3DUSAGE_DYNAMIC,
-	TU_RenderTarget = /*D3DUSAGE_AUTOGENMIPMAP |*/ D3DUSAGE_RENDERTARGET,
+	TU_RenderTarget = /*D3DUSAGE_AUTOGENMIPMAP |*/ D3DUSAGE_RENDERTARGET, // use as render-target, no mipmaps
 };
 
 
@@ -164,19 +166,22 @@ class Texture : public RefCounted
 {
 public:
 
-	Texture(TextureType _type, PixelFormat _format, TextureUsage _usage = TU_Default);
+	Texture(TextureType _type, PixelFormat _format, TextureUsage _usage = TU_Default, bool _useMipMaps = true);
 	~Texture(void);
 
-	void SetSize(uint _width, uint _height, uint _depth = 1, uint _lods = 0);
-	void SetData(const void* _data);
-	void GenerateLods(void);
+	void SetSize(uint _width, uint _height, uint _depth = 1);
+	void SetData(uint _lod, const void* _data);
+	void SetImage(Image* _img);
+	void UpdateRenderTarget(void);
 
 	IDirect3DBaseTexture9* Handle(void) { return m_handle; }
 
 protected:
+	friend class Graphics;
 
 	void _Create(void);
 	void _Destroy(void);
+	void _Bind(uint _unit);
 
 	TextureType m_type;
 	TextureUsage m_usage;
@@ -184,7 +189,8 @@ protected:
 	Vec2i m_size;
 	uint m_depth;
 	uint m_lods;
-	uint m_desiredLods;
+	bool m_useMipMaps;
+	//uint m_desiredLods;
 	union
 	{
 		IDirect3DBaseTexture9* m_handle;
@@ -192,6 +198,89 @@ protected:
 		IDirect3DVolumeTexture9* m_texture3d;
 		IDirect3DCubeTexture9* m_textureCube;
 	};
+};
+
+//----------------------------------------------------------------------------//
+// Sampler
+//----------------------------------------------------------------------------//
+
+enum TextureWrap : uint
+{
+	TW_Repeat = 0,
+	TW_Mirror,
+	TW_Clamp,
+};
+
+enum TextureFilter : uint
+{
+	TF_Default = 0,
+	TF_Nearest,
+	TF_Linear,
+	TF_Bilinear,
+	TF_Trilinear,
+};
+
+typedef uint SamplerID;
+
+class Sampler : public NonCopyable
+{
+public:
+
+	struct Desc
+	{
+		Desc(TextureFilter _filter = TF_Default, TextureWrap _u = TW_Repeat, TextureWrap _v = TW_Repeat, TextureWrap _w = TW_Repeat, uint _aniso = 0) :
+			wrapU(_u), wrapV(_v), wrapW(_w), filter(_filter), aniso(_aniso) { }
+		TextureWrap wrapU;
+		TextureWrap wrapV;
+		TextureWrap wrapW;
+		TextureFilter filter;
+		uint aniso;
+	};
+
+protected:
+	friend class Graphics;
+
+	Sampler(void);
+	Sampler(SamplerID _id, const Desc& _desc, uint _hash);
+	~Sampler(void);
+	Sampler& operator = (const Sampler& _rhs);
+
+	void _SetDefaultFilter(TextureFilter _filter);
+	void _SetDefaultAniso(uint _aniso);
+	void _Bind(uint _unit);
+
+	SamplerID m_id;
+	Desc m_desc;
+	uint m_hash;
+	TextureFilter m_filter;
+	uint m_dxwrap[3]; // u v w
+	uint m_dxfilter[3];	// mag, min, mip
+	uint m_aniso;
+};
+
+//----------------------------------------------------------------------------//
+// Shaders
+//----------------------------------------------------------------------------//
+
+enum VertexShaderID
+{
+	VS_Test,
+};
+
+enum PixelShaderID
+{
+	PS_Test,
+};
+
+//----------------------------------------------------------------------------//
+// 
+//----------------------------------------------------------------------------//
+
+class Material
+{
+public:
+
+protected:
 };
 
 //----------------------------------------------------------------------------//
@@ -208,8 +297,15 @@ public:
 	IDirect3D9* Direct3D(void) { return m_d3d; }
 	IDirect3DDevice9* Device(void) { return m_device; }
 
-	void LoadVertexShaders(const char** _names);
-	void LoadPixelShaders(const char** _names);
+	TextureFilter GetDefaultTextureFilter(void) { return m_defaultTexFilter; }
+	void SetDefaultTextureFilter(TextureFilter _filter);
+
+	uint GetMaxTextureAnisotropy(void) { return m_maxTexAniso; }
+	uint GetDefaultTextureAnisotropy(void) { return m_defaultTexAniso; }
+	void SetDefaultTextureAnisotropy(uint _value);
+
+	SamplerID AddSampler(const Sampler::Desc& _desc);
+
 
 	void BeginFrame(void);
 	void EndFrame(void);
@@ -219,12 +315,17 @@ public:
 	void SetVertexFormat(VertexFormat _format);
 	void SetVertexBuffer(VertexBuffer* _buffer, uint _offset, uint _stride);
 
-	void SetVertexShader(uint _id);
-	void SetPixelShader(uint _id);
+	void SetVertexShader(VertexShaderID _id);
+	void SetPixelShader(PixelShaderID _id);
 
-	//void SetUniformVS(uint _index, const void* _data)
+	void SetFloatUniformVS(uint _index, const void* _data, uint _num4);
+	void SetFloatUniformPS(uint _index, const void* _data, uint _num4);
 
-	void SetTexture(uint _stage, Texture* _tex);
+	void SetTexture(uint _unit, Texture* _texture);
+	void SetSampler(uint _unit, SamplerID _sampler);
+
+
+	//void DrawSprites();
 
 protected:
 
@@ -233,6 +334,20 @@ protected:
 	IDirect3DVertexDeclaration9* m_vertexFormats[MAX_VERTEX_FORMATS];
 	IDirect3DVertexShader9*	m_vertexShaders[MAX_VERTEX_SHADERS];
 	IDirect3DPixelShader9* m_pixelShaders[MAX_PIXEL_SHADERS];
+
+	TextureFilter m_defaultTexFilter;
+	uint m_defaultTexAniso;
+	uint m_maxTexAniso;
+	Sampler m_samplers[MAX_SAMPLERS];
+	uint m_numSamplers;
+
+	struct TextureUnit
+	{
+		Texture* texture = nullptr;
+		SamplerID sampler = 0;
+	};
+
+	TextureUnit m_texUnit[MAX_TEXTURE_UNITS];
 };
 
 //----------------------------------------------------------------------------//

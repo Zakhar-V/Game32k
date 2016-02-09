@@ -110,16 +110,18 @@ const D3DFORMAT DXPixelFormat[] =
 };
 
 //----------------------------------------------------------------------------//
-Texture::Texture(TextureType _type, PixelFormat _format, TextureUsage _usage) :
+Texture::Texture(TextureType _type, PixelFormat _format, TextureUsage _usage, bool _useMipMaps) :
 	m_type(_type),
 	m_usage(_usage),
 	m_format(_format),
 	m_size(0),
 	m_depth(0),
-	m_lods(0),
-	m_desiredLods(0),
+	m_lods(1),
+	m_useMipMaps(_useMipMaps),
 	m_handle(nullptr)
 {
+	if (m_usage == TU_RenderTarget)
+		m_useMipMaps = false;
 }
 //----------------------------------------------------------------------------//
 Texture::~Texture(void)
@@ -127,18 +129,22 @@ Texture::~Texture(void)
 	_Destroy();
 }
 //----------------------------------------------------------------------------//
-void Texture::SetSize(uint _width, uint _height, uint _depth, uint _lods)
+void Texture::SetSize(uint _width, uint _height, uint _depth)
 {
 	m_size.Set(_width, _height);
 	m_depth = _depth;
-	m_desiredLods = _lods;
+	uint _size = Max(_width, _height);
+	m_lods = (m_useMipMaps && _size) ? Log2i(_size) + 1 : 1;
 	_Create();
 }
 //----------------------------------------------------------------------------//
-void Texture::SetData(const void* _data)
+void Texture::SetData(uint _lod, const void* _data)
 {
 	ASSERT(m_handle != nullptr);
 	ASSERT(_data != nullptr);
+
+	if (_lod >= m_lods)
+		return;
 
 	uint _bpp = BitsPerPixel(m_format);
 
@@ -150,21 +156,45 @@ void Texture::SetData(const void* _data)
 		_rect.right = m_size.x;
 		_rect.top = 0;
 		_rect.bottom = m_size.y;
+
+		for (uint i = _lod; i--;)
+		{
+			if (_rect.right > 1)
+				_rect.right >>= 1;
+			if (_rect.bottom > 1)
+				_rect.bottom >>= 1;
+		}
 			
-		m_texture2d->LockRect(0, &_dst, &_rect, D3DLOCK_DISCARD);
+		m_texture2d->LockRect(_lod, &_dst, &_rect, D3DLOCK_DISCARD);
+
+		ASSERT(_dst.pBits != nullptr);
 
 		if (m_format == PF_RGBA8 || m_format == PF_RGBX8)
-			RgbaToArgb(_dst.pBits, _data, m_size.x * m_size.y);
-		else
-			memcpy(_dst.pBits, _data, (m_size.x * m_size.y * _bpp) >> 3);
+			RgbaToArgb(_dst.pBits, _data, _rect.right * _rect.bottom);
+		//else // compressed
+		//	memcpy(_dst.pBits, _data, (m_size.x * m_size.y * _bpp) >> 3);
 
-		m_texture2d->UnlockRect(0);
+		m_texture2d->UnlockRect(_lod);
 	}
 }
 //----------------------------------------------------------------------------//
-void Texture::GenerateLods(void)
+void Texture::SetImage(Image* _img)
 {
-	m_handle->GenerateMipSubLevels();
+	ASSERT(_img != nullptr);
+	if (m_usage == TU_RenderTarget)
+		return;
+	SetSize(_img->Width(), _img->Height());
+	ImagePtr _lod = _img;
+	for (uint i = 0; i < m_lods; ++i)
+	{
+		SetData(i, _lod->RawData());
+		_lod = _lod->CreateLod();
+	}
+}
+//----------------------------------------------------------------------------//
+void Texture::UpdateRenderTarget(void)
+{
+	//m_handle->GenerateMipSubLevels();
 }
 //----------------------------------------------------------------------------//
 void Texture::_Create(void)
@@ -176,13 +206,6 @@ void Texture::_Create(void)
 	uint _usage = m_usage;
 	if (m_format == PF_D24S8)
 		_usage |= D3DUSAGE_DEPTHSTENCIL;
-
-	uint _lods = 1;
-	for (int i = FirstPow2(Max(m_size.x, m_size.y)); i > 1; i >>= 1)
-		++_lods;
-	if (m_desiredLods > 0 && _lods > m_desiredLods)
-		_lods = m_desiredLods;
-	m_lods = _lods;
 
 	switch (m_type)
 	{
@@ -197,6 +220,10 @@ void Texture::_Create(void)
 
 	if (!m_handle)
 		Fatal("Couldn't create texture");
+
+#if _DEBUG
+	LOG("Texture %dx%dx%d, %d lods", m_size.x, m_size.y, m_depth, m_handle->GetLevelCount());
+#endif
 }
 //----------------------------------------------------------------------------//
 void Texture::_Destroy(void)
@@ -208,6 +235,131 @@ void Texture::_Destroy(void)
 	//	m_target->Release();
 }
 //----------------------------------------------------------------------------//
+void Texture::_Bind(uint _unit)
+{
+	//m_handle->SetLOD(2);
+	gGraphicsDevice->SetTexture(_unit, m_handle);
+
+	// lod bias, ...
+}
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+// Sampler
+//----------------------------------------------------------------------------//
+
+const D3DTEXTUREADDRESS DXAddressing[] =
+{
+	D3DTADDRESS_WRAP, // TW_Repeat
+	D3DTADDRESS_MIRROR, // TW_Mirror
+	D3DTADDRESS_CLAMP, // TW_Clamp
+};
+
+const D3DTEXTUREFILTERTYPE DXMagFilter[] =
+{
+	D3DTEXF_ANISOTROPIC, // TF_Default
+	D3DTEXF_POINT, // TF_Nearest
+	D3DTEXF_LINEAR, // TF_Linear
+	D3DTEXF_ANISOTROPIC, // TF_Bilinear
+	D3DTEXF_ANISOTROPIC, // TF_Trilinear
+};
+
+const D3DTEXTUREFILTERTYPE DXMinFilter[] =
+{
+	D3DTEXF_ANISOTROPIC, // TF_Default
+	D3DTEXF_POINT, // TF_Nearest
+	D3DTEXF_LINEAR, // TF_Linear
+	D3DTEXF_ANISOTROPIC, // TF_Bilinear
+	D3DTEXF_ANISOTROPIC, // TF_Trilinear
+};
+
+const uint DXMipFilter[] =
+{
+	D3DTEXF_LINEAR, // TF_Default
+	D3DTEXF_NONE, // TF_Nearest
+	D3DTEXF_NONE, // TF_Linear
+	D3DTEXF_POINT, // TF_Bilinear
+	D3DTEXF_LINEAR, // TF_Trilinear
+};
+
+//----------------------------------------------------------------------------//
+Sampler::Sampler(void)
+{
+}
+//----------------------------------------------------------------------------//
+Sampler::Sampler(SamplerID _id, const Desc& _desc, uint _hash)	:
+	m_id(_id),
+	m_desc(_desc),
+	m_hash(_hash)
+{
+	m_filter = _desc.filter != TF_Default ? _desc.filter : gGraphics->GetDefaultTextureFilter();
+	m_dxwrap[0] = DXAddressing[_desc.wrapU];
+	m_dxwrap[1] = DXAddressing[_desc.wrapV];
+	m_dxwrap[2] = DXAddressing[_desc.wrapW];
+	m_dxfilter[0] = DXMagFilter[m_filter];
+	m_dxfilter[1] = DXMinFilter[m_filter];
+	m_dxfilter[2] = DXMipFilter[m_filter];
+	m_aniso = _desc.aniso ? _desc.aniso : gGraphics->GetDefaultTextureAnisotropy();
+	if (m_aniso > gGraphics->GetMaxTextureAnisotropy())
+		m_aniso = gGraphics->GetMaxTextureAnisotropy();
+}
+//----------------------------------------------------------------------------//
+Sampler::~Sampler(void)
+{
+}
+//----------------------------------------------------------------------------//
+Sampler& Sampler::operator = (const Sampler& _rhs)
+{
+	memcpy(this, &_rhs, sizeof(Sampler));
+	return *this;
+}
+//----------------------------------------------------------------------------//
+void Sampler::_SetDefaultFilter(TextureFilter _filter)
+{
+	if (m_desc.filter == TF_Default)
+	{
+		m_filter = _filter;
+		m_dxfilter[0] = DXMagFilter[_filter];
+		m_dxfilter[1] = DXMinFilter[_filter];
+		m_dxfilter[2] = DXMipFilter[_filter];
+	}
+}
+//----------------------------------------------------------------------------//
+void Sampler::_SetDefaultAniso(uint _aniso)
+{
+	if (m_desc.aniso == 0)
+	{
+		m_aniso = _aniso;
+	}
+}
+//----------------------------------------------------------------------------//
+void Sampler::_Bind(uint _unit)
+{
+	gGraphicsDevice->SetSamplerState(_unit, D3DSAMP_ADDRESSU, m_dxwrap[0]);
+	gGraphicsDevice->SetSamplerState(_unit, D3DSAMP_ADDRESSV, m_dxwrap[1]);
+	gGraphicsDevice->SetSamplerState(_unit, D3DSAMP_ADDRESSW, m_dxwrap[2]);
+	gGraphicsDevice->SetSamplerState(_unit, D3DSAMP_MAGFILTER, m_dxfilter[0]);
+	gGraphicsDevice->SetSamplerState(_unit, D3DSAMP_MINFILTER, m_dxfilter[1]);
+	gGraphicsDevice->SetSamplerState(_unit, D3DSAMP_MIPFILTER, m_dxfilter[2]);
+	gGraphicsDevice->SetSamplerState(_unit, D3DSAMP_MAXANISOTROPY, m_aniso);
+}
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+// Shaders
+//----------------------------------------------------------------------------//
+
+const char* g_vertexShaderNames[] =
+{
+	"Test-VS.cso", // VS_Test
+	nullptr,
+};
+
+const char* g_pixelShaderNames[] =
+{
+	"Test-PS.cso", // PS_Test
+	nullptr,
+};
 
 //----------------------------------------------------------------------------//
 // Graphics
@@ -239,7 +391,7 @@ Graphics::Graphics(void)
 	HRESULT _r = m_d3d->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, gDevice->WindowHandle(), D3DCREATE_SOFTWARE_VERTEXPROCESSING, &_pp, &m_device);
 	_CHECK(_r >= 0, "Couldn't create IDirect3D9Device");
 
-	// create vertex types
+	// vertex formats
 	{	 
 		DLOG("Create vertex declarations");
 
@@ -252,6 +404,41 @@ Graphics::Graphics(void)
 		_r = m_device->CreateVertexDeclaration(VF_Skinned_Desc, &m_vertexFormats[VF_Skinned]);
 		CHECK(_r >= 0, "Couldn't create vertex declaration");
 	}
+
+	// vertex shaders
+	for (uint i = 0; g_vertexShaderNames[i]; ++i)
+	{
+		ASSERT(i < MAX_VERTEX_SHADERS);
+
+		const char* _name = g_vertexShaderNames[i];
+		LOG("Load VertexShader \"%s\"", _name);
+
+		RawData _bytecode = LoadFile(_name);
+		HRESULT _r = gGraphicsDevice->CreateVertexShader((const DWORD*)*_bytecode, m_vertexShaders + i);
+		CHECK(_r >= 0, "Couldn't create VertexShader");
+	}
+
+	// pixel shaders
+	for (uint i = 0; g_pixelShaderNames[i]; ++i)
+	{
+		ASSERT(i < MAX_PIXEL_SHADERS);
+
+		const char* _name = g_pixelShaderNames[i];
+		LOG("Load PixelShader \"%s\"", _name);
+
+		RawData _bytecode = LoadFile(_name);
+		HRESULT _r = gGraphicsDevice->CreatePixelShader((const DWORD*)*_bytecode, m_pixelShaders + i);
+		CHECK(_r >= 0, "Couldn't create PixelShader");
+	}
+
+	// samplers
+	{
+		m_maxTexAniso = 4; // todo:
+		m_defaultTexAniso = m_maxTexAniso;
+		m_defaultTexFilter = TF_Trilinear;
+		m_numSamplers = 0;
+		AddSampler(TF_Default);
+	}
 }
 //----------------------------------------------------------------------------//
 Graphics::~Graphics(void)
@@ -259,38 +446,41 @@ Graphics::~Graphics(void)
 	LOG("Destroy Graphics");
 }
 //----------------------------------------------------------------------------//
-void Graphics::LoadVertexShaders(const char** _names)
+void Graphics::SetDefaultTextureFilter(TextureFilter _filter)
 {
-	ASSERT(m_vertexShaders[0] == nullptr);
-
-	for (uint i = 0; *_names; ++i)
+	if (_filter == TF_Default)
+		_filter = TF_Trilinear;
+	if (_filter != m_defaultTexFilter)
 	{
-		ASSERT(i < MAX_VERTEX_SHADERS);
-
-		const char* _name = *_names++;
-		LOG("Load VertexShader \"%s\"", _name);
-
-		RawData _bytecode = LoadFile(_name);
-		HRESULT _r = gGraphicsDevice->CreateVertexShader((const DWORD*)*_bytecode, m_vertexShaders + i);
-		CHECK(_r >= 0, "Couldn't create VertexShader");
+		m_defaultTexFilter = _filter;
+		for (uint i = 0; i < m_numSamplers; ++i)
+			m_samplers[i]._SetDefaultFilter(_filter);
 	}
 }
 //----------------------------------------------------------------------------//
-void Graphics::LoadPixelShaders(const char** _names)
+void Graphics::SetDefaultTextureAnisotropy(uint _value)
 {
-	ASSERT(m_pixelShaders[0] == nullptr);
-
-	for (uint i = 0; *_names; ++i)
+	if (_value == 0 || _value > m_maxTexAniso)
+		_value = m_maxTexAniso;
+	if (_value != m_defaultTexAniso)
 	{
-		ASSERT(i < MAX_PIXEL_SHADERS);
-
-		const char* _name = *_names++;
-		LOG("Load PixelShader \"%s\"", _name);
-
-		RawData _bytecode = LoadFile(_name);
-		HRESULT _r = gGraphicsDevice->CreatePixelShader((const DWORD*)*_bytecode, m_pixelShaders + i);
-		CHECK(_r >= 0, "Couldn't create PixelShader");
+		m_defaultTexAniso = _value;
+		for (uint i = 0; i < m_numSamplers; ++i)
+			m_samplers[i]._SetDefaultAniso(_value);
 	}
+}
+//----------------------------------------------------------------------------//
+SamplerID Graphics::AddSampler(const Sampler::Desc& _desc)
+{
+	uint _hash = Hash(&_desc, sizeof(_desc));
+	for (uint i = 0; i < m_numSamplers; ++i)
+	{
+		if (m_samplers[i].m_hash == _hash)
+			return i;
+	}
+	SamplerID _id = m_numSamplers++;
+	m_samplers[_id] = Sampler(_id, _desc, _hash);
+	return _id;
 }
 //----------------------------------------------------------------------------//
 void Graphics::BeginFrame(void)
@@ -328,7 +518,7 @@ void Graphics::SetVertexBuffer(VertexBuffer* _buffer, uint _offset, uint _stride
 	m_device->SetStreamSource( 0, _buffer->Handle(), _offset, _stride);
 }
 //----------------------------------------------------------------------------//
-void Graphics::SetVertexShader(uint _id)
+void Graphics::SetVertexShader(VertexShaderID _id)
 {
 	ASSERT(_id < MAX_VERTEX_SHADERS);
 	ASSERT(m_vertexShaders[_id] != nullptr);
@@ -336,7 +526,7 @@ void Graphics::SetVertexShader(uint _id)
 	m_device->SetVertexShader(m_vertexShaders[_id]);
 }
 //----------------------------------------------------------------------------//
-void Graphics::SetPixelShader(uint _id)
+void Graphics::SetPixelShader(PixelShaderID _id)
 {
 	ASSERT(_id < MAX_PIXEL_SHADERS);
 	ASSERT(m_pixelShaders[_id] != nullptr);
@@ -344,9 +534,39 @@ void Graphics::SetPixelShader(uint _id)
 	m_device->SetPixelShader(m_pixelShaders[_id]);
 }
 //----------------------------------------------------------------------------//
-void Graphics::SetTexture(uint _stage, Texture* _tex)
+void Graphics::SetFloatUniformVS(uint _index, const void* _data, uint _num4)
 {
-	m_device->SetTexture(_stage, _tex ? _tex->Handle() : nullptr);
+	m_device->SetVertexShaderConstantF(_index, (const float*)_data, _num4);
+}
+//----------------------------------------------------------------------------//
+void Graphics::SetFloatUniformPS(uint _index, const void* _data, uint _num4)
+{
+	m_device->SetPixelShaderConstantF(_index, (const float*)_data, _num4);
+}
+//----------------------------------------------------------------------------//
+void Graphics::SetTexture(uint _unit, Texture* _texture)
+{
+	ASSERT(_unit < MAX_TEXTURE_UNITS);
+	TextureUnit& _tu = m_texUnit[_unit];
+	if (_tu.texture != _texture)
+	{
+		_tu.texture = _texture;
+		if (_texture)
+			_texture->_Bind(_unit);
+		else
+			m_device->SetTexture(_unit, nullptr);
+	}
+}
+//----------------------------------------------------------------------------//
+void Graphics::SetSampler(uint _unit, SamplerID _sampler)
+{
+	ASSERT(_unit < MAX_TEXTURE_UNITS);
+	TextureUnit& _tu = m_texUnit[_unit];
+	if (_tu.sampler != _sampler)
+	{
+		_tu.sampler = _sampler;
+		m_samplers[_sampler]._Bind(_unit);
+	}
 }
 //----------------------------------------------------------------------------//
 

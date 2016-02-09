@@ -43,6 +43,8 @@ void RgbaToArgb(void* _dst, const void* _src, uint _numPixels);
 // Image
 //----------------------------------------------------------------------------//
 
+//TODO: 3D & compressed
+
 class Image : public RefCounted
 {
 public:
@@ -56,14 +58,14 @@ public:
 	uint8* RawData(void) { return m_data; }
 	Color* Pixels(void) { return m_pixels; }
 	uint Bpp(void) { return BitsPerPixel(m_format); }
-	Vec2i GetCoord(const Vec2& _tc, bool _repeat = true);
+	Vec2 GetCoord(const Vec2& _tc, bool _repeat = true);
 	Color Sample(const Vec2& _tc, bool _smoothed = true, bool _repeat = true);
-	//Color LSample(uint _x, uint _y)
-	//Color Sample(float _x, float _y, bool _nearest, int _addressing)
+	ImagePtr CreateLod(void);
 
 	void CreateBitmapFont(FontInfo& _info, const char* _name, uint _fheight, float _fwidth = 0.5f, bool _italic = false);
 	int CreateNoize(uint _size, int _rseed = 0);
 	void CreatePerlin(uint _size, float _scale = 1, const Vec2& _offset = 0, int _rseed = 100, uint _iterations = 4);
+
 
 protected:
 	PixelFormat m_format;

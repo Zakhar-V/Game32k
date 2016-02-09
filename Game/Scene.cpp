@@ -104,7 +104,7 @@ void Node::_SetScene(Scene* _scene)
 		if (m_scene)
 		{
 			_OnChangeScene(nullptr);
-
+			m_scene->_FreeID(m_id);
 			if (!m_parent)
 				_Unlink(m_scene->_Root());
 		}
@@ -113,9 +113,9 @@ void Node::_SetScene(Scene* _scene)
 
 		if (m_scene)
 		{
+			m_id = m_scene->_NewID(this);
 			if (!m_parent)
 				_Link(m_scene->_Root());
-
 			_OnChangeScene(m_scene);
 		}
 	}
@@ -178,18 +178,23 @@ void Node::_UpdateWorldTM(void)
 //----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
+Scene::Scene(void) :
+	m_rootNodes(nullptr)
+{
+	m_nodes.Push(nullptr); // 0
+}
+//----------------------------------------------------------------------------//
+Scene::~Scene(void)
+{
+}
+//----------------------------------------------------------------------------//
 void Scene::AddNode(Node* _node)
 {
-	//if(!_node || !_node->m_scene)
-
+	if (_node)
+		_node->_SetScene(this);
 }
 //----------------------------------------------------------------------------//
-void Scene::RemoveNode(Node* _node)
-{
-
-}
-//----------------------------------------------------------------------------//
-uint Scene::_RegisterNode(Node* _node)
+uint Scene::_NewID(Node* _node)
 {
 	uint _id = 0;
 	if (m_freeIds.Size())
@@ -206,9 +211,10 @@ uint Scene::_RegisterNode(Node* _node)
 	return _id;
 }
 //----------------------------------------------------------------------------//
-void Scene::_UnregisterNode(Node* _node)
+void Scene::_FreeID(uint _id)
 {
-	
+	ASSERT(_id < m_nodes.Size());
+	m_nodes[_id] = nullptr;
 }
 //----------------------------------------------------------------------------//
 

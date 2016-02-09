@@ -48,7 +48,7 @@ public:
 	bool ShouldClose(void) { return m_shouldClose; }
 	void PollEvents(void);
 
-	//void SetCursorMode(CursorMode _mode);
+	void SetCursorMode(CursorMode _mode);
 
 protected:
 	void _CursorToCenter(void);

@@ -1,9 +1,7 @@
 #pragma once
 
 #include "Math.hpp"
-#include "Collision.hpp"
 #include "Object.hpp"
-
 
 //----------------------------------------------------------------------------//
 // Defs
@@ -28,21 +26,6 @@ class SoundWorld;
 //----------------------------------------------------------------------------//
 // 
 //----------------------------------------------------------------------------//
-
-enum ComponentType
-{
-	CT_Camera,
-	CT_Light,
-	//CT_
-	CT_Terrain,
-
-
-	CT_Shape,
-	CT_Body,
-	//CT_Joint,
-
-	CT_MaxTypes,
-};
 
 //----------------------------------------------------------------------------//
 // 
@@ -77,6 +60,15 @@ protected:
 // Node
 //----------------------------------------------------------------------------//
 
+enum NodeType
+{
+	NT_Unknown = 0,
+	NT_Camera = 0x1,
+	NT_Renderable = 0x2,
+	NT_Light = NT_Renderable | 0x4,
+	NT_Terrain = NT_Renderable | 0x8,
+};
+
 class Node : public Object
 {
 public:
@@ -84,12 +76,15 @@ public:
 	Node(void);
 	~Node(void);
 
+	virtual NodeType Type(void) { return NT_Unknown; }
+
 	Scene* GetScene(void) { return m_scene; }
 	void SetParent(Node* _parent);
 	void DetachAllChildren(bool _remove = false);
 	void RemoveThis(void);
 
 protected:
+	friend class Scene;
 
 	void _SetScene(Scene* _scene);
 
@@ -126,28 +121,72 @@ protected:
 };
 
 //----------------------------------------------------------------------------//
-// 
+// CameraNode 
 //----------------------------------------------------------------------------//
 
-class TerrainNode : public Node
+class CameraNode : public Node
 {
 public:
 
+	virtual NodeType Type(void) { return NT_Camera; }
+
 protected:
 
+	Mat44 m_view;
+	Mat44 m_proj;
+};
+
+//----------------------------------------------------------------------------//
+// RenderableNode
+//----------------------------------------------------------------------------//
+
+class RenderOp
+{
+	VertexBuffer* vertices;
+	IndexBuffer* indices;
+	Material* material;
+	uint start;
+	uint count;
+	float distance;
+};
+
+class RenderableNode : public Node
+{
+public:
+
+	virtual NodeType Type(void) { return NT_Renderable; }
+
+	virtual void GetRenderOps(Array<RenderOp>& _dst, uint _flags, uint _mask) { }
+};
+
+//----------------------------------------------------------------------------//
+// TerrainNode
+//----------------------------------------------------------------------------//
+
+class TerrainNode : public RenderableNode
+{
+public:
+
+	virtual NodeType Type(void) { return NT_Terrain; }
+
+protected:
 
 };
 
 //----------------------------------------------------------------------------//
-// 
+// Scene
 //----------------------------------------------------------------------------//
 
 class Scene : public NonCopyable
 {
 public:
 
+	Scene(void);
+	~Scene(void);
+
 	void AddNode(Node* _node);
-	void RemoveNode(Node* _node);
+
+	DbvTree& GetDbvt(void) { return m_dbvt; }
 
 protected:
 
@@ -155,14 +194,23 @@ protected:
 
 	Node*& _Root(void) { return m_rootNodes; }
 
-	uint _RegisterNode(Node* _node);
-	void _UnregisterNode(Node* _node);
+	uint _NewID(Node* _node);
+	void _FreeID(uint _id);
 
 	Node* m_rootNodes;
 
 	Array<Node*> m_nodes;
 	Array<uint> m_freeIds;
+
+	DbvTree m_dbvt;
+
+	//Array<RenderableNode*> m_mainCameraPvs;
+	//Array<RenderableNode*>
 };
+
+//----------------------------------------------------------------------------//
+// 
+//----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
 // 

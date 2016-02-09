@@ -5,9 +5,9 @@
 
 #include "Base.cpp"
 #include "File.cpp"
+#include "Math.cpp"
 #include "Device.cpp"
 #include "Graphics.cpp"
-#include "Renderer.cpp"
 #include "BuiltinData.cpp"
 #include "Scene.cpp"
 #include "Image.cpp"
@@ -25,28 +25,6 @@
 
 
 
-//----------------------------------------------------------------------------//
-//
-//----------------------------------------------------------------------------//
-
-class String
-{
-public:
-
-protected:
-
-	struct Buffer
-	{
-		uint length = 0;
-		uint size = 1;
-		int refs = 1;
-		//char str[1] = { 0 };
-	};
-
-	static Buffer s_null;
-};
-
-String::Buffer String::s_null;
 
 //----------------------------------------------------------------------------//
 //
@@ -131,18 +109,68 @@ template <class F> F FuncCast(void* _func) { union { void* p; F f; }_fp = { _fun
 //
 //----------------------------------------------------------------------------//
 
-/*
-
-
-
-*/
-
-
 
 //----------------------------------------------------------------------------//
 //
 //----------------------------------------------------------------------------//
 
+class String
+{
+public:
+
+	//void Append(const char)
+	void Append(const char* _str, int _length = -1)
+	{
+
+	}
+
+protected:
+
+	static int _Length(const char* _str, int _length)
+	{
+		return (uint)(_length >= 0 ? _length : strlen(_str ? _str : ""));
+	}
+
+	struct Buffer
+	{
+		Buffer* AddRef(void)
+		{
+			++refs;
+			return this;
+		}
+		void Release(void)
+		{
+			if (!--refs)
+				delete [] reinterpret_cast<uint8*>(this);
+		}
+
+		uint length = 0;
+		uint size = 1;
+		int refs = 1;
+		union
+		{
+			char ch = 0;
+			char str[1];
+		};
+	};
+
+	Buffer* _New(uint _maxLength)
+	{
+		if (!_maxLength)
+			return s_null.AddRef();
+
+		Buffer* _buff = reinterpret_cast<Buffer*>(new uint8[sizeof(Buffer) + _maxLength]);
+		new(_buff) Buffer();
+		_buff->size = _maxLength + 1;
+		return _buff;
+	}
+
+	Buffer* m_buffer;
+
+	static Buffer s_null;
+};
+
+String::Buffer String::s_null;
 
 //----------------------------------------------------------------------------//
 //
@@ -170,13 +198,12 @@ void main(void)
 	PRINT_SIZEOF(Node);
 	LOG("1KK nodes = %d mb", (sizeof(Node) * 1000000) / 1024 / 1024);
 
-
 	{
 		const Color _clearColor(0x7f7f9fff);
 		Device _device;
 		Graphics _graphics;	  
-		Renderer _renderer;
 		{
+
 			/*Texture _tex(TT_2D, PF_RGB8);
 			const uint8 _img[2*2*3] =
 			{
@@ -188,22 +215,26 @@ void main(void)
 			_tex.SetData(_img);
 			_tex.GenerateLods(); */
 			
-			Texture _tex(TT_2D, PF_RGBA8);
+			SamplerID _sampler = gGraphics->AddSampler({ TF_Trilinear, TW_Clamp, TW_Clamp });
+
+			Texture _tex(TT_2D, PF_RGBA8, TU_Default);
 			FontInfo _fi;
 			//ImagePtr _img = CreateBitmapFont(_fi, "Courier New TT", 32, 0.5f);
 			ImagePtr _img = new Image;
-			//_img->CreateBitmapFont(_fi, "Courier New TT", 32, 0.5f);
+			_img->CreateBitmapFont(_fi, "Courier New TT", 32, 0.5f);
 			//_img->CreateNoize(512, 0);
-			_img->CreatePerlin(256, 0.03f, 0, 777, 2);
-			_tex.SetSize(_img->Width(), _img->Height());
-			_tex.SetData(_img->RawData());
-			_tex.GenerateLods();
+			//_img->CreatePerlin(256, 0.05f, 0, 777, 4);
+			//_tex.SetSize(_img->Width(), _img->Height());
+			//_tex.SetData(0, _img->RawData());
+			//_tex.GenerateLods();
+			_tex.SetImage(_img);
+
 
 			VertexBuffer _vb(4 * sizeof(SimpleVertex));
 
 			{
 				Vec2 _p(100, 100);
-				Vec2 _s(512, 512);
+				Vec2 _s(600, 600);
 				/*SimpleVertex _vd[3] =  // xyz, tc, argb
 				{
 					{ Vec3(150.0f,  50.0f, 0.5f), Vec2(0.5f, 1.0f), 0xff0000ff, }, // t
@@ -239,6 +270,8 @@ void main(void)
 
 			Mat44 _viewProjMatrix;
 
+			//gDevice->SetCursorMode(CM_Camera);
+
 			while (!gDevice->ShouldClose())
 			{
 				gDevice->PollEvents();
@@ -249,14 +282,15 @@ void main(void)
 				 
 				gGraphics->BeginFrame();
 				gGraphics->ClearFrameBuffers(FBT_Color, _clearColor);
-				gGraphics->SetVertexShader(0);
-				gGraphics->SetPixelShader(0);
+				gGraphics->SetVertexShader(VS_Test);
+				gGraphics->SetPixelShader(PS_Test);
 				gGraphics->SetVertexFormat(VF_Simple);
 				gGraphics->SetVertexBuffer(&_vb, 0, sizeof(SimpleVertex));
 
-				gGraphicsDevice->SetVertexShaderConstantF(0, _viewProjMatrix.v, 4);
+				gGraphics->SetFloatUniformVS(0, &_viewProjMatrix, 4);
 
 				gGraphics->SetTexture(0, &_tex);
+				gGraphics->SetSampler(0, _sampler);
 
 
 				gGraphicsDevice->DrawPrimitive(D3DPT_TRIANGLESTRIP, 0, 2);

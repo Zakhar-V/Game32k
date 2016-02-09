@@ -13,9 +13,6 @@
     <ClCompile Include="File.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
-    <ClCompile Include="Renderer.cpp">
-      <Filter>Engine</Filter>
-    </ClCompile>
     <ClCompile Include="Scene.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
@@ -26,6 +23,9 @@
       <Filter>Engine</Filter>
     </ClCompile>
     <ClCompile Include="Device.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="Math.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
   </ItemGroup>
@@ -65,13 +65,7 @@
     <ClInclude Include="Scene.hpp">
       <Filter>Engine</Filter>
     </ClInclude>
-    <ClInclude Include="Collision.hpp">
-      <Filter>Engine</Filter>
-    </ClInclude>
     <ClInclude Include="Object.hpp">
-      <Filter>Engine</Filter>
-    </ClInclude>
-    <ClInclude Include="Renderer.hpp">
       <Filter>Engine</Filter>
     </ClInclude>
     <ClInclude Include="Geometry.hpp">
