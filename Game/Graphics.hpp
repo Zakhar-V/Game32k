@@ -41,6 +41,7 @@ enum VertexFormat : uint8
 {
 	VF_Base,
 	VF_Simple,
+	VF_Sprite,
 	VF_Static,
 	VF_Skinned,
 	MAX_VERTEX_FORMATS,
@@ -62,6 +63,18 @@ struct SimpleVertex : Vertex
 	Vec2 texcoord;
 };
 
+struct SpriteVertex : SimpleVertex
+{
+	SpriteVertex(void) { }
+	SpriteVertex(const Vec3& _pos, const Vec2& _size, float _scale, float _rotation, const Vec2& _texcoord, const Vec2& _texcoord2, const Color& _color) :
+		SimpleVertex(_pos, _texcoord, _color), size(_size), scale(_scale), rotation(_rotation), texcoord2(_texcoord2) { }
+	
+	Vec2 texcoord2; // in shader: TEXCOORD0.zw (texture scaling for point-sprites)
+	Vec2 size; // in shader: float4 sprite:TEXCOORD1 {size.x, size.y, scale, rotate}
+	float scale; // in shader: TEXCOORD1.z
+	float rotation;	// in shader: TEXCOORD1.w
+};
+
 struct StaticVertex : Vertex
 {
 	StaticVertex(void) { }
@@ -81,6 +94,15 @@ struct SkinnedVertex : StaticVertex
 	Color weights;
 };
 
+static const uint VertexSize[] =
+{
+	sizeof(Vertex),
+	sizeof(SimpleVertex),
+	sizeof(SpriteVertex),
+	sizeof(StaticVertex),
+	sizeof(SkinnedVertex),
+};
+
 //----------------------------------------------------------------------------//
 // Buffer
 //----------------------------------------------------------------------------//
@@ -97,38 +119,51 @@ enum BufferUsage : uint16
 	BU_Dynamic = D3DUSAGE_DYNAMIC,
 };
 
+typedef Ptr<class VertexBuffer> VertexBufferPtr;
+
 class VertexBuffer : public RefCounted
 {
 public:
 
-	VertexBuffer(uint _size, BufferUsage _usage = BU_Static);
+	VertexBuffer(VertexFormat _format, BufferUsage _usage = BU_Static);
 	~VertexBuffer(void);
 
+	void Realloc(uint _newSize);
 	uint Size(void) { return m_size; }
 	IDirect3DVertexBuffer9* Handle(void) { return m_handle; }
+	VertexFormat Format(void) { return m_format; }
+	uint Stride(void) { return VertexSize[m_format]; }
 
 	void Write(const void* _data, uint _offset, uint _size);
 
 protected:
 
+	BufferUsage m_usage;
+	VertexFormat m_format;
 	uint m_size;
 	IDirect3DVertexBuffer9*	m_handle;
 };
 
-class IndexBuffer : public NonCopyable
+typedef Ptr<class IndexBuffer> IndexBufferPtr;
+
+class IndexBuffer : public RefCounted
 {
 public:
 
-	IndexBuffer(uint _size, IndexFormat _format, BufferUsage _usage = BU_Static);
+	IndexBuffer(IndexFormat _format = IF_UShort, BufferUsage _usage = BU_Static);
 	~IndexBuffer(void);
 
+	void Realloc(uint _newSize);
 	uint Size(void) { return m_size; }
 	IDirect3DIndexBuffer9* Handle(void) { return m_handle; }
+	uint Stride(void) { return m_format == IF_UShort ? 2 : 4; }
 
 	void Write(const void* _data, uint _offset, uint _size);
 
 protected:
 
+	BufferUsage m_usage;
+	IndexFormat m_format;
 	uint m_size;
 	IDirect3DIndexBuffer9*	m_handle;
 };
@@ -312,8 +347,12 @@ public:
 
 	void ClearFrameBuffers(uint _buffers, const Color& _color = 0x000000ff, float _depth = 1.0, uint _stencil = 0xff);
 
-	void SetVertexFormat(VertexFormat _format);
-	void SetVertexBuffer(VertexBuffer* _buffer, uint _offset, uint _stride);
+	void SetVertexBuffer(VertexBuffer* _buffer, uint _offset = 0);
+	VertexBuffer* GetVertexBuffer(void) { return m_vertexBuffer; }
+	uint GetVertexBufferOffset(void) { return m_vertexBufferOffset; }
+
+	void SetIndexBuffer(IndexBuffer* _buffer);
+	IndexBuffer* GetIndexBuffer(void) { return m_indexBuffer; }
 
 	void SetVertexShader(VertexShaderID _id);
 	void SetPixelShader(PixelShaderID _id);
@@ -334,6 +373,12 @@ protected:
 	IDirect3DVertexDeclaration9* m_vertexFormats[MAX_VERTEX_FORMATS];
 	IDirect3DVertexShader9*	m_vertexShaders[MAX_VERTEX_SHADERS];
 	IDirect3DPixelShader9* m_pixelShaders[MAX_PIXEL_SHADERS];
+
+	VertexFormat m_vertexFormat;
+	VertexBuffer* m_vertexBuffer;
+	uint m_vertexBufferOffset;
+
+	IndexBuffer* m_indexBuffer;
 
 	TextureFilter m_defaultTexFilter;
 	uint m_defaultTexAniso;

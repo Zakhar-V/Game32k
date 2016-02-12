@@ -228,12 +228,18 @@ public:
 	}
 	uint Size(void) const
 	{
-		return m_size;
+		return m_used;
 	}
 	Array& Reserve(uint _size)
 	{
 		_Realloc(_size, false);
 		return *this;
+	}
+	T* Upsize(uint _append, bool _quantize = false)
+	{
+		uint _offset = m_used;
+		Resize(m_used + _append, T(), _quantize);
+		return m_data + _offset;
 	}
 	Array& Resize(uint _newSize, const T& _sample = T(), bool _quantize = false)
 	{
@@ -293,12 +299,11 @@ public:
 protected:
 	void _Realloc(uint _newSize, bool _quantize)
 	{
-		if (m_size > _newSize)
+		if (_newSize < m_size)
 			return;
 		if (_quantize)
 			_newSize = (_newSize + 1) << 1;
-		T* _newData = reinterpret_cast<T*>(new uint8[_newSize]);
-
+		T* _newData = reinterpret_cast<T*>(new uint8[_newSize * sizeof(T)]);
 		for (T *_new = _newData, *_old = m_data, *_end = m_data + m_used; _old < _end; ++_new, ++_old)
 		{
 			new(reinterpret_cast<void*>(_new)) T(Move(*_old));

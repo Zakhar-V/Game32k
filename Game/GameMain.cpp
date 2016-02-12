@@ -11,6 +11,7 @@
 #include "BuiltinData.cpp"
 #include "Scene.cpp"
 #include "Image.cpp"
+#include "Geometry.cpp"
 
 //----------------------------------------------------------------------------//
 //
@@ -183,6 +184,292 @@ String::Buffer String::s_null;
 //----------------------------------------------------------------------------//
 ////////////////////////////////////////////////////////////////////////////////
 
+class TestCamera
+{
+public:
+
+	void Update(float _dt)
+	{
+		Vec3 _vec = 0;
+		if ((GetAsyncKeyState('W') & 0x8000) != 0)
+			_vec.z += m_speed.z;
+		if ((GetAsyncKeyState('S') & 0x8000) != 0)
+			_vec.z -= m_speed.z;
+
+		if ((GetAsyncKeyState('A') & 0x8000) != 0)
+			_vec.x += m_speed.x;
+		if ((GetAsyncKeyState('D') & 0x8000) != 0)
+			_vec.x -= m_speed.x;
+
+		if ((GetAsyncKeyState('Q') & 0x8000) != 0)
+			_vec.y += m_speed.y;
+		if ((GetAsyncKeyState('E') & 0x8000) != 0)
+			_vec.y -= m_speed.y;
+
+		/*if ((GetAsyncKeyState(VK_ADD) & 0x8000) != 0)
+			m_fov += RADIANS;
+		if ((GetAsyncKeyState(VK_SUBTRACT) & 0x8000) != 0)
+			m_fov -= RADIANS;*/
+
+		if ((GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0)
+			_vec *= 5;
+
+		_vec = _vec * m_viewMatrix.GetRotation().Inverse();
+		m_pos += _vec * _dt;
+		//printf("pos (%f %f %f)\n", m_pos.x, m_pos.y, m_pos.z);
+		Mat44 _tm;
+		_tm.CreateTranslation(m_pos);
+
+		m_rot += gDevice->GetCameraDelta() * m_rspeed * _dt;
+		m_rot.y = Clamp<float>(m_rot.y, -90, 90);
+		//printf("rot (%f %f)\n", m_rot.x, m_rot.y);
+
+		Quat _rx, _ry, _r;
+		_rx.FromAxisAngle(VEC3_UNIT_X, -m_rot.y * RADIANS);
+		_ry.FromAxisAngle(VEC3_UNIT_Y, -m_rot.x * RADIANS);
+		_r = _ry * _rx;
+		Mat44 _rm;
+		_rm.CreateRotation(_r);
+		m_viewMatrix = (_rm * _tm);
+
+		Vec2 _wndSize = gDevice->WindowSize();
+		//
+		m_projMatrix.CreatePerspective(m_fov, _wndSize.x / _wndSize.y, 0.01f, 100);
+		//printf("fov (%f %f %f)\n", m_fov, m_projMatrix[0][0], m_projMatrix[1][1]);
+
+		m_viewProjMatrix = m_projMatrix * m_viewMatrix;
+	}
+
+	float m_fov = PI / 4; // 45
+	Vec3 m_speed = 1;
+	Vec2 m_rspeed = 1;
+	Vec3 m_pos = 0;
+	Vec2 m_rot = 0;
+	Mat44 m_viewMatrix = MAT44_IDENTITY;
+	Mat44 m_projMatrix;
+	Mat44 m_viewProjMatrix;
+protected:
+
+};
+
+double Time(void)
+{
+	LARGE_INTEGER _f, _c;
+	QueryPerformanceFrequency(&_f);
+	QueryPerformanceCounter(&_c);
+	return (double)_c.QuadPart / (double)_f.QuadPart;
+}
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------//
+//
+//----------------------------------------------------------------------------//
+////////////////////////////////////////////////////////////////////////////////
+
+
+////////////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------//
+//
+//----------------------------------------------------------------------------//
+////////////////////////////////////////////////////////////////////////////////
+
+/*
+Тип вершины
+
+Тип геометрии
+
+Тип примитива
+
+*/
+
+enum GeometryType
+{
+	GT_
+};
+
+class Geometry : public RefCounted
+{
+public:
+
+	virtual uint Count(void) = 0;
+	virtual void Bind(uint _offset = 0) = 0;
+	virtual void Draw(uint _baseVertex, uint _start, uint _count) = 0;
+
+//protected:
+
+	VertexBufferPtr m_vertexBuffer;
+	IndexBufferPtr m_indexBuffer;
+};
+
+class RenderMesh : public Geometry
+{
+public:
+
+	RenderMesh(void)
+	{
+
+	}
+
+	void ClearIndices(void)
+	{
+
+	}
+
+	void SetIndices(const uint16* _data, uint _count)
+	{
+	}
+};
+
+class DebugGeometry : public Geometry
+{
+public:
+
+protected:
+};
+
+
+class SpriteBatch : public Geometry
+{
+public:
+
+	SpriteBatch(void)
+	{
+		m_vertexBuffer = new VertexBuffer(VF_Sprite, BU_Dynamic);
+		m_indexBuffer = new IndexBuffer(IF_UShort, BU_Dynamic);
+	}
+
+	uint Count(void) override { return m_indices.Size(); }
+
+	void Bind(uint _offset = 0) override
+	{
+		_Update();
+		gGraphics->SetVertexBuffer(m_vertexBuffer, _offset);
+		gGraphics->SetIndexBuffer(m_indexBuffer);
+	}
+	void Draw(uint _baseVertex, uint _start, uint _count) override
+	{
+		ASSERT(_baseVertex < m_vertices.Size());
+		gGraphicsDevice->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, _baseVertex, 0, m_vertices.Size() - _baseVertex, _start, _count / 3);
+	}
+
+	void Clear(void)
+	{
+		m_vertices.Clear();
+		m_indices.Clear();
+		m_updated = false;
+	}
+
+	void AddVertices(const SpriteVertex* _src, uint _count, bool _flipYTexcoord = false)
+	{
+		uint _base = m_vertices.Size();
+		AddSpritesToBatch(m_vertices.Upsize(_count * 4, true), _src, _count, _flipYTexcoord);
+		AddQuadsToBatch(m_indices.Upsize(_count * 6), _base, _count);
+		m_updated = false;
+	}
+
+protected:
+
+	void _Update(void)
+	{
+		if (!m_updated)
+		{
+			uint _size = m_vertices.Size() * sizeof(m_vertices[0]);
+			if (_size > m_vertexBuffer->Size())
+				m_vertexBuffer->Realloc(_size);
+			m_vertexBuffer->Write(*m_vertices, 0, _size);
+
+			_size = m_indices.Size() * sizeof(m_indices[0]);
+			if (_size > m_indexBuffer->Size())
+				m_indexBuffer->Realloc(_size);
+			m_indexBuffer->Write(*m_indices, 0, _size);
+
+			m_updated = true;
+		}
+	}
+
+	Array<SpriteVertex> m_vertices;
+	Array<uint16> m_indices;
+	bool m_updated = false;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------//
+//
+//----------------------------------------------------------------------------//
+////////////////////////////////////////////////////////////////////////////////
+
+enum : uint
+{
+	MAX_TERRAIN_LODS = 7, // 64x64, 32x32 ...
+	TERRAIN_SECTOR_SIDE_M1 = (1 << (MAX_TERRAIN_LODS - 1)),
+	TERRAIN_SECTOR_SIDE = TERRAIN_SECTOR_SIDE_M1 + 1,
+	TERRAIN_SECTOR_VERTICES = TERRAIN_SECTOR_SIDE * TERRAIN_SECTOR_SIDE + TERRAIN_SECTOR_SIDE * 4,
+};
+
+struct HeightMap
+{
+	Array<uint16> incides;
+	uint lods[MAX_TERRAIN_LODS][2]; // start, count
+	uint sectors[2];
+	uint numSectors;
+
+};
+
+void CreateHeightMap(Image* _img, float _scaleY, float _finalSize, float _desiredStep)
+{
+	// 65x65 33x33 17x17 9x9 5x5 3x3 2x2
+
+	// sectors
+
+	int _s = FirstPow2((int)(_finalSize / _desiredStep)) + 1;
+	if (_s < TERRAIN_SECTOR_SIDE)
+		_s = TERRAIN_SECTOR_SIDE;
+
+	uint _numSectors = _s / TERRAIN_SECTOR_SIDE_M1;
+	uint _numQuads = _numSectors * TERRAIN_SECTOR_SIDE_M1;
+	uint _numVertices = _numQuads + 1;
+	float _step = _finalSize / _numQuads;
+	float _texStep = 1.0f / _numVertices;
+	float _length = _step * _numQuads;
+	float _startPos = _length * -0.5f;
+
+	for (uint sy = 0; sy < _numSectors; ++sy)
+	{
+		for (uint sx = 0; sx < _numSectors; ++sx)
+		{
+			for (uint vy = 0; vy <= TERRAIN_SECTOR_SIDE; ++vy)
+			{
+				uint y = (sy * TERRAIN_SECTOR_SIDE_M1 + vy);
+				for (uint vx = 0; vx <= TERRAIN_SECTOR_SIDE; ++vx)
+				{
+					uint x = (sx * TERRAIN_SECTOR_SIDE_M1 + vx);
+					float tx = _texStep * x;
+					float ty = _texStep * y;
+					float px = _startPos + x * _step;
+					float py = _startPos + y * _step;
+					printf("%d %d {%f %f} {%f %f}\n", x, y, px, py, tx, ty);
+
+
+				}
+			}
+			system("pause");
+		}
+	}
+
+	printf("num sectors: %d, step: %f, size: %f\n", _numSectors, _step, _length);
+
+	// indices
+
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------//
+//
+//----------------------------------------------------------------------------//
+////////////////////////////////////////////////////////////////////////////////
+
 void main(void)
 {
 	LOG("Startup ...");
@@ -221,20 +508,22 @@ void main(void)
 			FontInfo _fi;
 			//ImagePtr _img = CreateBitmapFont(_fi, "Courier New TT", 32, 0.5f);
 			ImagePtr _img = new Image;
-			_img->CreateBitmapFont(_fi, "Courier New TT", 32, 0.5f);
+			_img->CreateBitmapFont(_fi, "Courier New TT", 16, 0.5f);
 			//_img->CreateNoize(512, 0);
-			//_img->CreatePerlin(256, 0.05f, 0, 777, 4);
+			//_img->CreatePerlin(512, 0.05f, 0, 777, 4);
 			//_tex.SetSize(_img->Width(), _img->Height());
 			//_tex.SetData(0, _img->RawData());
 			//_tex.GenerateLods();
 			_tex.SetImage(_img);
 
 
-			VertexBuffer _vb(4 * sizeof(SimpleVertex));
+			VertexBuffer _vb(VF_Simple);
+			IndexBuffer _ib(IF_UShort);
 
 			{
-				Vec2 _p(100, 100);
-				Vec2 _s(600, 600);
+				_vb.Realloc(4 * sizeof(SimpleVertex));
+				Vec2 _p(-1,-1);
+				Vec2 _s(2, 2);
 				/*SimpleVertex _vd[3] =  // xyz, tc, argb
 				{
 					{ Vec3(150.0f,  50.0f, 0.5f), Vec2(0.5f, 1.0f), 0xff0000ff, }, // t
@@ -247,6 +536,7 @@ void main(void)
 				1 0
 				3 2
 				*/
+				float _z = 0;
 				SimpleVertex _vd[4] =  // xyz, tc, rgba
 				{
 					//{ Vec3(_p.x,  _p.y, 0.5f), Vec2(0, 1), 0xff0000ff, }, // lt
@@ -256,45 +546,110 @@ void main(void)
 					
 					// argb xyzw
 					// rgba
-					{ Vec3(_p.x + _s.x,  _p.y, 0.5f), Vec2(1, 0), 0xff0000ff, }, // rt
-					{ Vec3(_p.x,  _p.y, 0.5f), Vec2(0, 0), 0xffffffff, }, // lt
-					{ Vec3(_p.x + _s.x,  _p.y + _s.y, 0.5f), Vec2(1, 1), 0x00ff00ff, }, // rb
-					{ Vec3(_p.x,  _p.y + _s.y, 0.5f), Vec2(0, 1), 0x0000ffff, }, // lb
+					{ Vec3(_p.x + _s.x,  _p.y, _z), Vec2(1, 0), 0xff0000ff, }, // rt
+					{ Vec3(_p.x,  _p.y, _z), Vec2(0, 0), 0xffffffff, }, // lt
+					{ Vec3(_p.x + _s.x,  _p.y + _s.y, _z), Vec2(1, 1), 0x00ff00ff, }, // rb
+					{ Vec3(_p.x,  _p.y + _s.y, _z), Vec2(0, 1), 0x0000ffff, }, // lb
 				};
 				_vb.Write(_vd, 0, sizeof(_vd));	
+
+				_ib.Realloc(6 * 2);
+
+				const uint16 _idx[] =
+				{
+					0, 1, 3, 3, 1, 2,
+				};
+				_ib.Write(_idx, 0, 12);
 
 			}
 
 			Mat44 _worldMatrix;
-			_worldMatrix.SetIdentity() ;
+			_worldMatrix.CreateTransform({0, 0, -5}, QUAT_IDENTITY);
 
-			Mat44 _viewProjMatrix;
+			gDevice->SetCursorMode(CM_Camera);
 
-			//gDevice->SetCursorMode(CM_Camera);
+
+			double _st, _et;
+			float _dt = 0;
+
+			TestCamera _camera;
+
+			SpriteBatch _spriteBatch;
+			SpriteVertex _sprite({ 0, 0, -3 }, { 3 }, 1, 0, { 0 }, { 1 }, 0xffffffff);
+			SpriteVertex _sprite2({ 250, 250, 0 }, { 300 }, 1, 0, _fi.chars['A'].tc[0], _fi.chars['A'].tc[1], 0xffffffff);
+
+
+
+			//CreateHeightMap(_img, 1, 1000, 1);
+			//CreateHeightMap(_img, 1, 1, 1);
+
+			Scene _scene;
+
 
 			while (!gDevice->ShouldClose())
 			{
 				gDevice->PollEvents();
+				_st = Time();
 
-				Vec2 _size = gDevice->WindowSize();
-				_viewProjMatrix.CreateOrtho2D(_size.x, _size.y);
+				//Vec2 _size = gDevice->WindowSize();
+				//Mat44 _viewProjMatrix;
+				//_viewProjMatrix.CreateOrtho2D(_size.x, _size.y);
+				//_viewProjMatrix.CreateOrtho(0, _size.x, _size.y, 0, -1, 1);
+				//_viewProjMatrix.CreatePerspective(90 * RADIANS, _size.x / _size.y, 0.01, 100);
 				//_viewProjMatrix.Inverse().Inverse();
-				 
+
+				_camera.Update(_dt);
+
+
+
 				gGraphics->BeginFrame();
 				gGraphics->ClearFrameBuffers(FBT_Color, _clearColor);
 				gGraphics->SetVertexShader(VS_Test);
 				gGraphics->SetPixelShader(PS_Test);
-				gGraphics->SetVertexFormat(VF_Simple);
-				gGraphics->SetVertexBuffer(&_vb, 0, sizeof(SimpleVertex));
+				//gGraphics->SetVertexFormat(VF_Simple);
 
-				gGraphics->SetFloatUniformVS(0, &_viewProjMatrix, 4);
+				//gGraphics->SetFloatUniformVS(0, &_viewProjMatrix, 4);
+				gGraphics->SetFloatUniformVS(0, &_camera.m_viewProjMatrix, 4);
+				gGraphics->SetFloatUniformVS(4, &_worldMatrix, 4);
 
 				gGraphics->SetTexture(0, &_tex);
 				gGraphics->SetSampler(0, _sampler);
 
 
-				gGraphicsDevice->DrawPrimitive(D3DPT_TRIANGLESTRIP, 0, 2);
+				_spriteBatch.Clear();
+				_spriteBatch.AddVertices(&_sprite, 1);
+				_spriteBatch.AddVertices(&_sprite2, 1);
+				_spriteBatch.Bind();
+				_spriteBatch.Draw(0, 0, 6);
+				//gGraphics->SetVertexBuffer(&_vb);
+				//gGraphicsDevice->DrawPrimitive(D3DPT_TRIANGLESTRIP, 0, 2);
+				//gGraphics->SetIndexBuffer(&_ib);
+				//gGraphicsDevice->SetIndices(_ib.Handle());
+				//gGraphicsDevice->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, 0, 4, 0, 2);
+
+
+				{
+					Vec2 _size = gDevice->WindowSize();
+					Mat44 _viewProjMatrix, _model;
+					_model.SetIdentity();
+					//_viewProjMatrix.CreateOrtho2D(_size.x, _size.y);
+					_viewProjMatrix.CreateOrtho(0, _size.x, _size.y, 0, -1, 1);
+
+					gGraphics->SetFloatUniformVS(0, &_viewProjMatrix, 4);
+					gGraphics->SetFloatUniformVS(4, &_model, 4);
+
+					_spriteBatch.Draw(0, 6, 6);
+				}
+
 				gGraphics->EndFrame();
+
+				_et = Time();
+				float _odt = _dt;
+				_dt = (float)(_et - _st);
+				_dt = _dt * 0.6f + _odt * 0.4f;
+
+				//printf("dt %f\n", _dt);
+
 			}
 		}
 	}

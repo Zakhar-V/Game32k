@@ -67,6 +67,8 @@ enum NodeType
 	NT_Renderable = 0x2,
 	NT_Light = NT_Renderable | 0x4,
 	NT_Terrain = NT_Renderable | 0x8,
+
+	NT_Test = NT_Renderable | 0x10,
 };
 
 class Node : public Object
@@ -140,11 +142,15 @@ protected:
 // RenderableNode
 //----------------------------------------------------------------------------//
 
-class RenderOp
+class Geometry;
+
+struct RenderOp
 {
-	VertexBuffer* vertices;
-	IndexBuffer* indices;
+	Mat44* matrix;
+	Geometry* geom;
 	Material* material;
+	void* deform; 
+	uint baseVertex;
 	uint start;
 	uint count;
 	float distance;
@@ -160,6 +166,31 @@ public:
 };
 
 //----------------------------------------------------------------------------//
+// LightNode
+//----------------------------------------------------------------------------//
+
+class LightNode : public RenderableNode
+{
+public:
+	virtual NodeType Type(void) { return NT_Light; }
+
+protected:
+};
+
+//----------------------------------------------------------------------------//
+// TestNode
+//----------------------------------------------------------------------------//
+
+class TestNode : public RenderableNode
+{
+public:
+
+	virtual NodeType Type(void) { return NT_Test; }
+
+protected:
+};
+
+//----------------------------------------------------------------------------//
 // TerrainNode
 //----------------------------------------------------------------------------//
 
@@ -169,8 +200,22 @@ public:
 
 	virtual NodeType Type(void) { return NT_Terrain; }
 
+	//void CreateFromHeightMap(Image* _image, const Vec2& _size, float _heightScale);
 protected:
 
+};
+
+//----------------------------------------------------------------------------//
+// SkyDome
+//----------------------------------------------------------------------------//
+
+class SkyDome : public NonCopyable
+{
+public:
+
+protected:
+
+	float m_timeOfDay;
 };
 
 //----------------------------------------------------------------------------//
@@ -185,6 +230,9 @@ public:
 	~Scene(void);
 
 	void AddNode(Node* _node);
+
+	void Update(float _dt);
+	void Render(float _dt);
 
 	DbvTree& GetDbvt(void) { return m_dbvt; }
 
@@ -204,6 +252,11 @@ protected:
 
 	DbvTree m_dbvt;
 
+	// [renderer]
+
+	void _GetRenderableNodes();
+
+	Array<RenderableNode*> m_visibleNodes;
 	//Array<RenderableNode*> m_mainCameraPvs;
 	//Array<RenderableNode*>
 };

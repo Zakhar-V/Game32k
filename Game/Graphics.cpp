@@ -21,6 +21,16 @@ static const D3DVERTEXELEMENT9 VF_Simple_Desc[] =
 	{ 0, offsetof(SimpleVertex, color), D3DDECLTYPE_UBYTE4N, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR, 0 },
 	D3DDECL_END(),
 };
+static const D3DVERTEXELEMENT9 VF_Sprite_Desc[] =
+{
+	{ 0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0 },
+	{ 0, offsetof(SpriteVertex, color), D3DDECLTYPE_UBYTE4N, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR, 0 },
+	{ 0, offsetof(SpriteVertex, texcoord), D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0 },
+	//{ 0, offsetof(SpriteVertex, texscale), D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1 },
+	{ 0, offsetof(SpriteVertex, size), D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1 },
+	//{ 0, offsetof(SpriteVertex, rotation), D3DDECLTYPE_FLOAT1, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 2 },
+	D3DDECL_END(),
+};
 
 static const D3DVERTEXELEMENT9 VF_Static_Desc[] =
 {
@@ -47,21 +57,42 @@ static const D3DVERTEXELEMENT9 VF_Skinned_Desc[] =
 //----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
-VertexBuffer::VertexBuffer(uint _size, BufferUsage _usage) :
-	m_size(_size),
+VertexBuffer::VertexBuffer(VertexFormat _format, BufferUsage _usage) :
+	m_usage(_usage),
+	m_format(_format),
+	m_size(0),
 	m_handle(nullptr)
 {
-	HRESULT _r = gGraphicsDevice->CreateVertexBuffer(_size, _usage, 0, _usage == BU_Static ? D3DPOOL_MANAGED : D3DPOOL_DEFAULT, &m_handle, nullptr);
-	CHECK(_r >= 0, "Couldn't create vertex buffer");
 }
 //----------------------------------------------------------------------------//
 VertexBuffer::~VertexBuffer(void)
 {
-	m_handle->Release();
+	if (m_handle)
+		m_handle->Release();
+}
+//----------------------------------------------------------------------------//
+void VertexBuffer::Realloc(uint _newSize)
+{
+	if (_newSize != m_size)
+	{
+		if (m_handle)
+		{
+			m_handle->Release();
+			m_handle = nullptr;
+		}
+		m_size = _newSize;
+		gGraphicsDevice->CreateVertexBuffer(_newSize, m_usage, 0, m_usage == BU_Static ? D3DPOOL_MANAGED : D3DPOOL_DEFAULT, &m_handle, nullptr);
+		CHECK(m_handle != nullptr, "Couldn't create vertex buffer");
+		
+		if (gGraphics->GetVertexBuffer() == this)
+			gGraphicsDevice->SetStreamSource(0, m_handle, gGraphics->GetVertexBufferOffset(), VertexSize[m_format]);
+	}
 }
 //----------------------------------------------------------------------------//
 void VertexBuffer::Write(const void* _data, uint _offset, uint _size)
 {
+	ASSERT(m_handle != nullptr);
+	ASSERT(_offset + _size <= m_size);
 	void* _dst = nullptr;
 	m_handle->Lock(_offset, _size, &_dst, D3DLOCK_DISCARD);
 	memcpy(_dst, _data, _size);
@@ -74,12 +105,12 @@ void VertexBuffer::Write(const void* _data, uint _offset, uint _size)
 //----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
-IndexBuffer::IndexBuffer(uint _size, IndexFormat _format, BufferUsage _usage) :
-	m_size(_size),
+IndexBuffer::IndexBuffer(IndexFormat _format, BufferUsage _usage) :
+	m_usage(_usage),
+	m_format(_format),
+	m_size(0),
 	m_handle(nullptr)
 {
-	HRESULT _r = gGraphicsDevice->CreateIndexBuffer(_size, _usage, (D3DFORMAT)_format, _usage == BU_Static ? D3DPOOL_MANAGED : D3DPOOL_DEFAULT, &m_handle, nullptr);
-	CHECK(_r >= 0, "Couldn't create index buffer");
 }
 //----------------------------------------------------------------------------//
 IndexBuffer::~IndexBuffer(void)
@@ -87,8 +118,27 @@ IndexBuffer::~IndexBuffer(void)
 	m_handle->Release();
 }
 //----------------------------------------------------------------------------//
+void IndexBuffer::Realloc(uint _newSize)
+{
+	if (_newSize != m_size)
+	{
+		if (m_handle)
+		{
+			m_handle->Release();
+			m_handle = nullptr;
+		}
+		m_size = _newSize;
+		gGraphicsDevice->CreateIndexBuffer(m_size, m_usage, (D3DFORMAT)m_format, m_usage == BU_Static ? D3DPOOL_MANAGED : D3DPOOL_DEFAULT, &m_handle, nullptr);
+		CHECK(m_handle != nullptr, "Couldn't create index buffer");
+
+		if (gGraphics->GetIndexBuffer() == this)
+			gGraphicsDevice->SetIndices(m_handle);
+	}
+}
+//----------------------------------------------------------------------------//
 void IndexBuffer::Write(const void* _data, uint _offset, uint _size)
 {
+	ASSERT(m_handle != nullptr);
 	void* _dst = nullptr;
 	m_handle->Lock(_offset, _size, &_dst, D3DLOCK_DISCARD);
 	memcpy(_dst, _data, _size);
@@ -388,21 +438,38 @@ Graphics::Graphics(void)
 	_pp.SwapEffect = D3DSWAPEFFECT_DISCARD;
 	_pp.BackBufferFormat = D3DFMT_UNKNOWN;
 
-	HRESULT _r = m_d3d->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, gDevice->WindowHandle(), D3DCREATE_SOFTWARE_VERTEXPROCESSING, &_pp, &m_device);
-	_CHECK(_r >= 0, "Couldn't create IDirect3D9Device");
+	m_device = 0;
+	m_d3d->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, gDevice->WindowHandle(), D3DCREATE_SOFTWARE_VERTEXPROCESSING, &_pp, &m_device);
+	_CHECK(m_device, "Couldn't create IDirect3D9Device");
 
 	// vertex formats
 	{	 
 		DLOG("Create vertex declarations");
 
-		_r = m_device->CreateVertexDeclaration(VF_Base_Desc, &m_vertexFormats[VF_Base]);
-		CHECK(_r >= 0, "Couldn't create vertex declaration");
-		_r = m_device->CreateVertexDeclaration(VF_Simple_Desc, &m_vertexFormats[VF_Simple]);
-		CHECK(_r >= 0, "Couldn't create vertex declaration");
-		_r = m_device->CreateVertexDeclaration(VF_Static_Desc, &m_vertexFormats[VF_Static]);
-		CHECK(_r >= 0, "Couldn't create vertex declaration");
-		_r = m_device->CreateVertexDeclaration(VF_Skinned_Desc, &m_vertexFormats[VF_Skinned]);
-		CHECK(_r >= 0, "Couldn't create vertex declaration");
+		m_device->CreateVertexDeclaration(VF_Base_Desc, &m_vertexFormats[VF_Base]);
+		CHECK(m_vertexFormats[VF_Base], "Couldn't create vertex declaration");
+		m_device->CreateVertexDeclaration(VF_Simple_Desc, &m_vertexFormats[VF_Simple]);
+		CHECK(m_vertexFormats[VF_Simple], "Couldn't create vertex declaration");
+		m_device->CreateVertexDeclaration(VF_Sprite_Desc, &m_vertexFormats[VF_Sprite]);
+		CHECK(m_vertexFormats[VF_Sprite], "Couldn't create vertex declaration");
+		m_device->CreateVertexDeclaration(VF_Static_Desc, &m_vertexFormats[VF_Static]);
+		CHECK(m_vertexFormats[VF_Static], "Couldn't create vertex declaration");
+		m_device->CreateVertexDeclaration(VF_Skinned_Desc, &m_vertexFormats[VF_Skinned]);
+		CHECK(m_vertexFormats[VF_Skinned], "Couldn't create vertex declaration");
+	}
+
+	// vertex source
+	{
+		m_vertexFormat = VF_Base;
+		m_vertexBuffer = nullptr;
+		m_vertexBufferOffset = 0;
+
+		m_device->SetVertexDeclaration(m_vertexFormats[m_vertexFormat]);
+	}
+
+	// index source
+	{
+		m_indexBuffer = nullptr;
 	}
 
 	// vertex shaders
@@ -489,7 +556,8 @@ void Graphics::BeginFrame(void)
 
 	// reset state
 
-	m_device->SetRenderState(D3DRS_CULLMODE, D3DCULL_CW); // ccw == front face
+	//m_device->SetRenderState(D3DRS_CULLMODE, D3DCULL_CW); // ccw == front face
+	m_device->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE); // ccw == front face
 
 	// ...
 }
@@ -505,17 +573,33 @@ void Graphics::ClearFrameBuffers(uint _buffers, const Color& _color, float _dept
 	m_device->Clear(0, nullptr, _buffers, _color.Argb(), _depth, _stencil);
 }
 //----------------------------------------------------------------------------//
-void Graphics::SetVertexFormat(VertexFormat _format)
-{
-	m_device->SetVertexDeclaration(m_vertexFormats[_format]);
-}
-//----------------------------------------------------------------------------//
-void Graphics::SetVertexBuffer(VertexBuffer* _buffer, uint _offset, uint _stride)
+void Graphics::SetVertexBuffer(VertexBuffer* _buffer, uint _offset)
 {
 	ASSERT(_buffer != nullptr);
 	ASSERT(_offset < _buffer->Size());
 
-	m_device->SetStreamSource( 0, _buffer->Handle(), _offset, _stride);
+	if (m_vertexBuffer != _buffer || m_vertexBufferOffset != _offset)
+	{
+		if (m_vertexFormat != _buffer->Format())
+		{
+			m_vertexFormat = _buffer->Format();
+			m_device->SetVertexDeclaration(m_vertexFormats[m_vertexFormat]);
+		}
+		m_vertexBuffer = _buffer;
+		m_vertexBufferOffset = _offset;
+		m_device->SetStreamSource(0, _buffer->Handle(), _offset, _buffer->Stride());
+	}
+}
+//----------------------------------------------------------------------------//
+void Graphics::SetIndexBuffer(IndexBuffer* _buffer)
+{
+	ASSERT(_buffer != nullptr);
+
+	if (m_indexBuffer != _buffer)
+	{
+		m_indexBuffer = _buffer;
+		m_device->SetIndices(m_indexBuffer->Handle());
+	}
 }
 //----------------------------------------------------------------------------//
 void Graphics::SetVertexShader(VertexShaderID _id)

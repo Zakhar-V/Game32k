@@ -28,6 +28,9 @@
     <ClCompile Include="Math.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
+    <ClCompile Include="Geometry.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Game">

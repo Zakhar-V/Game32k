@@ -49,6 +49,7 @@ public:
 	void PollEvents(void);
 
 	void SetCursorMode(CursorMode _mode);
+	const Vec2& GetCameraDelta(void) { return m_cameraDelta; }
 
 protected:
 	void _CursorToCenter(void);

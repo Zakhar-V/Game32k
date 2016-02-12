@@ -18,12 +18,13 @@ CBUFFER(UCameraVS, 0)
 };
 
 #ifdef HLSL
-uniform matrix<float, 4, 4> ViewProjMatrix : register(c0);
+uniform float4x4 ViewProjMatrix : register(c0);
+uniform float4x4 WorldMatrix : register(c4);
 #endif
 
-CBUFFER(UObjectVS, 4)
+/*CBUFFER(UObjectVS, 4)
 {
 	float4x4 WorldMatrix;
-};
+};*/
 
 #endif//__ShaderConstants_h__

@@ -105,6 +105,7 @@ inline float Tan(float _x)
 	float _r;
 	__asm fld _x
 	__asm fptan
+	__asm fstp st
 	__asm fstp _r
 	return _r;
 #endif
@@ -416,6 +417,9 @@ struct Vec3
 
 const Vec3 VEC3_ZERO(0);
 const Vec3 VEC3_ONE(1);
+const Vec3 VEC3_UNIT_X(1, 0, 0);
+const Vec3 VEC3_UNIT_Y(0, 1, 0);
+const Vec3 VEC3_UNIT_Z(0, 0, 1);
 
 //----------------------------------------------------------------------------//
 // Vec4
@@ -619,6 +623,33 @@ struct Mat44
 	{
 		return *this;
 	}*/
+
+	/*Mat44& CreateLookAt()
+	{
+
+	}*/
+
+	Mat44& CreatePerspective(float _fov, float _aspect, float _near, float _far, bool _reversed = false)
+	{
+		if (_aspect != _aspect)
+			_aspect = 1; // NaN
+		if (_far == _near)
+			_far = _near + EPSILON;
+		float _h = 1 / Tan(_fov * 0.5f);
+		float _w = _h / _aspect;
+		float _d = (_far - _near);
+		float _q = -(_far + _near) / _d;
+		float _qn = -2 * (_far * _near) / _d;
+		if (_reversed)
+			Swap(_q, _qn);
+		SetZero();
+		m00 = _w;
+		m11 = _h;
+		m22 = _q;
+		m23 = _qn;
+		m32 = -1;
+		return *this;
+	}
 
 	Mat44& CreateOrtho(float _left, float _right, float _bottom, float _top, float _znear, float _zfar);
 	Mat44& CreateOrtho2D(float _width, float _height);

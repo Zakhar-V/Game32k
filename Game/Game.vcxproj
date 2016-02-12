@@ -66,6 +66,7 @@
       <AdditionalDependencies>d3d9.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateMapFile>true</GenerateMapFile>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <SubSystem>Console</SubSystem>
     </Link>
     <FxCompile>
       <ShaderModel>2.0</ShaderModel>
@@ -95,7 +96,7 @@
       <ExceptionHandling>false</ExceptionHandling>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
       <BufferSecurityCheck>false</BufferSecurityCheck>
-      <EnableEnhancedInstructionSet>NoExtensions</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet>StreamingSIMDExtensions</EnableEnhancedInstructionSet>
       <PreprocessToFile>false</PreprocessToFile>
     </ClCompile>
     <Link>
@@ -112,18 +113,15 @@
       <GenerateMapFile>true</GenerateMapFile>
       <AdditionalLibraryDirectories>$(SolutionDir)Build\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
-      <MinimumRequiredVersion />
+      <MinimumRequiredVersion>5.01</MinimumRequiredVersion>
     </Link>
     <CustomBuildStep>
       <Command>
       </Command>
     </CustomBuildStep>
     <PostBuildEvent>
-      <Command>rem md /q "$(SolutionDir)Bin\crinkler"
-cd "$(SolutionDir)Build"
-"$(SolutionDir)Build\CompressExeFile.bat" "$(IntDir)GameMain.obj" "$(OutDir)$(TargetName)_crinkler$(TargetExt)"  "$(TargetPath)" "$(OutDir)$(TargetName)_upx$(TargetExt)"
-
-</Command>
+      <Command>cd "$(SolutionDir)Build"
+"$(SolutionDir)Build\CompressExeFile.bat" "$(IntDir)GameMain.obj" "$(TargetPath)" "$(OutDir)$(TargetName)_crinkler$(TargetExt)"  "$(OutDir)$(TargetName)_kkrunchy$(TargetExt)"  "$(OutDir)$(TargetName)_upx$(TargetExt)"</Command>
     </PostBuildEvent>
     <FxCompile>
       <ShaderModel>2.0</ShaderModel>
@@ -153,6 +151,10 @@ cd "$(SolutionDir)Build"
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="GameMain.cpp" />
+    <ClCompile Include="Geometry.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="Graphics.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
