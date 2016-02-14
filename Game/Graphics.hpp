@@ -33,6 +33,13 @@ enum IndexFormat : uint8
 	IF_UInt = D3DFMT_INDEX32,
 };
 
+enum PrimitiveType : uint
+{
+	PT_Points = 1,
+	PT_Lines = 2,
+	PT_Triangles = 3,
+};
+
 //----------------------------------------------------------------------------//
 // Vertex
 //----------------------------------------------------------------------------//
@@ -50,15 +57,15 @@ enum VertexFormat : uint8
 struct Vertex
 {
 	Vertex(void) { }
-	Vertex(const Vec3& _pos) : pos(_pos) { }
-	Vec3 pos;
+	Vertex(const Vec3& _position) : position(_position) { }
+	Vec3 position;
 };
 
 struct SimpleVertex : Vertex
 {
 	SimpleVertex(void) { }
-	SimpleVertex(const Vec3& _pos, const Vec2& _texcoord, const Color& _color) :
-		Vertex(_pos), texcoord(_texcoord), color(_color) { }
+	SimpleVertex(const Vec3& _position, const Vec2& _texcoord, const Color& _color) :
+		Vertex(_position), texcoord(_texcoord), color(_color) { }
 	Color color;
 	Vec2 texcoord;
 };
@@ -66,20 +73,18 @@ struct SimpleVertex : Vertex
 struct SpriteVertex : SimpleVertex
 {
 	SpriteVertex(void) { }
-	SpriteVertex(const Vec3& _pos, const Vec2& _size, float _scale, float _rotation, const Vec2& _texcoord, const Vec2& _texcoord2, const Color& _color) :
-		SimpleVertex(_pos, _texcoord, _color), size(_size), scale(_scale), rotation(_rotation), texcoord2(_texcoord2) { }
+	SpriteVertex(const Vec3& _position, const Vec2& _size, float _rotation, const Vec2& _texcoord, const Color& _color) :
+		SimpleVertex(_position, _texcoord, _color), size(_size), rotation(_rotation) { }
 	
-	Vec2 texcoord2; // in shader: TEXCOORD0.zw (texture scaling for point-sprites)
-	Vec2 size; // in shader: float4 sprite:TEXCOORD1 {size.x, size.y, scale, rotate}
-	float scale; // in shader: TEXCOORD1.z
-	float rotation;	// in shader: TEXCOORD1.w
+	Vec2 size; // in shader: float4 sprite:TEXCOORD1 {size.x, size.y, rotate}
+	float rotation;	// in shader: TEXCOORD1.z
 };
 
 struct StaticVertex : Vertex
 {
 	StaticVertex(void) { }
-	StaticVertex(const Vec3& _pos, const Vec2& _texcoord, const Color& _normal, const Color& _tangent) :
-		Vertex(_pos), texcoord(_texcoord), normal(_normal), tangent(_tangent) { }
+	StaticVertex(const Vec3& _position, const Vec2& _texcoord, const Color& _normal, const Color& _tangent) :
+		Vertex(_position), texcoord(_texcoord), normal(_normal), tangent(_tangent) { }
 	Vec2 texcoord;
 	Color normal;
 	Color tangent;
@@ -88,8 +93,8 @@ struct StaticVertex : Vertex
 struct SkinnedVertex : StaticVertex
 {
 	SkinnedVertex(void) { }
-	SkinnedVertex(const Vec3& _pos, const Vec2& _texcoord, const Color& _normal, const Color& _tangent, const Color& _bones, const Color& _weights) :
-		StaticVertex(_pos, _texcoord, _normal,_tangent), bones(_bones), weights(_weights) { }
+	SkinnedVertex(const Vec3& _position, const Vec2& _texcoord, const Color& _normal, const Color& _tangent, const Color& _bones, const Color& _weights) :
+		StaticVertex(_position, _texcoord, _normal,_tangent), bones(_bones), weights(_weights) { }
 	Color bones;
 	Color weights;
 };
@@ -119,9 +124,14 @@ enum BufferUsage : uint16
 	BU_Dynamic = D3DUSAGE_DYNAMIC,
 };
 
-typedef Ptr<class VertexBuffer> VertexBufferPtr;
+enum LockMode : uint
+{
+	LM_ReadOnly = D3DLOCK_READONLY,
+	LM_WriteDiscard = D3DLOCK_DISCARD,
+	LM_WriteNoOverwrite = D3DLOCK_NOOVERWRITE,
+};
 
-class VertexBuffer : public RefCounted
+class VertexBuffer : public NonCopyable
 {
 public:
 
@@ -130,11 +140,14 @@ public:
 
 	void Realloc(uint _newSize);
 	uint Size(void) { return m_size; }
+	uint ElementCount(void) { return m_size / ElementSize(); }
+	uint ElementSize(void) { return VertexSize[m_format]; }
 	IDirect3DVertexBuffer9* Handle(void) { return m_handle; }
 	VertexFormat Format(void) { return m_format; }
-	uint Stride(void) { return VertexSize[m_format]; }
 
-	void Write(const void* _data, uint _offset, uint _size);
+	uint8* Lock(LockMode _mode, uint _offset, uint _size);
+	void Unlock(void);
+	void Write(const void* _src, uint _offset, uint _size);
 
 protected:
 
@@ -144,9 +157,7 @@ protected:
 	IDirect3DVertexBuffer9*	m_handle;
 };
 
-typedef Ptr<class IndexBuffer> IndexBufferPtr;
-
-class IndexBuffer : public RefCounted
+class IndexBuffer : public NonCopyable
 {
 public:
 
@@ -155,10 +166,13 @@ public:
 
 	void Realloc(uint _newSize);
 	uint Size(void) { return m_size; }
+	uint ElementCount(void) { return m_size / ElementSize(); }
+	uint ElementSize(void) { return m_format == IF_UShort ? 2 : 4; }
 	IDirect3DIndexBuffer9* Handle(void) { return m_handle; }
-	uint Stride(void) { return m_format == IF_UShort ? 2 : 4; }
 
-	void Write(const void* _data, uint _offset, uint _size);
+	uint8* Lock(LockMode _mode, uint _offset, uint _size);
+	void Unlock(void);
+	void Write(const void* _src, uint _offset, uint _size);
 
 protected:
 
@@ -166,6 +180,48 @@ protected:
 	IndexFormat m_format;
 	uint m_size;
 	IDirect3DIndexBuffer9*	m_handle;
+};
+
+//----------------------------------------------------------------------------//
+// RenderModel
+//----------------------------------------------------------------------------//
+
+typedef Ptr<class RenderModel> RenderModelPtr;
+
+class RenderModel : public RefCounted
+{
+public:
+
+	RenderModel(VertexFormat _format, PrimitiveType _type, BufferUsage _usage = BU_Static);
+	~RenderModel(void);
+
+	PrimitiveType Type(void) { return m_type; }
+	VertexFormat Format(void) { return m_vertexBuffer.Format(); }
+
+	void Bind(void);
+	void Draw(uint _baseVertex, uint _start, uint _count);
+
+	uint NumVertices(void) { return m_numVertices; }
+	void ReallocVertices(uint _count);
+	Vertex* LockVertices(LockMode _mode, uint _offset, uint _count, bool _realloc = false, uint _newSize = 0);
+	void UnlockVertices(void);
+	void SetVertices(const void* _data, uint _count);
+
+	uint NumIndices(void) { return m_numIndices; }
+	void ReallocIndices(uint _count);
+	uint16* LockIndices(LockMode _mode, uint _offset, uint _count, bool _realloc = false, uint _newSize = 0);
+	void UnlockIndices(void);
+	void SetIndices(const void* _data, uint _count);
+
+protected:
+
+	PrimitiveType m_type;
+	uint m_numVertices;
+	uint m_numIndices;
+	uint m_vertexSize;
+	uint m_indexSize;
+	VertexBuffer m_vertexBuffer;
+	IndexBuffer m_indexBuffer;
 };
 
 //----------------------------------------------------------------------------//
@@ -347,9 +403,8 @@ public:
 
 	void ClearFrameBuffers(uint _buffers, const Color& _color = 0x000000ff, float _depth = 1.0, uint _stencil = 0xff);
 
-	void SetVertexBuffer(VertexBuffer* _buffer, uint _offset = 0);
+	void SetVertexBuffer(VertexBuffer* _buffer);
 	VertexBuffer* GetVertexBuffer(void) { return m_vertexBuffer; }
-	uint GetVertexBufferOffset(void) { return m_vertexBufferOffset; }
 
 	void SetIndexBuffer(IndexBuffer* _buffer);
 	IndexBuffer* GetIndexBuffer(void) { return m_indexBuffer; }
@@ -363,6 +418,8 @@ public:
 	void SetTexture(uint _unit, Texture* _texture);
 	void SetSampler(uint _unit, SamplerID _sampler);
 
+	void Draw(PrimitiveType _type, uint _start, uint _count);
+	void DrawIndexed(PrimitiveType _type, uint _baseVertex, uint _start, uint _count);
 
 	//void DrawSprites();
 
@@ -376,8 +433,6 @@ protected:
 
 	VertexFormat m_vertexFormat;
 	VertexBuffer* m_vertexBuffer;
-	uint m_vertexBufferOffset;
-
 	IndexBuffer* m_indexBuffer;
 
 	TextureFilter m_defaultTexFilter;

@@ -14,7 +14,7 @@ struct FontInfo
 	struct Char
 	{
 		Vec2 size;
-		Vec2 tc[2];
+		Vec2 tc[2];	// lt, rb
 	}
 	chars[256];
 	float height;

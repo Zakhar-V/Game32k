@@ -275,124 +275,13 @@ double Time(void)
 //----------------------------------------------------------------------------//
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Тип вершины
 
-Тип геометрии
+////////////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------//
+//
+//----------------------------------------------------------------------------//
+////////////////////////////////////////////////////////////////////////////////
 
-Тип примитива
-
-*/
-
-enum GeometryType
-{
-	GT_
-};
-
-class Geometry : public RefCounted
-{
-public:
-
-	virtual uint Count(void) = 0;
-	virtual void Bind(uint _offset = 0) = 0;
-	virtual void Draw(uint _baseVertex, uint _start, uint _count) = 0;
-
-//protected:
-
-	VertexBufferPtr m_vertexBuffer;
-	IndexBufferPtr m_indexBuffer;
-};
-
-class RenderMesh : public Geometry
-{
-public:
-
-	RenderMesh(void)
-	{
-
-	}
-
-	void ClearIndices(void)
-	{
-
-	}
-
-	void SetIndices(const uint16* _data, uint _count)
-	{
-	}
-};
-
-class DebugGeometry : public Geometry
-{
-public:
-
-protected:
-};
-
-
-class SpriteBatch : public Geometry
-{
-public:
-
-	SpriteBatch(void)
-	{
-		m_vertexBuffer = new VertexBuffer(VF_Sprite, BU_Dynamic);
-		m_indexBuffer = new IndexBuffer(IF_UShort, BU_Dynamic);
-	}
-
-	uint Count(void) override { return m_indices.Size(); }
-
-	void Bind(uint _offset = 0) override
-	{
-		_Update();
-		gGraphics->SetVertexBuffer(m_vertexBuffer, _offset);
-		gGraphics->SetIndexBuffer(m_indexBuffer);
-	}
-	void Draw(uint _baseVertex, uint _start, uint _count) override
-	{
-		ASSERT(_baseVertex < m_vertices.Size());
-		gGraphicsDevice->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, _baseVertex, 0, m_vertices.Size() - _baseVertex, _start, _count / 3);
-	}
-
-	void Clear(void)
-	{
-		m_vertices.Clear();
-		m_indices.Clear();
-		m_updated = false;
-	}
-
-	void AddVertices(const SpriteVertex* _src, uint _count, bool _flipYTexcoord = false)
-	{
-		uint _base = m_vertices.Size();
-		AddSpritesToBatch(m_vertices.Upsize(_count * 4, true), _src, _count, _flipYTexcoord);
-		AddQuadsToBatch(m_indices.Upsize(_count * 6), _base, _count);
-		m_updated = false;
-	}
-
-protected:
-
-	void _Update(void)
-	{
-		if (!m_updated)
-		{
-			uint _size = m_vertices.Size() * sizeof(m_vertices[0]);
-			if (_size > m_vertexBuffer->Size())
-				m_vertexBuffer->Realloc(_size);
-			m_vertexBuffer->Write(*m_vertices, 0, _size);
-
-			_size = m_indices.Size() * sizeof(m_indices[0]);
-			if (_size > m_indexBuffer->Size())
-				m_indexBuffer->Realloc(_size);
-			m_indexBuffer->Write(*m_indices, 0, _size);
-
-			m_updated = true;
-		}
-	}
-
-	Array<SpriteVertex> m_vertices;
-	Array<uint16> m_indices;
-	bool m_updated = false;
-};
 
 ////////////////////////////////////////////////////////////////////////////////
 //----------------------------------------------------------------------------//
@@ -416,6 +305,15 @@ struct HeightMap
 	uint numSectors;
 
 };
+
+uint CreateTerrainSectorIndices(uint16* _dst, uint _side)
+{
+	uint16* _startP = _dst;
+
+
+
+	return (uint)(_dst - _startP);
+}
 
 void CreateHeightMap(Image* _img, float _scaleY, float _finalSize, float _desiredStep)
 {
@@ -574,9 +472,10 @@ void main(void)
 
 			TestCamera _camera;
 
-			SpriteBatch _spriteBatch;
-			SpriteVertex _sprite({ 0, 0, -3 }, { 3 }, 1, 0, { 0 }, { 1 }, 0xffffffff);
-			SpriteVertex _sprite2({ 250, 250, 0 }, { 300 }, 1, 0, _fi.chars['A'].tc[0], _fi.chars['A'].tc[1], 0xffffffff);
+			//SpriteBatch _spriteBatch;
+			RenderModel _spriteBatch(VF_Sprite, PT_Triangles, BU_Dynamic);
+			Sprite _sprite({ 0, 0, -3 }, { 3 }, 1, 0, { 0 }, { 1 }, 0xffffffff);
+			Sprite _sprite2({ 250, 250, 0 }, { 300 }, 1, 0, _fi.chars['A'].tc[0], _fi.chars['A'].tc[1], 0xffffffff);
 
 
 
@@ -585,11 +484,13 @@ void main(void)
 
 			Scene _scene;
 
-
-			while (!gDevice->ShouldClose())
+			bool _quit = false;
+			while (!_quit && !gDevice->ShouldClose())
 			{
 				gDevice->PollEvents();
 				_st = Time();
+
+				_quit = GetAsyncKeyState(VK_ESCAPE) != 0;
 
 				//Vec2 _size = gDevice->WindowSize();
 				//Mat44 _viewProjMatrix;
@@ -616,11 +517,18 @@ void main(void)
 				gGraphics->SetSampler(0, _sampler);
 
 
-				_spriteBatch.Clear();
-				_spriteBatch.AddVertices(&_sprite, 1);
-				_spriteBatch.AddVertices(&_sprite2, 1);
+				{
+					//_spri
+					SpriteVertex* _v = (SpriteVertex*)_spriteBatch.LockVertices(LM_WriteDiscard, 0, 2 * 4, true, 2 * 6);
+					uint16* _i = _spriteBatch.LockIndices(LM_WriteDiscard, 0, 2 * 6, true, 2 * 6);
+					Sprite::AddToBatch(_i, 0, _v, &_sprite, 1);
+					Sprite::AddToBatch(_i + 6, 4, _v + 4, &_sprite2, 1);
+
+				}
+
 				_spriteBatch.Bind();
 				_spriteBatch.Draw(0, 0, 6);
+
 				//gGraphics->SetVertexBuffer(&_vb);
 				//gGraphicsDevice->DrawPrimitive(D3DPT_TRIANGLESTRIP, 0, 2);
 				//gGraphics->SetIndexBuffer(&_ib);

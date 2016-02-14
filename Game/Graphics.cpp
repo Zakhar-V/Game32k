@@ -26,8 +26,7 @@ static const D3DVERTEXELEMENT9 VF_Sprite_Desc[] =
 	{ 0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0 },
 	{ 0, offsetof(SpriteVertex, color), D3DDECLTYPE_UBYTE4N, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR, 0 },
 	{ 0, offsetof(SpriteVertex, texcoord), D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0 },
-	//{ 0, offsetof(SpriteVertex, texscale), D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1 },
-	{ 0, offsetof(SpriteVertex, size), D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1 },
+	{ 0, offsetof(SpriteVertex, size), D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1 },
 	//{ 0, offsetof(SpriteVertex, rotation), D3DDECLTYPE_FLOAT1, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 2 },
 	D3DDECL_END(),
 };
@@ -85,17 +84,27 @@ void VertexBuffer::Realloc(uint _newSize)
 		CHECK(m_handle != nullptr, "Couldn't create vertex buffer");
 		
 		if (gGraphics->GetVertexBuffer() == this)
-			gGraphicsDevice->SetStreamSource(0, m_handle, gGraphics->GetVertexBufferOffset(), VertexSize[m_format]);
+			gGraphicsDevice->SetStreamSource(0, m_handle, 0, VertexSize[m_format]);
 	}
 }
 //----------------------------------------------------------------------------//
-void VertexBuffer::Write(const void* _data, uint _offset, uint _size)
+uint8* VertexBuffer::Lock(LockMode _mode, uint _offset, uint _size)
 {
 	ASSERT(m_handle != nullptr);
 	ASSERT(_offset + _size <= m_size);
 	void* _dst = nullptr;
-	m_handle->Lock(_offset, _size, &_dst, D3DLOCK_DISCARD);
-	memcpy(_dst, _data, _size);
+	m_handle->Lock(_offset, _size, &_dst, _mode);
+	return (uint8*)_dst;
+}
+//----------------------------------------------------------------------------//
+void VertexBuffer::Unlock(void)
+{
+	m_handle->Unlock();
+}
+//----------------------------------------------------------------------------//
+void VertexBuffer::Write(const void* _src, uint _offset, uint _size)
+{
+	memcpy(Lock(LM_WriteDiscard, _offset, _size), _src, _size);
 	m_handle->Unlock();
 }
 //----------------------------------------------------------------------------//
@@ -136,13 +145,113 @@ void IndexBuffer::Realloc(uint _newSize)
 	}
 }
 //----------------------------------------------------------------------------//
-void IndexBuffer::Write(const void* _data, uint _offset, uint _size)
+uint8* IndexBuffer::Lock(LockMode _mode, uint _offset, uint _size)
 {
 	ASSERT(m_handle != nullptr);
+	ASSERT(_offset + _size <= m_size);
 	void* _dst = nullptr;
-	m_handle->Lock(_offset, _size, &_dst, D3DLOCK_DISCARD);
-	memcpy(_dst, _data, _size);
+	m_handle->Lock(_offset, _size, &_dst, _mode);
+	return (uint8*)_dst;
+}
+//----------------------------------------------------------------------------//
+void IndexBuffer::Unlock(void)
+{
 	m_handle->Unlock();
+}
+//----------------------------------------------------------------------------//
+void IndexBuffer::Write(const void* _src, uint _offset, uint _size)
+{
+	memcpy(Lock(LM_WriteDiscard, _offset, _size), _src, _size);
+	m_handle->Unlock();
+}
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+// RenderModel
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+RenderModel::RenderModel(VertexFormat _format, PrimitiveType _type, BufferUsage _usage) :
+	m_type(_type),
+	m_numVertices(0),
+	m_numIndices(0),
+	m_vertexBuffer(_format, (BufferUsage)_usage),
+	m_indexBuffer(IF_UShort, (BufferUsage)_usage)
+{
+	m_vertexSize = m_vertexBuffer.ElementSize();
+	m_indexSize = m_indexBuffer.ElementSize();
+}
+//----------------------------------------------------------------------------//
+RenderModel::~RenderModel(void)
+{
+}
+//----------------------------------------------------------------------------//
+void RenderModel::Bind(void)
+{
+	gGraphics->SetVertexBuffer(&m_vertexBuffer);
+	gGraphics->SetIndexBuffer(&m_indexBuffer);
+}
+//----------------------------------------------------------------------------//
+void RenderModel::Draw(uint _baseVertex, uint _start, uint _count)
+{
+	if (m_numIndices)
+		gGraphics->DrawIndexed(m_type, _baseVertex, _start, _count);
+	else
+		gGraphics->Draw(m_type, _baseVertex + _start, _count);
+}
+//----------------------------------------------------------------------------//
+void RenderModel::ReallocVertices(uint _count)
+{
+	if (m_vertexBuffer.ElementCount() < _count)
+	{
+		m_vertexBuffer.Realloc(_count * m_vertexSize);
+		m_numVertices = _count;
+	}
+}
+//----------------------------------------------------------------------------//
+Vertex* RenderModel::LockVertices(LockMode _mode, uint _offset, uint _count, bool _realloc, uint _newSize)
+{
+	if (_realloc)
+		ReallocVertices(_newSize);
+	return (Vertex*)m_vertexBuffer.Lock(_mode, _offset * m_vertexSize, _count * m_vertexSize);
+}
+//----------------------------------------------------------------------------//
+void RenderModel::UnlockVertices(void)
+{
+	m_vertexBuffer.Unlock();
+}
+//----------------------------------------------------------------------------//
+void RenderModel::SetVertices(const void* _data, uint _count)
+{
+	ReallocVertices(_count);
+	m_vertexBuffer.Write(_data, 0, _count * m_vertexSize);
+}
+//----------------------------------------------------------------------------//
+void RenderModel::ReallocIndices(uint _count)
+{
+	if (m_indexBuffer.ElementCount() < _count)
+	{
+		m_indexBuffer.Realloc(_count * m_indexSize);
+		m_numIndices = _count;
+	}
+}
+//----------------------------------------------------------------------------//
+uint16* RenderModel::LockIndices(LockMode _mode, uint _offset, uint _count, bool _realloc, uint _newSize)
+{
+	if (_realloc)
+		ReallocIndices(_newSize);
+	return (uint16*)m_indexBuffer.Lock(_mode, _offset * m_indexSize, _count * m_indexSize);
+}
+//----------------------------------------------------------------------------//
+void RenderModel::UnlockIndices(void)
+{
+	m_indexBuffer.Unlock();
+}
+//----------------------------------------------------------------------------//
+void RenderModel::SetIndices(const void* _data, uint _count)
+{
+	ReallocVertices(_count);
+	m_indexBuffer.Write(_data, 0, _count * m_indexSize);
 }
 //----------------------------------------------------------------------------//
 
@@ -415,6 +524,14 @@ const char* g_pixelShaderNames[] =
 // Graphics
 //----------------------------------------------------------------------------//
 
+D3DPRIMITIVETYPE DXPrimitiveType[] =
+{
+	D3DPT_FORCE_DWORD,
+	D3DPT_POINTLIST, // PT_Points = 1,
+	D3DPT_LINELIST, // PT_Lines = 2,
+	D3DPT_TRIANGLELIST, // PT_Triangles = 3,
+};
+
 //----------------------------------------------------------------------------//
 Graphics::Graphics(void)
 {
@@ -458,18 +575,13 @@ Graphics::Graphics(void)
 		CHECK(m_vertexFormats[VF_Skinned], "Couldn't create vertex declaration");
 	}
 
-	// vertex source
+	// geometry source
 	{
 		m_vertexFormat = VF_Base;
 		m_vertexBuffer = nullptr;
-		m_vertexBufferOffset = 0;
+		m_indexBuffer = nullptr;
 
 		m_device->SetVertexDeclaration(m_vertexFormats[m_vertexFormat]);
-	}
-
-	// index source
-	{
-		m_indexBuffer = nullptr;
 	}
 
 	// vertex shaders
@@ -573,12 +685,11 @@ void Graphics::ClearFrameBuffers(uint _buffers, const Color& _color, float _dept
 	m_device->Clear(0, nullptr, _buffers, _color.Argb(), _depth, _stencil);
 }
 //----------------------------------------------------------------------------//
-void Graphics::SetVertexBuffer(VertexBuffer* _buffer, uint _offset)
+void Graphics::SetVertexBuffer(VertexBuffer* _buffer)
 {
 	ASSERT(_buffer != nullptr);
-	ASSERT(_offset < _buffer->Size());
 
-	if (m_vertexBuffer != _buffer || m_vertexBufferOffset != _offset)
+	if (m_vertexBuffer != _buffer)
 	{
 		if (m_vertexFormat != _buffer->Format())
 		{
@@ -586,8 +697,7 @@ void Graphics::SetVertexBuffer(VertexBuffer* _buffer, uint _offset)
 			m_device->SetVertexDeclaration(m_vertexFormats[m_vertexFormat]);
 		}
 		m_vertexBuffer = _buffer;
-		m_vertexBufferOffset = _offset;
-		m_device->SetStreamSource(0, _buffer->Handle(), _offset, _buffer->Stride());
+		m_device->SetStreamSource(0, _buffer->Handle(), 0, _buffer->ElementSize());
 	}
 }
 //----------------------------------------------------------------------------//
@@ -651,6 +761,24 @@ void Graphics::SetSampler(uint _unit, SamplerID _sampler)
 		_tu.sampler = _sampler;
 		m_samplers[_sampler]._Bind(_unit);
 	}
+}
+//----------------------------------------------------------------------------//
+void Graphics::Draw(PrimitiveType _type, uint _start, uint _count)
+{
+	ASSERT(m_vertexBuffer != nullptr);
+	ASSERT(_start + _count <= m_vertexBuffer->ElementCount());
+
+	m_device->DrawPrimitive(DXPrimitiveType[_type], _start, _count / _type);
+}
+//----------------------------------------------------------------------------//
+void Graphics::DrawIndexed(PrimitiveType _type, uint _baseVertex, uint _start, uint _count)
+{
+	ASSERT(m_vertexBuffer != nullptr);
+	ASSERT(_baseVertex <= m_vertexBuffer->ElementCount());
+	ASSERT(m_indexBuffer != nullptr);
+	ASSERT(_start + _count <= m_indexBuffer->ElementCount());
+
+	m_device->DrawIndexedPrimitive(DXPrimitiveType[_type], _baseVertex, 0, m_vertexBuffer->ElementCount() - _baseVertex, _start, _count / _type);
 }
 //----------------------------------------------------------------------------//
 

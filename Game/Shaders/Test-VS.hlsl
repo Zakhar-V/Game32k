@@ -15,6 +15,6 @@ VS_OUTPUT main( float4 pos : POSITION, float4 sprite : TEXCOORD1, float4 color :
 	_out.pos = mul(wpos, ViewProjMatrix);
 	_out.color = color;
 	//_out.tc = tc;
-	_out.tc = tc.xy * tc.zw;
+	_out.tc = tc.xy;
 	return _out;
 }			  
