@@ -7,215 +7,154 @@
 // Defs
 //----------------------------------------------------------------------------//
 
-class Scene;
+class Component;
 class Entity;
-typedef Ptr<class Node> NodePtr;
-typedef Ref<class Node> NodeRef;
-
-class PhysicsEntity;
-class PhysicsWorld;
-class SoundWorld;
-//class VegetationSystem;
-//class WeatherSystem;
+class SceneSystem;
+class Scene;
 
 //----------------------------------------------------------------------------//
 // 
 //----------------------------------------------------------------------------//
 
+enum ComponentType
+{
+	CT_Transform = 0,
 
-//----------------------------------------------------------------------------//
-// 
-//----------------------------------------------------------------------------//
+	CT_Unknown,
+	CT_MaxTypes,
+};
 
-//----------------------------------------------------------------------------//
-// 
-//----------------------------------------------------------------------------//
-
-class SceneObject : public Object // SerializableObject
+class Component : public Object
 {
 public:
+
+	static ComponentType GetComponentTypeStatic(void) { return CT_Unknown; }
+	virtual ComponentType GetComponentType(void) { return CT_Unknown; }
+	virtual bool IsSingleComponent(void) { return false; }
+
+	Component(void);
+	~Component(void);
+
+	Entity* GetEntity(void) { return m_entity; }
+	virtual Scene* GetScene(void);
+
+	Component* GetNextComponent(void) { return m_next; }
+
+	virtual void TransformUpdated(void) { }
+
+	virtual void OnEvent(int _type, Entity* _sender, void* _arg) { }
 
 protected:
-	Scene* m_scene;
-	uint16 m_layer;
-	uint16 m_group;
-	uint m_id;
-	//m_name;
+	friend class Entity;
+
+	virtual void _SetScene(Scene* _scene) { }
+	virtual void _SetEntity(Entity* _entity)
+	{ 
+		//Scene* _oldScene = m_entity->GetScene();
+		m_entity = _entity; 
+		/*if (m_entity && m_entity->GetScene() != _oldScene)
+			_SetScene(m_entity->GetScene());*/
+	}
+
+	Entity* m_entity;
+	Component* m_prev;
+	Component* m_next;
 };
 
 //----------------------------------------------------------------------------//
-// Animator
+// Entity
 //----------------------------------------------------------------------------//
 
-class Animator : public Object
+/*enum EntityEventType
+{
+	EET_SetScene,
+	EET_SetParent,
+	EET_AttachChild,
+	EET_DetachChild,
+};*/
+
+enum EntityAttachFlags
+{
+	EAF_InheritTransform,
+};
+
+enum EntityEvent
+{
+	EE_,
+};
+
+typedef Ptr<Entity> EntityPtr;
+
+class Entity final : public Object
 {
 public:
 
-protected:
-
-	//Node* m_node;
-};
-
-//----------------------------------------------------------------------------//
-// Node
-//----------------------------------------------------------------------------//
-
-enum NodeType
-{
-	NT_Unknown = 0,
-	NT_Camera = 0x1,
-	NT_Renderable = 0x2,
-	NT_Light = NT_Renderable | 0x4,
-	NT_Terrain = NT_Renderable | 0x8,
-
-	NT_Test = NT_Renderable | 0x10,
-};
-
-class Node : public Object
-{
-public:
-
-	Node(void);
-	~Node(void);
-
-	virtual NodeType Type(void) { return NT_Unknown; }
+	Entity(void);
+	~Entity(void);
 
 	Scene* GetScene(void) { return m_scene; }
-	void SetParent(Node* _parent);
+	Entity* GetParent(void) { return m_parent; }
+	void SetParent(Entity* _parent, bool _inheritTransform = true);
 	void DetachAllChildren(bool _remove = false);
-	void RemoveThis(void);
+	void RemoveThis(bool _force = false);
+
+	
+	//void SendEvent(const Event& _event);
+
+	template <class T> T* GetComponent(uint _index = 0) { return GetComponent(T::GetComponentTypeStatic(), _index); }
+	Component* GetComponent(ComponentType _type, uint _index = 0);
+	void AttachComponent(Component* _c);
+	void DetachComponent(Component* _c, bool _removeFromScene = true);
 
 protected:
 	friend class Scene;
+	friend class Component;
 
 	void _SetScene(Scene* _scene);
 
-	virtual void _OnChangeScene(Scene* _scene) { }
-	virtual void _OnChangeParent(Node* _node) { }
-	virtual void _Register(void) { }
-	virtual void _Unregister(void) { }
-
-	void _Link(Node*& _list);
-	void _Unlink(Node*& _list);
-	void _UpdateLocalTM(void);
-	void _UpdateWorldTM(void);
 
 	Scene* m_scene;
-	Entity* m_entity;
-	uint16 m_layer;
-	uint16 m_group;
-	uint m_id;
+	Entity* m_parent;
+	Entity* m_prev;
+	Entity* m_next;
+	Entity* m_child;
 
-	Node* m_parent;
-	Node* m_prev;
-	Node* m_next;
-	Node* m_child;
+	Component* m_components[CT_MaxTypes];
+	uint m_numComponents;
 
-	Vec3 m_position;
-	Quat m_rotation;
-	Vec3 m_scale;
-	Mat44 m_matrix;
 
-	PhysicsEntity* m_physics;
-	DbvTreeNode* m_dbvtNode;
-
-	//bool m_removeAllChildrenWhenDestroy : 1; // default is true
+	bool m_persistent : 1;
 };
 
 //----------------------------------------------------------------------------//
-// CameraNode 
+// SceneSystem
 //----------------------------------------------------------------------------//
 
-class CameraNode : public Node
+enum SceneSystemType
+{
+	SST_Transform,
+
+	// game specific
+	SST_,
+
+	SST_MaxTypes,
+};
+
+class SceneSystem : public NonCopyable
 {
 public:
+	//static SceneSystemType GetSystemTypeStatic(void) { return CT_Unknown; }
+	//virtual SceneSystemType GetSystemType(void) { return CT_Unknown; }
 
-	virtual NodeType Type(void) { return NT_Camera; }
+	SceneSystem(Scene* _scene) : m_scene(_scene) { }
+	virtual ~SceneSystem(void) { }
+
+	virtual void AddComponent(Component* _c);
+	virtual void RemoveComponent(Component* _c);
 
 protected:
 
-	Mat44 m_view;
-	Mat44 m_proj;
-};
-
-//----------------------------------------------------------------------------//
-// RenderableNode
-//----------------------------------------------------------------------------//
-
-class Geometry;
-
-struct RenderOp
-{
-	Mat44* matrix;
-	Geometry* geom;
-	Material* material;
-	void* deform; 
-	uint baseVertex;
-	uint start;
-	uint count;
-	float distance;
-};
-
-class RenderableNode : public Node
-{
-public:
-
-	virtual NodeType Type(void) { return NT_Renderable; }
-
-	virtual void GetRenderOps(Array<RenderOp>& _dst, uint _flags, uint _mask) { }
-};
-
-//----------------------------------------------------------------------------//
-// LightNode
-//----------------------------------------------------------------------------//
-
-class LightNode : public RenderableNode
-{
-public:
-	virtual NodeType Type(void) { return NT_Light; }
-
-protected:
-};
-
-//----------------------------------------------------------------------------//
-// TestNode
-//----------------------------------------------------------------------------//
-
-class TestNode : public RenderableNode
-{
-public:
-
-	virtual NodeType Type(void) { return NT_Test; }
-
-protected:
-};
-
-//----------------------------------------------------------------------------//
-// TerrainNode
-//----------------------------------------------------------------------------//
-
-class TerrainNode : public RenderableNode
-{
-public:
-
-	virtual NodeType Type(void) { return NT_Terrain; }
-
-	//void CreateFromHeightMap(Image* _image, const Vec2& _size, float _heightScale);
-protected:
-
-};
-
-//----------------------------------------------------------------------------//
-// SkyDome
-//----------------------------------------------------------------------------//
-
-class SkyDome : public NonCopyable
-{
-public:
-
-protected:
-
-	float m_timeOfDay;
+	Scene* m_scene;
 };
 
 //----------------------------------------------------------------------------//
@@ -229,41 +168,16 @@ public:
 	Scene(void);
 	~Scene(void);
 
-	void AddNode(Node* _node);
-
-	void Update(float _dt);
-	void Render(float _dt);
-
-	DbvTree& GetDbvt(void) { return m_dbvt; }
+	void AddEntity(Entity* _entity);
+	void RemoveEntity(Entity* _entity);
 
 protected:
+	friend class Entity;
 
-	friend class Node;
+	Entity*& _RootEntityRef(void) { return m_rootEntity; }
 
-	Node*& _Root(void) { return m_rootNodes; }
-
-	uint _NewID(Node* _node);
-	void _FreeID(uint _id);
-
-	Node* m_rootNodes;
-
-	Array<Node*> m_nodes;
-	Array<uint> m_freeIds;
-
-	DbvTree m_dbvt;
-
-	// [renderer]
-
-	void _GetRenderableNodes();
-
-	Array<RenderableNode*> m_visibleNodes;
-	//Array<RenderableNode*> m_mainCameraPvs;
-	//Array<RenderableNode*>
+	Entity* m_rootEntity;
 };
-
-//----------------------------------------------------------------------------//
-// 
-//----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
 // 

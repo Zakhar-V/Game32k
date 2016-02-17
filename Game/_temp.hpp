@@ -1,170 +1,719 @@
 
 //----------------------------------------------------------------------------//
-// Font
+//
 //----------------------------------------------------------------------------//
 
-class Font : public NonCopyable
+//----------------------------------------------------------------------------//
+//
+//----------------------------------------------------------------------------//
+
+class Component
 {
 public:
-	Font(const char* _name, uint _size, float _width = 0.5f, bool _italic = false);
-	~Font(void);
-	void SetColor(const Color& _color) { m_color = _color; }
-	Vec2 Draw(const Vec2& _pos, const char* _text, int _length = -1);
-	void BeginDraw(void);
-	static void EndDraw(void);
+
+	Component(Scene* _scene);
 
 protected:
-	struct Char { Vec2 size; Vec2 tc[2]; } m_chars[256];
-	uint m_texture;
-	float m_height;
-	Color m_color;
+};
+
+
+class Entity
+{
+public:
+
+	Entity(Scene* _scene);
+
+	void AttachComponent(Component* _c)
+	{
+
+	}
+
+protected:
+
+	Component* m_components;
+	Array<Entity*> m_childs;
+};
+
+
+class Transform
+{
+public:
+
+	void SetParent(Transform*) { }
+
+protected:
+
+	Array<Transform*> m_childs;
+};
+
+
+class Scene;
+class Entity;
+typedef Ptr<class Node> NodePtr;
+typedef Ref<class Node> NodeRef;
+
+class PhysicsEntity;
+class PhysicsWorld;
+class SoundWorld;
+//class VegetationSystem;
+//class WeatherSystem;
+
+//----------------------------------------------------------------------------//
+// 
+//----------------------------------------------------------------------------//
+
+
+//----------------------------------------------------------------------------//
+// 
+//----------------------------------------------------------------------------//
+
+struct FrameInfo
+{
+
+};
+
+class SceneSystem
+{
+public:
+
+	virtual void Update(FrameInfo& _frame) { }
+	Scene* GetScene(void) { return m_scene; }
+
+protected:
+
+	Scene* m_scene;
+};
+
+enum ComponentType
+{
+	CT_Unknown,
+
+	CT_Updateable,
+	CT_Behaviour,
+	CT_Logic,
+
+	CT_Renderable,
+	CT_Light,
+	CT_Camera,
+
+	CT_Skeleton,
+
+	CT_PhysicsBody,
+	CT_PhysicsShape,
+	CT_PhysicsJoint,
+
+	MAX_COMPONENT_TYPES,
+};
+
+class Component : public Object
+{
+public:
+	virtual bool IsSingle(void) { return false; }
+
+	virtual uint GetComponentType(void) = 0;
+	static uint GetComponentTypeStatic(void) { return CT_Unknown; }
+
+	Component* GetNextComponent(void) { return m_nextComponent; }
+
+	//virtual Actor* GetActor(void) { return nullptr; }
+	//virtual Entity* GetEntity(void) { return nullptr; }
+
+protected:
+	friend class Actor;
+
+	Component* m_prevComponent;
+	Component* m_nextComponent;
+};
+
+class Actor : public Object
+{
+public:
+
+	Actor(void);
+	~Actor(void);
+
+	void SetParentActor(Actor* _actor) { }
+	Actor* GetParentActor(void) { return m_parentActor; }
+	Actor* GetNextActor(void) { return m_nextActor; }
+	Actor* GetChildActor(void) { return m_childActor; }
+	void DetachAllChildren(bool _remove = false);
+	void RemoveThis(void);
+
+	void SetParentEntity(Entity* _parent) { }
+
+protected:
+	friend class Scene;
+	friend class Entity;
+
+	void _SetScene(Scene* _scene);
+
+	virtual void _OnChangeScene(Scene* _scene) { }
+	virtual void _OnChangeParent(Node* _node) { }
+
+	//m_childs[]
+
+	Actor* m_parentActor;
+	Actor* m_prevActor;
+	Actor* m_nextActor;
+	Actor* m_childActor;
+
+	//	Actor* m_parentActor;
 };
 
 //----------------------------------------------------------------------------//
-// Font
+// 
 //----------------------------------------------------------------------------//
 
-//----------------------------------------------------------------------------//
-Font::Font(const char* _name, uint _size, float _width, bool _italic)
+class Entity : public Actor
 {
-	int _tw = int(_width * 1000) / 100;
-	HFONT _fnt = CreateFontA(-int(_size), 0, 0, 0, _tw * 100, _italic, 0, 0, RUSSIAN_CHARSET, OUT_OUTLINE_PRECIS, CLIP_TT_ALWAYS, CLEARTYPE_NATURAL_QUALITY, DEFAULT_PITCH | FF_DONTCARE, _name);
-	HDC _dc = CreateCompatibleDC(0);
-	SetTextColor(_dc, RGB(255, 255, 255));
-	SetBkColor(_dc, RGB(0, 0, 0));
-	SetBkMode(_dc, TRANSPARENT);
-	SetMapMode(_dc, MM_TEXT);
-	SetTextAlign(_dc, TA_TOP);
-	SelectObject(_dc, _fnt);
+public:
 
-	ABCFLOAT _abc[256];
-	TEXTMETRICA	_tm;
-	GetTextMetricsA(_dc, &_tm);
-	GetCharABCWidthsFloatA(_dc, 0, 0xff, _abc);
+protected:
 
-	struct CharRect { uint x, y, w, h; } _chars[256];
-	uint _height = _tm.tmHeight;
-	m_height = (float)_height;
-	for (uint i = 0; i < 256; ++i)
+	//m_childs[]
+};
+
+
+//----------------------------------------------------------------------------//
+// 
+//----------------------------------------------------------------------------//
+
+class CUpdateable : public Component
+{
+public:
+
+protected:
+
+	bool m_enabled;
+	CUpdateable* m_prevUpdateable;
+	CUpdateable* m_nextUpdateable;
+};
+
+class CBehaviour : public CUpdateable
+{
+public:
+
+	virtual void PreUpdate(void) = 0;
+	virtual void Update(void) = 0;
+
+protected:
+
+};
+
+class UpdateManager : public SceneSystem
+{
+
+};
+
+//----------------------------------------------------------------------------//
+// 
+//----------------------------------------------------------------------------//
+
+class CRenderable : public Component
+{
+public:
+
+protected:
+
+	CRenderable* m_prevRenderable;
+	CRenderable* m_nextRederable;
+};
+
+class RenderWorld : public SceneSystem
+{
+public:
+
+	void Update(FrameInfo& _frame) override { }
+
+	void AddComponent(CRenderable* _component) { }
+	void RemoveComponent(CRenderable* _component) { }
+
+protected:
+
+	CRenderable* m_renderables;
+	DbvTree m_dbvt;
+};
+
+//----------------------------------------------------------------------------//
+// 
+//----------------------------------------------------------------------------//
+
+class EntityChild
+{
+public:
+
+protected:
+};
+
+//----------------------------------------------------------------------------//
+// Node
+//----------------------------------------------------------------------------//
+
+enum NodeType
+{
+	NT_Unknown = 0,
+	NT_Camera = 0x1,
+	NT_Renderable = 0x2,
+	NT_Light = NT_Renderable | 0x4,
+	NT_Terrain = NT_Renderable | 0x8,
+
+	NT_Test = NT_Renderable | 0x10,
+};
+
+class Node : public Object
+{
+public:
+
+	template <class T> T* GetComponent(uint _index = 0)
 	{
-		CharRect& _ch = _chars[i];
-		_ch.w = int(_abc[i].abcfB) + 2;
-		_ch.h = _height;
+		Component* _c = m_components[T::GetComponentTypeStatic()];
+		while (_c && _index--)
+			_c = _c->GetNextComponent();
+		return _c;
 	}
 
-	uint _tex_width = 32, _tex_height = 32;
-	for (;;)
+	Node(void);
+	~Node(void);
+
+	virtual NodeType Type(void) { return NT_Unknown; }
+
+	Scene* GetScene(void) { return m_scene; }
+	void SetParent(Node* _parent);
+	void DetachAllChildren(bool _remove = false);
+	void RemoveThis(void);
+
+	const Mat44& GetWorldMatrix(void);
+
+protected:
+	friend class Scene;
+
+	void _SetScene(Scene* _scene);
+
+	virtual void _OnChangeScene(Scene* _scene) { }
+	virtual void _OnChangeParent(Node* _node) { }
+	virtual void _Register(void) { }
+	virtual void _Unregister(void) { }
+
+	void _Link(Node*& _list);
+	void _Unlink(Node*& _list);
+	void _UpdateLocalTM(void);
+	void _UpdateWorldTM(void);
+
+	Scene* m_scene;
+	Entity* m_entity;
+	uint16 m_layer;
+	uint16 m_group;
+	uint m_id;
+
+	Node* m_parent;
+	Node* m_prev;
+	Node* m_next;
+	Node* m_child;
+
+	Vec3 m_position;
+	Quat m_rotation;
+	Vec3 m_scale;
+	Mat44 m_matrix;
+
+	PhysicsEntity* m_physics;
+	DbvTreeNode* m_dbvtNode;
+
+	//bool m_removeAllChildrenWhenDestroy : 1; // default is true
+
+	Component* m_components[MAX_COMPONENT_TYPES];
+};
+
+//----------------------------------------------------------------------------//
+//  
+//----------------------------------------------------------------------------//
+
+/*class Entity : public Object
+{
+public:
+
+protected:
+
+Entity* m_parent;
+Entity* m_prev;
+Entity* m_next;
+Entity* m_child;
+}; */
+
+//----------------------------------------------------------------------------//
+// CameraNode 
+//----------------------------------------------------------------------------//
+
+class CameraNode : public Node
+{
+public:
+
+	virtual NodeType Type(void) { return NT_Camera; }
+
+protected:
+
+	Mat44 m_view;
+	Mat44 m_proj;
+};
+
+//----------------------------------------------------------------------------//
+// RenderableNode
+//----------------------------------------------------------------------------//
+
+class Geometry;
+
+struct RenderOp
+{
+	Mat44* matrix;
+	Geometry* geom;
+	//Material* material;
+	void* deform;
+	uint baseVertex;
+	uint start;
+	uint count;
+	float distance;
+};
+
+class RenderableNode : public Node
+{
+public:
+
+	virtual NodeType Type(void) { return NT_Renderable; }
+
+	virtual void GetRenderOps(Array<RenderOp>& _dst, uint _flags, uint _mask) { }
+};
+
+//----------------------------------------------------------------------------//
+// LightNode
+//----------------------------------------------------------------------------//
+
+class LightNode : public RenderableNode
+{
+public:
+	virtual NodeType Type(void) { return NT_Light; }
+
+protected:
+};
+
+//----------------------------------------------------------------------------//
+// TestNode
+//----------------------------------------------------------------------------//
+
+class TestNode : public RenderableNode
+{
+public:
+
+	virtual NodeType Type(void) { return NT_Test; }
+
+protected:
+};
+
+//----------------------------------------------------------------------------//
+// TerrainNode
+//----------------------------------------------------------------------------//
+
+class TerrainNode : public RenderableNode
+{
+public:
+
+	virtual NodeType Type(void) { return NT_Terrain; }
+
+	//void CreateFromHeightMap(Image* _image, const Vec2& _size, float _heightScale);
+protected:
+
+};
+
+//----------------------------------------------------------------------------//
+// SkyDome
+//----------------------------------------------------------------------------//
+
+class SkyDome : public NonCopyable
+{
+public:
+
+protected:
+
+	float m_timeOfDay;
+};
+
+//----------------------------------------------------------------------------//
+// Scene
+//----------------------------------------------------------------------------//
+
+class Scene : public NonCopyable
+{
+public:
+
+	Scene(void);
+	~Scene(void);
+
+	void AddNode(Node* _node);
+
+	void Update(float _dt);
+	void Render(float _dt);
+
+	DbvTree& GetDbvt(void) { return m_dbvt; }
+
+protected:
+
+	friend class Actor;
+	friend class Node;
+
+	Node*& _Root(void) { return m_rootNodes; }
+	Actor*& _RootActor(void) { return m_rootActor; }
+
+	uint _NewID(Node* _node);
+	void _FreeID(uint _id);
+
+	Node* m_rootNodes;
+
+	Array<Node*> m_nodes;
+	Array<uint> m_freeIds;
+
+	DbvTree m_dbvt;
+
+	// [renderer]
+
+	void _GetRenderableNodes();
+
+	Array<RenderableNode*> m_visibleNodes;
+
+	Actor* m_rootActor;
+	//Array<RenderableNode*> m_mainCameraPvs;
+	//Array<RenderableNode*>
+};
+
+//----------------------------------------------------------------------------//
+// Node
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+Node::Node(void) :
+	m_scene(nullptr),
+	m_entity(nullptr),
+	m_layer(0),
+	m_group(0),
+	m_id(0),
+	m_parent(nullptr),
+	m_prev(nullptr),
+	m_next(nullptr),
+	m_child(nullptr),
+	m_position(VEC3_ZERO),
+	m_rotation(QUAT_IDENTITY),
+	m_scale(VEC3_ONE),
+	m_matrix(MAT44_IDENTITY),
+	m_physics(nullptr),
+	m_dbvtNode(nullptr)
+{
+}
+//----------------------------------------------------------------------------//
+Node::~Node(void)
+{
+	DetachAllChildren(true);
+	// TODO: remove physics, dbvt ... ?
+}
+//----------------------------------------------------------------------------//
+void Node::SetParent(Node* _parent)
+{
+	ASSERT(_parent != this);
+	if (m_parent == _parent)
+		return;
+
+	if (!_parent && !m_scene)
+		AddRef();
+
+	if (m_parent)
 	{
-		bool _placed = true;
-		for (uint x = 0, y = 0, i = 0; i < 256; ++i)
-		{
-			CharRect& _ch = _chars[i];
-			if (x + _ch.w > _tex_width)
-			{
-				x = 0;
-				y += _height;
-				if (y + _height > _tex_height)
-				{
-					_placed = false;
-					break;
-				}
-			}
-			_ch.x = x;
-			_ch.y = y;
-			x += _ch.w;
-		}
-		if (_placed)
-			break;
-		if (_tex_width <= _tex_height)
-			_tex_width <<= 1;
+		_OnChangeParent(nullptr);
+		_Unlink(m_parent->m_child);
+	}
+	else if (m_scene)
+	{
+		_Unlink(m_scene->_Root());
+	}
+
+	//TODO: update world TM
+
+	m_parent = _parent;
+
+	if (m_parent)
+	{
+		_Link(m_parent->m_child);
+		_OnChangeParent(_parent);
+
+		if (m_parent->m_scene && m_parent->m_scene != m_scene)
+			_SetScene(m_parent->m_scene);
+	}
+	else if (m_scene)
+	{
+		_Link(m_scene->_Root());
+	}
+
+	if (!_parent && !m_scene)
+		Release();
+}
+//----------------------------------------------------------------------------//
+void Node::DetachAllChildren(bool _remove)
+{
+	for (Node *n, *i = m_child; i;)
+	{
+		n = i;
+		i = i->m_next;
+		if (_remove && !i->m_entity)
+			n->RemoveThis();
 		else
-			_tex_height <<= 1;
+			n->SetParent(nullptr);
 	}
-
-	BITMAPINFO _bmi;
-	memset(&_bmi, 0, sizeof(_bmi));
-	_bmi.bmiHeader.biSize = sizeof(_bmi);
-	_bmi.bmiHeader.biWidth = _tex_width;
-	_bmi.bmiHeader.biHeight = -int(_tex_height);
-	_bmi.bmiHeader.biBitCount = 32;
-	_bmi.bmiHeader.biCompression = BI_RGB;
-	_bmi.bmiHeader.biPlanes = 1;
-
-	Color* _img;
-	HBITMAP _bm = CreateDIBSection(_dc, &_bmi, DIB_RGB_COLORS, (void**)&_img, 0, 0);
-	//memset(_img, 0, _tex_width * _tex_height * sizeof(Color));
-
-	float _itw = 1.0f / float(_tex_width);
-	float _ith = 1.0f / float(_tex_height);
-	SelectObject(_dc, _bm);
-	for (uint i = 0; i < 256; ++i)
-	{
-		uint8 c = (uint8)i;
-		CharRect& _cr = _chars[i];
-		Char& _ch = m_chars[i];
-		TextOutA(_dc, _cr.x - (int(_abc[i].abcfA) - 1), _cr.y, (const char*)&c, 1);
-		_ch.size.Set((float)_cr.w, (float)_cr.h);
-		_ch.tc[0].Set(_cr.x * _itw, _cr.y * _ith);
-		_ch.tc[1].Set((_cr.x + _cr.w) * _itw, (_cr.y + _cr.h) * _ith);
-	}
-	GdiFlush();
-
-	glGenTextures(1, &m_texture);
-	glBindTexture(GL_TEXTURE_2D, m_texture);
-	glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_FALSE);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, _tex_width, _tex_height, 0, GL_ABGR_EXT, GL_UNSIGNED_BYTE, _img);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-
-	DeleteObject(_bm);
-	DeleteDC(_dc);
-	DeleteObject(_fnt);
 }
 //----------------------------------------------------------------------------//
-Font::~Font(void)
+void Node::RemoveThis(void)
 {
-	//do nothing
+	NodePtr _addref(this);
+	SetParent(nullptr);
+	_SetScene(nullptr);
 }
 //----------------------------------------------------------------------------//
-Vec2 Font::Draw(const Vec2& _pos, const char* _text, int _length)
+void Node::_SetScene(Scene* _scene)
 {
-	Vec2 _p = _pos;
-	glBegin(GL_QUADS);
-	for (int i = 0; _length < 0 ? *_text : i < _length; ++i)
+	if (!m_parent && !_scene)
+		AddRef();
+
+	Scene* _oldScene = m_scene;
+
+	if (m_scene != _scene)
 	{
-		if (*_text == '\n' || *_text == '\r')
+		if (m_scene)
 		{
-			if (*_text == '\n' && _text[1] == '\r')	++_text;
-			++_text;
-			_p.x = _pos.x;
-			_p.y += m_height;
-			continue;
+			_OnChangeScene(nullptr);
+			m_scene->_FreeID(m_id);
+			if (!m_parent)
+				_Unlink(m_scene->_Root());
 		}
-		const Font::Char& _ch = m_chars[uint8(*_text++)];
-		glTexCoord2f(_ch.tc[0].x, _ch.tc[0].y); glVertex2f(_p.x, _p.y);	// lt
-		glTexCoord2f(_ch.tc[0].x, _ch.tc[1].y); glVertex2f(_p.x, _p.y + _ch.size.y); // lb
-		glTexCoord2f(_ch.tc[1].x, _ch.tc[1].y); glVertex2f(_p.x + _ch.size.x, _p.y + _ch.size.y); // rb
-		glTexCoord2f(_ch.tc[1].x, _ch.tc[0].y); glVertex2f(_p.x + _ch.size.x, _p.y); // rt;
-		_p.x += _ch.size.x;
+
+		m_scene = _scene;
+
+		if (m_scene)
+		{
+			m_id = m_scene->_NewID(this);
+			if (!m_parent)
+				_Link(m_scene->_Root());
+			_OnChangeScene(m_scene);
+		}
 	}
-	glEnd();
-	return _p;
+
+	if (_oldScene != m_scene || _scene == nullptr)
+	{
+		for (Node* i = m_child; i; i = i->m_next)
+		{
+			i->_SetScene(m_scene);
+		}
+	}
+
+	if (!m_parent && !_scene)
+		Release();
 }
 //----------------------------------------------------------------------------//
-void Font::BeginDraw(void)
+void Node::_Link(Node*& _list)
 {
-	glBindTexture(GL_TEXTURE_2D, m_texture);
-	glEnable(GL_TEXTURE_2D);
-	glEnable(GL_COLOR_MATERIAL);
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-	glColor4ubv(m_color.v);
+	ASSERT(m_prev == nullptr && m_next == nullptr && _list != this);
+
+	m_next = _list;
+	_list = this;
+	if (m_next)
+		m_next->m_prev = this;
+
+	//Link((uint8**)&_list, (uint8*)this, offsetof(Node, m_prev), offsetof(Node, m_next));
 }
 //----------------------------------------------------------------------------//
-void Font::EndDraw(void)
+void Node::_Unlink(Node*& _list)
 {
-	glDisable(GL_TEXTURE_2D);
-	glDisable(GL_BLEND);
+	if (m_next)
+		m_next->m_prev = m_prev;
+	if (m_prev)
+		m_prev->m_next = m_next;
+	else
+		_list = m_next;
+
+	m_prev = nullptr;
+	m_next = nullptr;
+
+	//Unlink((uint8**)&_list, (uint8*)this, offsetof(Node, m_prev), offsetof(Node, m_next));
+}
+//----------------------------------------------------------------------------//
+void Node::_UpdateLocalTM(void)
+{
+	if (m_parent)
+	{
+
+	}
+	else
+	{
+
+	}
+}
+//----------------------------------------------------------------------------//
+void Node::_UpdateWorldTM(void)
+{
+
+}
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+// Scene
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+Scene::Scene(void) :
+	m_rootNodes(nullptr)
+{
+	m_nodes.Push(nullptr); // 0
+}
+//----------------------------------------------------------------------------//
+Scene::~Scene(void)
+{
+}
+//----------------------------------------------------------------------------//
+void Scene::AddNode(Node* _node)
+{
+	if (_node)
+		_node->_SetScene(this);
+}
+//----------------------------------------------------------------------------//
+void Scene::Update(float _dt)
+{
+
+}
+//----------------------------------------------------------------------------//
+void Scene::Render(float _dt)
+{
+
+}
+//----------------------------------------------------------------------------//
+uint Scene::_NewID(Node* _node)
+{
+	uint _id = 0;
+	if (m_freeIds.Size())
+	{
+		_id = m_freeIds.Top();
+		m_freeIds.Pop();
+	}
+	else
+	{
+		_id = m_nodes.Size();
+		m_nodes.Push(nullptr);
+	}
+	m_nodes[_id] = _node;
+	return _id;
+}
+//----------------------------------------------------------------------------//
+void Scene::_FreeID(uint _id)
+{
+	ASSERT(_id < m_nodes.Size());
+	m_nodes[_id] = nullptr;
+}
+//----------------------------------------------------------------------------//
+void Scene::_GetRenderableNodes()
+{
+
 }
 //----------------------------------------------------------------------------//
 

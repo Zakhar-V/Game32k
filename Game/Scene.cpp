@@ -1,98 +1,166 @@
 #pragma once
 
 #include "Scene.hpp"
+#include "Transform.hpp"
 
 //----------------------------------------------------------------------------//
-// Node
+// Component
 //----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
-Node::Node(void) :
-	m_scene(nullptr),
+Component::Component(void) :
 	m_entity(nullptr),
-	m_layer(0),
-	m_group(0),
-	m_id(0),
+	m_prev(nullptr),
+	m_next(nullptr)
+{
+}
+//----------------------------------------------------------------------------//
+Component::~Component(void)
+{
+}
+//----------------------------------------------------------------------------//
+Scene* Component::GetScene(void)
+{
+	return m_entity ? m_entity->GetScene() : nullptr;
+}
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+// Entity 
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+Entity::Entity(void) :
+	m_scene(nullptr),
 	m_parent(nullptr),
 	m_prev(nullptr),
 	m_next(nullptr),
 	m_child(nullptr),
-	m_position(VEC3_ZERO),
-	m_rotation(QUAT_IDENTITY),
-	m_scale(VEC3_ONE),
-	m_matrix(MAT44_IDENTITY),
-	m_physics(nullptr),
-	m_dbvtNode(nullptr)
+	m_numComponents(0)
 {
+	memset(m_components, 0, sizeof(m_components));
 }
 //----------------------------------------------------------------------------//
-Node::~Node(void)
+Entity::~Entity(void)
 {
 	DetachAllChildren(true);
-	// TODO: remove physics, dbvt ... ?
 }
 //----------------------------------------------------------------------------//
-void Node::SetParent(Node* _parent)
+void Entity::SetParent(Entity* _parent, bool _inheritTransform)
 {
-	ASSERT(_parent != this);
 	if (m_parent == _parent)
 		return;
+
+	if (_parent && _parent->m_scene != m_scene)
+		return;
+
+	if (_parent)
+	{
+		for (Entity* i = this; i; i = i->m_parent)
+		{
+			if (i == this)
+				return;
+		}
+	}
 
 	if (!_parent && !m_scene)
 		AddRef();
 
 	if (m_parent)
 	{
-		_OnChangeParent(nullptr);
-		_Unlink(m_parent->m_child);
+		Unlink(m_parent->m_child, this, m_prev);
 	}
-	else if(m_scene)
+	else if (m_scene)
 	{
-		_Unlink(m_scene->_Root());
+		Unlink(m_scene->_RootEntityRef(), this, m_prev);
 	}
-
-	//TODO: update world TM
 
 	m_parent = _parent;
 
 	if (m_parent)
 	{
-		_Link(m_parent->m_child);
-		_OnChangeParent(_parent);
+		Link(m_parent->m_child, this, m_prev);
 
 		if (m_parent->m_scene && m_parent->m_scene != m_scene)
 			_SetScene(m_parent->m_scene);
 	}
-	else if(m_scene)
+	else if (m_scene)
 	{
-		_Link(m_scene->_Root());
+		Link(m_scene->_RootEntityRef(), this, m_prev);
 	}
+
+	/*if (_inheritTransform)
+	{
+		Transform* _parentTransform = m_parent ? m_parent->GetComponent<Transform>() : nullptr;
+
+	}*/
 
 	if (!_parent && !m_scene)
 		Release();
 }
 //----------------------------------------------------------------------------//
-void Node::DetachAllChildren(bool _remove)
+void Entity::DetachAllChildren(bool _remove)
 {
-	for (Node *n, *i = m_child; i;)
+	for (Entity *n, *i = m_child; i;)
 	{
 		n = i;
 		i = i->m_next;
-		if (_remove && !i->m_entity)
+		if (_remove && !i->m_persistent)
 			n->RemoveThis();
 		else
 			n->SetParent(nullptr);
 	}
 }
 //----------------------------------------------------------------------------//
-void Node::RemoveThis(void)
+void Entity::RemoveThis(bool _force)
 {
-	NodePtr _addref(this);
+	EntityPtr _addref(this);
 	SetParent(nullptr);
-	_SetScene(nullptr);
+	if(_force || !m_persistent)
+		_SetScene(nullptr);
 }
 //----------------------------------------------------------------------------//
-void Node::_SetScene(Scene* _scene)
+Component* Entity::GetComponent(ComponentType _type, uint _index)
+{
+	ASSERT(_type < CT_MaxTypes);
+	Component* _c = m_components[_type];
+	while (_c && _index--)
+		_c = _c->m_next;
+	return _c;
+}
+//----------------------------------------------------------------------------//
+void Entity::AttachComponent(Component* _c)
+{
+	if (!_c || _c->m_entity == this)
+		return;
+
+	if (_c->GetScene() != m_scene)
+		return;
+
+	ComponentType _type = _c->GetComponentType();
+
+	if (m_components[_type] && m_components[_type]->IsSingleComponent())
+		return;
+
+	_c->AddRef();
+	if (_c->m_entity)
+		_c->m_entity->DetachComponent(_c, _c->m_entity->m_scene == m_scene);
+
+	Link(m_components[_type], _c, _c->m_prev);
+	_c->_SetEntity(this);
+	_c->_SetScene(m_scene);
+}
+//----------------------------------------------------------------------------//
+void Entity::DetachComponent(Component* _c, bool _removeFromScene)
+{
+	if (_c && _c->m_entity == this)
+	{
+		ComponentType _type = _c->GetComponentType();
+		//Unlink(m_components[_c->GetComponentType()])
+	}
+}
+//----------------------------------------------------------------------------//
+void Entity::_SetScene(Scene* _scene)
 {
 	if (!m_parent && !_scene)
 		AddRef();
@@ -101,28 +169,40 @@ void Node::_SetScene(Scene* _scene)
 
 	if (m_scene != _scene)
 	{
+		ASSERT(m_scene == nullptr || _scene == nullptr);
+
+		// remove from scene
 		if (m_scene)
 		{
-			_OnChangeScene(nullptr);
-			m_scene->_FreeID(m_id);
+			//m_scene->_FreeID(m_id);
 			if (!m_parent)
-				_Unlink(m_scene->_Root());
+				Unlink(m_scene->_RootEntityRef(), this, m_prev);
+		}
+
+		// notify components
+		for (uint i = 0; i < CT_MaxTypes; ++i)
+		{
+			for (Component* c = m_components[i]; c; c = c->GetNextComponent())
+			{
+				c->_SetScene(m_scene);
+			}
 		}
 
 		m_scene = _scene;
 
+		// add to scene
 		if (m_scene)
 		{
-			m_id = m_scene->_NewID(this);
+			//m_id = m_scene->_NewID(this);
 			if (!m_parent)
-				_Link(m_scene->_Root());
-			_OnChangeScene(m_scene);
+				Link(m_scene->_RootEntityRef(), this, m_prev);
 		}
 	}
 
+	// notify children
 	if (_oldScene != m_scene || _scene == nullptr)
 	{
-		for (Node* i = m_child; i; i = i->m_next)
+		for (Entity* i = m_child; i; i = i->m_next)
 		{
 			i->_SetScene(m_scene);
 		}
@@ -132,44 +212,23 @@ void Node::_SetScene(Scene* _scene)
 		Release();
 }
 //----------------------------------------------------------------------------//
-void Node::_Link(Node*& _list)
+void _ChangeScene(Scene* _scene)
 {
-	ASSERT(m_prev == nullptr && m_next == nullptr && _list != this);
-
-	m_next = _list;
-	_list = this;
-	if (m_next)
-		m_next->m_prev = this;
+	
 }
 //----------------------------------------------------------------------------//
-void Node::_Unlink(Node*& _list)
-{
-	if (m_next)
-		m_next->m_prev = m_prev;
-	if (m_prev)
-		m_prev->m_next = m_next;
-	else
-		_list = m_next;
 
-	m_prev = nullptr;
-	m_next = nullptr;
+//----------------------------------------------------------------------------//
+// SceneSystem
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+void SceneSystem::AddComponent(Component* _c)
+{
 }
 //----------------------------------------------------------------------------//
-void Node::_UpdateLocalTM(void)
+void SceneSystem::RemoveComponent(Component* _c)
 {
-	if (m_parent)
-	{
-
-	}
-	else
-	{
-
-	}
-}
-//----------------------------------------------------------------------------//
-void Node::_UpdateWorldTM(void)
-{
-
 }
 //----------------------------------------------------------------------------//
 
@@ -179,57 +238,28 @@ void Node::_UpdateWorldTM(void)
 
 //----------------------------------------------------------------------------//
 Scene::Scene(void) :
-	m_rootNodes(nullptr)
+	m_rootEntity(nullptr)
 {
-	m_nodes.Push(nullptr); // 0
 }
 //----------------------------------------------------------------------------//
 Scene::~Scene(void)
 {
+	while (m_rootEntity)
+		m_rootEntity->RemoveThis(true);
+
+	// ...
 }
 //----------------------------------------------------------------------------//
-void Scene::AddNode(Node* _node)
+void Scene::AddEntity(Entity* _entity)
 {
-	if (_node)
-		_node->_SetScene(this);
+	if (_entity && (!_entity->GetParent() || _entity->GetParent()->GetScene() == this))
+		_entity->_SetScene(this);
 }
 //----------------------------------------------------------------------------//
-void Scene::Update(float _dt)
+void Scene::RemoveEntity(Entity* _entity)
 {
-	
-}
-//----------------------------------------------------------------------------//
-void Scene::Render(float _dt)
-{
-	
-}
-//----------------------------------------------------------------------------//
-uint Scene::_NewID(Node* _node)
-{
-	uint _id = 0;
-	if (m_freeIds.Size())
-	{
-		_id = m_freeIds.Top();
-		m_freeIds.Pop();
-	}
-	else
-	{
-		_id = m_nodes.Size();
-		m_nodes.Push(nullptr);
-	}
-	m_nodes[_id] = _node;
-	return _id;
-}
-//----------------------------------------------------------------------------//
-void Scene::_FreeID(uint _id)
-{
-	ASSERT(_id < m_nodes.Size());
-	m_nodes[_id] = nullptr;
-}
-//----------------------------------------------------------------------------//
-void Scene::_GetRenderableNodes()
-{
-	
+	if (_entity && _entity->GetScene() == this && !_entity->GetParent())
+		_entity->RemoveThis(true);
 }
 //----------------------------------------------------------------------------//
 

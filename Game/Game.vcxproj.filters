@@ -13,9 +13,6 @@
     <ClCompile Include="File.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
-    <ClCompile Include="Scene.cpp">
-      <Filter>Engine</Filter>
-    </ClCompile>
     <ClCompile Include="BuiltinData.cpp">
       <Filter>Assets</Filter>
     </ClCompile>
@@ -31,6 +28,12 @@
     <ClCompile Include="Geometry.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
+    <ClCompile Include="Scene.cpp">
+      <Filter>Engine\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="Transform.cpp">
+      <Filter>Engine\Scene</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Game">
@@ -44,6 +47,9 @@
     </Filter>
     <Filter Include="Assets">
       <UniqueIdentifier>{5d94416d-1ab4-4d71-a350-12de6607e734}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Scene">
+      <UniqueIdentifier>{69e71c05-904d-42ef-93fb-f4fc22683435}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -65,9 +71,6 @@
     <ClInclude Include="File.hpp">
       <Filter>Engine</Filter>
     </ClInclude>
-    <ClInclude Include="Scene.hpp">
-      <Filter>Engine</Filter>
-    </ClInclude>
     <ClInclude Include="Object.hpp">
       <Filter>Engine</Filter>
     </ClInclude>
@@ -82,6 +85,12 @@
     </ClInclude>
     <ClInclude Include="Device.hpp">
       <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene.hpp">
+      <Filter>Engine\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Transform.hpp">
+      <Filter>Engine\Scene</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -9,9 +9,11 @@
 #include "Device.cpp"
 #include "Graphics.cpp"
 #include "BuiltinData.cpp"
-#include "Scene.cpp"
 #include "Image.cpp"
 #include "Geometry.cpp"
+
+#include "Scene.cpp"
+#include "Transform.cpp"
 
 //----------------------------------------------------------------------------//
 //
@@ -368,6 +370,14 @@ void CreateHeightMap(Image* _img, float _scaleY, float _finalSize, float _desire
 //----------------------------------------------------------------------------//
 ////////////////////////////////////////////////////////////////////////////////
 
+
+
+////////////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------//
+//
+//----------------------------------------------------------------------------//
+////////////////////////////////////////////////////////////////////////////////
+
 void main(void)
 {
 	LOG("Startup ...");
@@ -380,8 +390,18 @@ void main(void)
 		LOG("Generate resources ...");
 	}
 
-	PRINT_SIZEOF(Node);
-	LOG("1KK nodes = %d mb", (sizeof(Node) * 1000000) / 1024 / 1024);
+
+#if defined(_DEBUG) && 1
+	PRINT_SIZEOF(Component);
+	PRINT_SIZEOF(Entity);
+	PRINT_SIZEOF(Transform);
+	LOG("1KK nodes = %d mb", ((sizeof(Transform) + sizeof(Entity)) * 1000000) / 1024 / 1024);
+
+	{
+		system("pause");
+		return;
+	}
+#endif
 
 	{
 		const Color _clearColor(0x7f7f9fff);
@@ -483,6 +503,8 @@ void main(void)
 			//CreateHeightMap(_img, 1, 1, 1);
 
 			Scene _scene;
+			EntityPtr _entity = new Entity;
+			_scene.AddEntity(_entity);
 
 			bool _quit = false;
 			while (!_quit && !gDevice->ShouldClose())

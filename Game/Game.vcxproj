@@ -175,6 +175,10 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="Transform.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Base.hpp" />
@@ -184,6 +188,7 @@
     <ClInclude Include="Image.hpp" />
     <ClInclude Include="Object.hpp" />
     <ClInclude Include="Scene.hpp" />
+    <ClInclude Include="Transform.hpp" />
     <ClInclude Include="_temp.hpp" />
     <ClInclude Include="Game.h" />
     <ClInclude Include="Graphics.hpp" />
