@@ -66,7 +66,7 @@ Quat& Quat::Mul(const Quat& _rhs)
 		w * _rhs.w - x * _rhs.x - y * _rhs.y - z * _rhs.z);
 }
 //----------------------------------------------------------------------------//
-Vec3& Quat::Transform(const Vec3& _v) const
+Vec3 Quat::Transform(const Vec3& _v) const
 {
 	const Vec3& _q = *(const Vec3*)(&x);
 	Vec3 _uv(_q.Cross(_v));

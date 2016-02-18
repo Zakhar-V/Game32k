@@ -34,6 +34,12 @@
     <ClCompile Include="Transform.cpp">
       <Filter>Engine\Scene</Filter>
     </ClCompile>
+    <ClCompile Include="Physics.cpp">
+      <Filter>Engine\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="Render.cpp">
+      <Filter>Engine\Scene</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Game">
@@ -90,6 +96,12 @@
       <Filter>Engine\Scene</Filter>
     </ClInclude>
     <ClInclude Include="Transform.hpp">
+      <Filter>Engine\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Physics.hpp">
+      <Filter>Engine\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Render.hpp">
       <Filter>Engine\Scene</Filter>
     </ClInclude>
   </ItemGroup>

@@ -283,7 +283,7 @@ public:
 	}
 	Array& Remove(const T& _e)
 	{
-		for (T *_p = m_data, *_end = m_data + m_used; _p < _end)
+		for (T *_p = m_data, *_end = m_data + m_used; _p < _end;)
 		{
 			if (*_p == _e)
 			{

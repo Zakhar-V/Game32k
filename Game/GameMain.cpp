@@ -14,6 +14,8 @@
 
 #include "Scene.cpp"
 #include "Transform.cpp"
+#include "Physics.cpp"
+#include "Render.cpp"
 
 //----------------------------------------------------------------------------//
 //
@@ -370,6 +372,46 @@ void CreateHeightMap(Image* _img, float _scaleY, float _finalSize, float _desire
 //----------------------------------------------------------------------------//
 ////////////////////////////////////////////////////////////////////////////////
 
+void CreateTerrain()
+{
+}
+
+void CreateTree(int _type)
+{
+}
+
+void CreateBuilding(int _type)
+{
+}
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------//
+//
+//----------------------------------------------------------------------------//
+////////////////////////////////////////////////////////////////////////////////
+
+class LogicComponent : public Component
+{
+};
+
+class SpawnZone : public LogicComponent
+{
+};
+
+class Weapon : public LogicComponent
+{
+
+};
+
+class Character : public LogicComponent
+{
+};
+
+class Player : public Character
+{
+};
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -390,16 +432,19 @@ void main(void)
 		LOG("Generate resources ...");
 	}
 
-
-#if defined(_DEBUG) && 1
 	PRINT_SIZEOF(Component);
 	PRINT_SIZEOF(Entity);
 	PRINT_SIZEOF(Transform);
+	PRINT_SIZEOF(PhysicsBody);
+	PRINT_SIZEOF(PhysicsShape);
+	PRINT_SIZEOF(PhysicsJoint);
 	LOG("1KK nodes = %d mb", ((sizeof(Transform) + sizeof(Entity)) * 1000000) / 1024 / 1024);
+
+#if defined(_DEBUG) && 0
 
 	{
 		system("pause");
-		return;
+		ExitProcess(0);
 	}
 #endif
 
@@ -504,7 +549,9 @@ void main(void)
 
 			Scene _scene;
 			EntityPtr _entity = new Entity;
-			_scene.AddEntity(_entity);
+			Ptr<Transform> _transform = new Transform;
+			_entity->AddComponent(_transform);
+			_entity->SetScene(&_scene);
 
 			bool _quit = false;
 			while (!_quit && !gDevice->ShouldClose())
@@ -524,6 +571,7 @@ void main(void)
 				_camera.Update(_dt);
 
 
+				_scene.Update(_dt);
 
 				gGraphics->BeginFrame();
 				gGraphics->ClearFrameBuffers(FBT_Color, _clearColor);

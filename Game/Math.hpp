@@ -529,7 +529,7 @@ struct Quat
 	friend Vec3 operator * (const Vec3& _lhs, const Quat& _rhs) { return _rhs.Transform(_lhs); }
 	
 	Quat& Mul(const Quat& _rhs);
-	Vec3& Transform(const Vec3& _v) const;
+	Vec3 Transform(const Vec3& _v) const;
 	float Dot(const Quat& _q) const { return x * _q.x + y * _q.y + z * _q.z + w * _q.w; }
 	Quat& Normalize(void);
 	Quat& Inverse(void);

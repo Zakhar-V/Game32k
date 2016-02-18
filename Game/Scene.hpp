@@ -12,6 +12,16 @@ class Entity;
 class SceneSystem;
 class Scene;
 
+class Transform;
+class TransformSystem;
+
+class PhysicsBody;
+class PhysicsShape;
+class PhysicsJoint;
+class PhysicsWorld;
+
+class RenderWorld;
+
 //----------------------------------------------------------------------------//
 // 
 //----------------------------------------------------------------------------//
@@ -19,6 +29,10 @@ class Scene;
 enum ComponentType
 {
 	CT_Transform = 0,
+
+	CT_PhysicsBody,
+	CT_PhysicsShape,
+	CT_PhysicsJoint,
 
 	CT_Unknown,
 	CT_MaxTypes,
@@ -31,14 +45,19 @@ public:
 	static ComponentType GetComponentTypeStatic(void) { return CT_Unknown; }
 	virtual ComponentType GetComponentType(void) { return CT_Unknown; }
 	virtual bool IsSingleComponent(void) { return false; }
+	virtual uint GetComponentSubType(void) { return 0; }
 
 	Component(void);
 	~Component(void);
 
 	Entity* GetEntity(void) { return m_entity; }
-	virtual Scene* GetScene(void);
+	Scene* GetScene(void);
 
 	Component* GetNextComponent(void) { return m_next; }
+
+	template <class T> T* GetEntityComponent(uint _index = 0) { return static_cast<T*>(GetEntityComponent(T::GetComponentTypeStatic(), _index)); }
+	Component* GetEntityComponent(ComponentType _type, uint _index = 0);
+
 
 	virtual void TransformUpdated(void) { }
 
@@ -48,13 +67,7 @@ protected:
 	friend class Entity;
 
 	virtual void _SetScene(Scene* _scene) { }
-	virtual void _SetEntity(Entity* _entity)
-	{ 
-		//Scene* _oldScene = m_entity->GetScene();
-		m_entity = _entity; 
-		/*if (m_entity && m_entity->GetScene() != _oldScene)
-			_SetScene(m_entity->GetScene());*/
-	}
+	virtual void _SetEntity(Entity* _entity) { m_entity = _entity; }
 
 	Entity* m_entity;
 	Component* m_prev;
@@ -84,6 +97,7 @@ enum EntityEvent
 };
 
 typedef Ptr<Entity> EntityPtr;
+typedef Ref<Entity> EntityRef;
 
 class Entity final : public Object
 {
@@ -93,25 +107,28 @@ public:
 	~Entity(void);
 
 	Scene* GetScene(void) { return m_scene; }
+	bool SetScene(Scene* _scene);
 	Entity* GetParent(void) { return m_parent; }
-	void SetParent(Entity* _parent, bool _inheritTransform = true);
+	bool SetParent(Entity* _parent);
 	void DetachAllChildren(bool _remove = false);
-	void RemoveThis(bool _force = false);
+	void DetachThis(bool _remove = false);
 
-	
 	//void SendEvent(const Event& _event);
 
-	template <class T> T* GetComponent(uint _index = 0) { return GetComponent(T::GetComponentTypeStatic(), _index); }
+	bool SetManualTransformHierarchy(bool _state = true) { m_manualTransformHierarchy = _state; }
+	bool GetManualTransformHierarchy(void) { return m_manualTransformHierarchy; }
+	Entity* GetParentTransform(void);
+	void SetParentTransform(Entity* _parent);
+
+	template <class T> T* GetComponent(uint _index = 0) { return static_cast<T*>(GetComponent(T::GetComponentTypeStatic(), _index)); }
 	Component* GetComponent(ComponentType _type, uint _index = 0);
-	void AttachComponent(Component* _c);
-	void DetachComponent(Component* _c, bool _removeFromScene = true);
+	bool AddComponent(Component* _c);
+	void RemoveComponent(Component* _c);
+	void RemoveAllComponents(void);
 
 protected:
 	friend class Scene;
 	friend class Component;
-
-	void _SetScene(Scene* _scene);
-
 
 	Scene* m_scene;
 	Entity* m_parent;
@@ -120,37 +137,22 @@ protected:
 	Entity* m_child;
 
 	Component* m_components[CT_MaxTypes];
-	uint m_numComponents;
 
+	bool m_removed : 1;
 
-	bool m_persistent : 1;
+	//bool m_persistent : 1;
+	bool m_manualTransformHierarchy : 1;
 };
 
 //----------------------------------------------------------------------------//
 // SceneSystem
 //----------------------------------------------------------------------------//
 
-enum SceneSystemType
-{
-	SST_Transform,
-
-	// game specific
-	SST_,
-
-	SST_MaxTypes,
-};
-
 class SceneSystem : public NonCopyable
 {
 public:
-	//static SceneSystemType GetSystemTypeStatic(void) { return CT_Unknown; }
-	//virtual SceneSystemType GetSystemType(void) { return CT_Unknown; }
-
 	SceneSystem(Scene* _scene) : m_scene(_scene) { }
 	virtual ~SceneSystem(void) { }
-
-	virtual void AddComponent(Component* _c);
-	virtual void RemoveComponent(Component* _c);
 
 protected:
 
@@ -168,8 +170,12 @@ public:
 	Scene(void);
 	~Scene(void);
 
-	void AddEntity(Entity* _entity);
-	void RemoveEntity(Entity* _entity);
+	TransformSystem* GetTransformSystem(void) { return m_transformSystem; }
+	PhysicsWorld* GetPhysicsWorld(void) { return m_physicsWorld; }
+	RenderWorld* GetRenderWorld(void) { return m_renderWorld; }
+
+	void Update(float _dt);
+	
 
 protected:
 	friend class Entity;
@@ -177,6 +183,10 @@ protected:
 	Entity*& _RootEntityRef(void) { return m_rootEntity; }
 
 	Entity* m_rootEntity;
+
+	TransformSystem* m_transformSystem;
+	PhysicsWorld* m_physicsWorld;
+	RenderWorld* m_renderWorld;
 };
 
 //----------------------------------------------------------------------------//
