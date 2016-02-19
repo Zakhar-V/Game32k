@@ -419,6 +419,7 @@ class Player : public Character
 //
 //----------------------------------------------------------------------------//
 ////////////////////////////////////////////////////////////////////////////////
+#pragma comment(lib, "opengl32.lib")
 
 void main(void)
 {
@@ -434,11 +435,11 @@ void main(void)
 
 	PRINT_SIZEOF(Component);
 	PRINT_SIZEOF(Entity);
-	PRINT_SIZEOF(Transform);
+	LOG("sizeof(Transform) = %d (-28) = %d", sizeof(Transform), sizeof(Transform) - 28);
 	PRINT_SIZEOF(PhysicsBody);
 	PRINT_SIZEOF(PhysicsShape);
 	PRINT_SIZEOF(PhysicsJoint);
-	LOG("1KK nodes = %d mb", ((sizeof(Transform) + sizeof(Entity)) * 1000000) / 1024 / 1024);
+	LOG("1KK nodes = %d mb", ((sizeof(Entity) + sizeof(Transform) - 28) * 1000000) / 1024 / 1024);
 
 #if defined(_DEBUG) && 0
 
@@ -451,7 +452,7 @@ void main(void)
 	{
 		const Color _clearColor(0x7f7f9fff);
 		Device _device;
-		Graphics _graphics;	  
+		Graphics _graphics;	
 		{
 
 			/*Texture _tex(TT_2D, PF_RGB8);
@@ -464,6 +465,9 @@ void main(void)
 			_tex.SetSize(2, 2, 1, 1);
 			_tex.SetData(_img);
 			_tex.GenerateLods(); */
+
+			LoadOpenGL();
+
 			
 			SamplerID _sampler = gGraphics->AddSampler({ TF_Trilinear, TW_Clamp, TW_Clamp });
 

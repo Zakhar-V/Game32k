@@ -13,7 +13,8 @@
 Component::Component(void) :
 	m_entity(nullptr),
 	m_prev(nullptr),
-	m_next(nullptr)
+	m_next(nullptr),
+	m_eventMask(0)
 {
 }
 //----------------------------------------------------------------------------//
@@ -29,6 +30,12 @@ Scene* Component::GetScene(void)
 Component* Component::GetEntityComponent(ComponentType _type, uint _index)
 {
 	return m_entity ? m_entity->GetComponent(_type, _index) : nullptr;
+}
+//----------------------------------------------------------------------------//
+void Component::SendEvent(uint _type, void* _arg)
+{
+	if (m_entity)
+		m_entity->SendEvent(_type, this, _arg);
 }
 //----------------------------------------------------------------------------//
 
@@ -241,6 +248,21 @@ void Entity::RemoveAllComponents(void)
 	}
 }
 //----------------------------------------------------------------------------//
+void Entity::SendEvent(uint _type, Component* _sender, void* _arg)
+{
+	uint _mask = 1 << _type;
+	for (uint i = 0; i < CT_MaxTypes; ++i)
+	{
+		for (Component* c = m_components[i]; c;)
+		{
+			Component* _next = c->GetNextComponent();
+			if (c->GetEventMask() & _mask)
+				c->OnEvent(_type, this, _sender, _arg);
+			c = _next;
+		}
+	}
+}
+//----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
 // Scene
@@ -269,7 +291,18 @@ Scene::~Scene(void)
 //----------------------------------------------------------------------------//
 void Scene::Update(float _dt)
 {
-	
+	//m_updateSystem->Update(_dt);
+	//m_physicsWorld->Update(_dt);
+	m_transformSystem->Update(_dt);
+
+	/*
+	1. анимация объектов (любое перемещение объектов)
+	2. обновление иерархии трансформаций
+	3. передача трансформаций в физический движок
+	4. обновление физ. движка
+	5. получение трансформаций из физ. движка
+	6. обновление иерархии трансформаций
+	*/
 }
 //----------------------------------------------------------------------------//
 

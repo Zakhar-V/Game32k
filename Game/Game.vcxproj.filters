@@ -4,29 +4,8 @@
     <ClCompile Include="GameMain.cpp">
       <Filter>Game</Filter>
     </ClCompile>
-    <ClCompile Include="Base.cpp">
-      <Filter>Engine</Filter>
-    </ClCompile>
-    <ClCompile Include="Graphics.cpp">
-      <Filter>Engine</Filter>
-    </ClCompile>
-    <ClCompile Include="File.cpp">
-      <Filter>Engine</Filter>
-    </ClCompile>
     <ClCompile Include="BuiltinData.cpp">
       <Filter>Assets</Filter>
-    </ClCompile>
-    <ClCompile Include="Image.cpp">
-      <Filter>Engine</Filter>
-    </ClCompile>
-    <ClCompile Include="Device.cpp">
-      <Filter>Engine</Filter>
-    </ClCompile>
-    <ClCompile Include="Math.cpp">
-      <Filter>Engine</Filter>
-    </ClCompile>
-    <ClCompile Include="Geometry.cpp">
-      <Filter>Engine</Filter>
     </ClCompile>
     <ClCompile Include="Scene.cpp">
       <Filter>Engine\Scene</Filter>
@@ -39,6 +18,27 @@
     </ClCompile>
     <ClCompile Include="Render.cpp">
       <Filter>Engine\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="Device.cpp">
+      <Filter>Engine\System</Filter>
+    </ClCompile>
+    <ClCompile Include="File.cpp">
+      <Filter>Engine\System</Filter>
+    </ClCompile>
+    <ClCompile Include="Math.cpp">
+      <Filter>Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Base.cpp">
+      <Filter>Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Image.cpp">
+      <Filter>Engine\Resources</Filter>
+    </ClCompile>
+    <ClCompile Include="Geometry.cpp">
+      <Filter>Engine\Resources</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics.cpp">
+      <Filter>Engine\System</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -57,40 +57,28 @@
     <Filter Include="Engine\Scene">
       <UniqueIdentifier>{69e71c05-904d-42ef-93fb-f4fc22683435}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Engine\System">
+      <UniqueIdentifier>{e9207239-042d-44f2-9ba2-97b938f535e5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Core">
+      <UniqueIdentifier>{90df45cc-bc1e-4bc9-a26d-fc8f8e799891}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Resources">
+      <UniqueIdentifier>{09370e85-1c5e-4135-bace-4b683361c23c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\System\Old">
+      <UniqueIdentifier>{454bd8b8-4ff7-46f7-af61-67cd093e2ec3}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game.h">
       <Filter>Game</Filter>
     </ClInclude>
-    <ClInclude Include="Base.hpp">
-      <Filter>Engine</Filter>
-    </ClInclude>
-    <ClInclude Include="Graphics.hpp">
-      <Filter>Engine</Filter>
-    </ClInclude>
-    <ClInclude Include="Math.hpp">
-      <Filter>Engine</Filter>
-    </ClInclude>
     <ClInclude Include="_temp.hpp">
-      <Filter>Engine</Filter>
-    </ClInclude>
-    <ClInclude Include="File.hpp">
-      <Filter>Engine</Filter>
-    </ClInclude>
-    <ClInclude Include="Object.hpp">
-      <Filter>Engine</Filter>
-    </ClInclude>
-    <ClInclude Include="Geometry.hpp">
       <Filter>Engine</Filter>
     </ClInclude>
     <ClInclude Include="BuiltinData.hpp">
       <Filter>Assets</Filter>
-    </ClInclude>
-    <ClInclude Include="Image.hpp">
-      <Filter>Engine</Filter>
-    </ClInclude>
-    <ClInclude Include="Device.hpp">
-      <Filter>Engine</Filter>
     </ClInclude>
     <ClInclude Include="Scene.hpp">
       <Filter>Engine\Scene</Filter>
@@ -103,6 +91,33 @@
     </ClInclude>
     <ClInclude Include="Render.hpp">
       <Filter>Engine\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="_OldDX9Renderer.h">
+      <Filter>Engine\System\Old</Filter>
+    </ClInclude>
+    <ClInclude Include="Device.hpp">
+      <Filter>Engine\System</Filter>
+    </ClInclude>
+    <ClInclude Include="File.hpp">
+      <Filter>Engine\System</Filter>
+    </ClInclude>
+    <ClInclude Include="Object.hpp">
+      <Filter>Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Math.hpp">
+      <Filter>Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Base.hpp">
+      <Filter>Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Image.hpp">
+      <Filter>Engine\Resources</Filter>
+    </ClInclude>
+    <ClInclude Include="Geometry.hpp">
+      <Filter>Engine\Resources</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics.hpp">
+      <Filter>Engine\System</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

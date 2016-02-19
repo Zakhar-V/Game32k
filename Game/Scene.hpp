@@ -26,9 +26,28 @@ class RenderWorld;
 // 
 //----------------------------------------------------------------------------//
 
+enum EventType
+{
+	ET_TransformChanged, //!< transform was changed. \note do not change transform in this event
+	ET_,
+	// ...
+};
+
+//----------------------------------------------------------------------------//
+// 
+//----------------------------------------------------------------------------//
+
 enum ComponentType
 {
 	CT_Transform = 0,
+
+
+	CT_Camera,
+	CT_Light,
+	CT_Model,
+	CT_DecalSet,
+	//CT_Sprite,
+	CT_Terrain,
 
 	CT_PhysicsBody,
 	CT_PhysicsShape,
@@ -61,7 +80,9 @@ public:
 
 	virtual void TransformUpdated(void) { }
 
-	virtual void OnEvent(int _type, Entity* _sender, void* _arg) { }
+	uint GetEventMask(void) { return m_eventMask; }
+	virtual void OnEvent(uint _type, Entity* _entity, Component* _component, void* _arg) { }
+	void SendEvent(uint _type, void* _arg = nullptr);
 
 protected:
 	friend class Entity;
@@ -72,6 +93,7 @@ protected:
 	Entity* m_entity;
 	Component* m_prev;
 	Component* m_next;
+	uint m_eventMask;
 };
 
 //----------------------------------------------------------------------------//
@@ -99,6 +121,12 @@ enum EntityEvent
 typedef Ptr<Entity> EntityPtr;
 typedef Ref<Entity> EntityRef;
 
+/*struct EntityEventReceiver
+{
+	Ref<Component> receiver;
+	uint mask;
+};*/
+
 class Entity final : public Object
 {
 public:
@@ -113,7 +141,7 @@ public:
 	void DetachAllChildren(bool _remove = false);
 	void DetachThis(bool _remove = false);
 
-	//void SendEvent(const Event& _event);
+
 
 	bool SetManualTransformHierarchy(bool _state = true) { m_manualTransformHierarchy = _state; }
 	bool GetManualTransformHierarchy(void) { return m_manualTransformHierarchy; }
@@ -126,6 +154,9 @@ public:
 	void RemoveComponent(Component* _c);
 	void RemoveAllComponents(void);
 
+	//void AddListener()
+	void SendEvent(uint _type, Component* _sender, void* _arg = nullptr);
+
 protected:
 	friend class Scene;
 	friend class Component;
@@ -137,6 +168,8 @@ protected:
 	Entity* m_child;
 
 	Component* m_components[CT_MaxTypes];
+
+	//Array<Ref<Component*>> m_listeners;
 
 	bool m_removed : 1;
 
