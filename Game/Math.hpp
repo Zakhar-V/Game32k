@@ -233,6 +233,8 @@ inline uint32_t FirstPow2(uint32_t _val)
 inline bool IsPow2(uint32_t _val) { return (_val & (_val - 1)) == 0; }
 inline uint8 FloatToByte(float _x) { return (uint8)(_x * FLOAT2BYTE); }
 inline float ByteToFloat(uint8 _x) { return _x * BYTE2FLOAT; }
+
+typedef uint16_t float16_t;
 inline uint16_t FloatToHalf(float _value)
 {
 	union { float f; uint32 i; }_fb = { _value };
@@ -550,6 +552,24 @@ inline Quat Mix(const Quat& _a, const Quat& _b, float _t)
 
 const Quat QUAT_ZERO(0);
 const Quat QUAT_IDENTITY(1);
+
+//----------------------------------------------------------------------------//
+// Mat33
+//----------------------------------------------------------------------------//
+
+struct Mat33
+{
+	Vec3 r[3];
+};
+
+//----------------------------------------------------------------------------//
+// Mat34
+//----------------------------------------------------------------------------//
+
+struct Mat34
+{
+	Vec4 r[3];
+};
 
 //----------------------------------------------------------------------------//
 // Mat44

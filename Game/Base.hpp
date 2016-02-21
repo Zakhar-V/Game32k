@@ -394,6 +394,76 @@ template <class T> void Unlink(T*& _head, T* _this, LinkedListNode<T>& _node)
 }
 
 //----------------------------------------------------------------------------//
+// String
+//----------------------------------------------------------------------------//
+
+class String
+{
+public:
+	String(void) : m_buffer(s_null.AddRef()) { }
+	String(const char* _str, int _length = -1) : m_buffer(s_null.AddRef()) { Append(_str, _length); }
+	String(const char* _str, const char* _end) : String(_str, (int)(_end - _str)) { }
+	String(const char _ch) : String(&_ch, 1) { }
+	~String(void) { m_buffer->Release(); }
+
+	String& operator = (const String& _str);
+	String& operator = (const char* _str) { Clear().Append(_str, -1, false); }
+	String& operator = (char _ch) { Clear().Append(&_ch, 1, false); }
+
+	String& operator += (const String& _str) { return Append(_str); }
+	String& operator += (const char* _str) { return Append(_str); }
+	String& operator += (char _ch) { return Append(_ch); }
+
+	String operator + (const String& _str) { return String(*this).Append(_str); }
+	String operator + (const char* _str) { return String(*this).Append(_str); }
+	String operator + (char _ch) { return String(*this).Append(_ch); }
+
+	friend String operator + (const char* _lhs, const String& _rhs) { return String(_lhs).Append(_rhs); }
+	friend String operator + (char _lhs, const String& _rhs) { return String(_lhs).Append(_rhs); }
+
+	char operator [] (int _index) const { return _index < 0 || _index > (int)m_buffer->length ? 0 : m_buffer->str[_index]; }
+	operator const char* (void) const { return m_buffer->str; }
+
+	bool operator == (const char* _rhs) const { return strcmp(m_buffer->str, _rhs ? _rhs : "") == 0; }
+	bool operator != (const char* _rhs) const { return strcmp(m_buffer->str, _rhs ? _rhs : "") != 0; }
+
+	uint Length(void) const { return m_buffer->length; }
+	const char* CStr(void) const { return m_buffer->str; }
+
+	String& Clear(void);
+
+	String& Append(const String& _str) { return Append(_str.m_buffer->str, _str.m_buffer->length); }
+	String& Append(const char* _str, int _length = -1, bool _quantize = true);
+	String& Append(char _ch) { return Append(&_ch, 1); }
+
+protected:
+
+
+	struct Buffer
+	{
+		Buffer* AddRef(void) { ++refs; return this; }
+		void Release(void) { if (!--refs) delete[] reinterpret_cast<uint8*>(this); }
+
+		uint length = 0;
+		uint size = 1;
+		int refs = 1;
+		union
+		{
+			char ch = 0;
+			char str[1];
+		};
+	};
+
+	static int _Length(const char* _str, int _length);
+	static Buffer* _New(uint _maxLength);
+	void _Realloc(uint _newSize, bool _quantize);
+
+	Buffer* m_buffer;
+
+	static Buffer s_null;
+};
+
+//----------------------------------------------------------------------------//
 // Event
 //----------------------------------------------------------------------------//
 

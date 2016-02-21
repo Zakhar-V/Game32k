@@ -47,5 +47,72 @@ void Fatal(const char* _error)
 //----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
+// String
+//----------------------------------------------------------------------------//
+
+String::Buffer String::s_null;
+
+//----------------------------------------------------------------------------//
+String& String::operator = (const String& _str)
+{
+	_str.m_buffer->AddRef();
+	m_buffer->Release();
+	m_buffer = _str.m_buffer;
+	return *this;
+}
+//----------------------------------------------------------------------------//
+String& String::Clear(void)
+{
+	m_buffer->Release();
+	m_buffer = s_null.AddRef();
+	return *this;
+}
+//----------------------------------------------------------------------------//
+String& String::Append(const char* _str, int _length, bool _quantize)
+{
+	_length = _Length(_str, _length);
+	if (_length)
+	{
+		_Realloc(_length + m_buffer->length, _quantize);
+		memcpy(m_buffer->str + m_buffer->length, _str, _length);
+		m_buffer->length += _length;
+		m_buffer->str[m_buffer->length] = 0;
+	}
+	return *this;
+}
+//----------------------------------------------------------------------------//
+int String::_Length(const char* _str, int _length)
+{
+	int _strLength = strlen(_str ? _str : "");
+	return _length >= 0 && _length < _strLength ? _length : _strLength;
+}
+//----------------------------------------------------------------------------//
+String::Buffer* String::_New(uint _maxLength)
+{
+	if (!_maxLength)
+		return s_null.AddRef();
+
+	Buffer* _buff = reinterpret_cast<Buffer*>(new uint8[sizeof(Buffer) + _maxLength]);
+	new(_buff) Buffer();
+	_buff->size = _maxLength + 1;
+	return _buff;
+}
+//----------------------------------------------------------------------------//
+void String::_Realloc(uint _newSize, bool _quantize)
+{
+	if (_newSize < m_buffer->size && m_buffer->refs == 1)
+		return;
+	if (_quantize)
+		_newSize = (_newSize + 1) << 1;
+
+	Buffer* _newBuffer = _New(_newSize);
+	memcpy(_newBuffer->str, m_buffer->str, m_buffer->length + 1);
+	_newBuffer->length = m_buffer->length;
+	m_buffer->Release();
+	m_buffer = _newBuffer;
+}
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
 // 
 //----------------------------------------------------------------------------//

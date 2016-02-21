@@ -3,6 +3,31 @@
 //
 //----------------------------------------------------------------------------//
 
+// geometry shader input
+#if USE_GS && (COMPILE_VS || COMPILE_GS)
+struct VsOut_t
+{
+
+};
+#if COMPILE_VS
+out Out;
+#else
+in In;
+#endif 
+#endif // USE_GS && (COMPILE_VS || COMPILE_GS)
+
+
+// pixel shader input
+struct PsIn_t
+{
+
+}
+#if (COMPILE_VS && !USE_GS) || COMPILE_GS
+out Out;
+#elif COMPILE_FS
+in In;
+#endif
+
 //----------------------------------------------------------------------------//
 //
 //----------------------------------------------------------------------------//

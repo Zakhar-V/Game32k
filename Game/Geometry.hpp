@@ -44,7 +44,7 @@ struct Sprite
 	float scale; // xy
 	float rotation; // z
 
-	static void AddToBatch(uint16* _idx, uint _baseIndex, SpriteVertex* _dst, const Sprite* _src, uint _count, bool _flipY = false)
+	/*static void AddToBatch(uint16* _idx, uint _baseIndex, SpriteVertex* _dst, const Sprite* _src, uint _count, bool _flipY = false)
 	{
 		while (_count--)
 		{
@@ -72,7 +72,7 @@ struct Sprite
 			for (uint i = 0; i < 6; ++i)
 				*_idx++ = QuadIndices[i] + _baseIndex;
 		}
-	}
+	} */
 
 };
 

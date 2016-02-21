@@ -13,6 +13,9 @@
     <Filter Include="Assets\Output">
       <UniqueIdentifier>{04785928-541c-4e63-9624-fba683a828cf}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Assets\Shaders\old">
+      <UniqueIdentifier>{ddcff043-96d9-4a88-911c-3a512f5e2c9f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets.inc">
@@ -21,21 +24,22 @@
     <None Include="..\Build\CreateBuiltinData.bat">
       <Filter>Assets\Build</Filter>
     </None>
+    <None Include="Shaders\Terrain-GS.glsl">
+      <Filter>Assets\Shaders</Filter>
+    </None>
+    <None Include="Shaders\Generic-VS.glsl">
+      <Filter>Assets\Shaders</Filter>
+    </None>
+    <None Include="Shaders\Sprite-GS.glsl">
+      <Filter>Assets\Shaders</Filter>
+    </None>
+    <None Include="Shaders\FillGBuffer-PS.glsl">
+      <Filter>Assets\Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="Shaders\Test-PS.hlsl">
-      <Filter>Assets\Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="Shaders\Test-VS.hlsl">
-      <Filter>Assets\Shaders</Filter>
-    </FxCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="Shaders\Constants.h">
-      <Filter>Assets\Shaders</Filter>
-    </ClInclude>
-    <ClInclude Include="Shaders\VertexLib.h">
-      <Filter>Assets\Shaders</Filter>
+    <ClInclude Include="Shaders\Common.h">
+      <Filter>Assets\Shaders\old</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

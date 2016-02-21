@@ -127,5 +127,8 @@
     <None Include="..\Build\CompressExeFile.bat">
       <Filter>Build</Filter>
     </None>
+    <None Include="OpenGL.inl">
+      <Filter>Engine\System</Filter>
+    </None>
   </ItemGroup>
 </Project>

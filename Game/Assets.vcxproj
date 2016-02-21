@@ -207,19 +207,13 @@
   <ItemGroup>
     <None Include="..\Build\CreateBuiltinData.bat" />
     <None Include="Assets.inc" />
+    <None Include="Shaders\FillGBuffer-PS.glsl" />
+    <None Include="Shaders\Generic-VS.glsl" />
+    <None Include="Shaders\Sprite-GS.glsl" />
+    <None Include="Shaders\Terrain-GS.glsl" />
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="Shaders\Test-PS.hlsl">
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Pixel</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
-    </FxCompile>
-    <FxCompile Include="Shaders\Test-VS.hlsl" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="Shaders\Constants.h" />
-    <ClInclude Include="Shaders\VertexLib.h" />
+    <ClInclude Include="Shaders\Common.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -3,6 +3,218 @@
 #include "Math.hpp"
 #include "Object.hpp"
 #include "Image.hpp"
+#include "Shaders/Common.h"
+
+#include <Windows.h>
+#include <GL/gl.h>
+#include <GL/glext.h>
+
+//----------------------------------------------------------------------------//
+// Defs
+//----------------------------------------------------------------------------//
+
+#define gGraphics Graphics::Get()
+#define gGraphicsDevice gGraphics->Device()
+
+#define _DEBUG_OUTPUT
+
+#define MAX_SHADERS 64
+#define MAX_SAMPLERS 16
+#define MAX_TEXTURE_UNITS 8
+
+enum FrameBufferType : uint
+{
+	FBT_Color = GL_COLOR_BUFFER_BIT,
+	FBT_Depth = GL_DEPTH_BUFFER_BIT,
+	FBT_Stencil = GL_STENCIL_BUFFER_BIT,
+	FBT_DepthStencil = FBT_Depth | FBT_Stencil,
+	FBT_All = FBT_Color | FBT_DepthStencil,
+};
+
+/*enum IndexFormat : uint8
+{
+	IF_UShort = GL_UNSIGNED_SHORT,
+	IF_UInt = GL_UNSIGNED_INT,
+};*/
+
+typedef struct Vertex vertex_t;
+typedef uint16 index_t;
+
+enum PrimitiveType : uint
+{
+	PT_Points = 1,
+	PT_Lines = 2,
+	PT_Triangles = 3,
+};
+
+
+
+//----------------------------------------------------------------------------//
+// Buffer
+//----------------------------------------------------------------------------//
+
+enum BufferUsage : uint
+{
+	BU_Static = GL_STATIC_DRAW,
+	BU_Dynamic = GL_DYNAMIC_DRAW,
+};
+
+enum LockMode : uint
+{
+	LM_ReadOnly = GL_MAP_READ_BIT,
+	LM_WriteDiscard = GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT,
+	LM_WriteNoOverwrite = GL_MAP_WRITE_BIT,
+};
+
+class Buffer : public RefCounted
+{
+public:
+	Buffer(BufferUsage _usage = BU_Static);
+	~Buffer(void);
+	BufferUsage Usage(void) { return m_usage; }
+	uint Size(void) { return m_size; }
+	uint Handle(void) { return m_handle; }
+	void Realloc(uint _newSize, const void* _data = nullptr);
+	uint8* Map(LockMode _mode, uint _offset, uint _size);
+	void Unmap(void);
+	void Write(const void* _src, uint _offset, uint _size);
+	void Copy(Buffer* _src, uint _srcOffset, uint _dstOffset, uint _size);
+
+protected:
+
+	BufferUsage m_usage;
+	uint m_size = 0;
+	uint m_handle = 0;
+};
+
+//----------------------------------------------------------------------------//
+// Vertex
+//----------------------------------------------------------------------------//
+
+/*
+struct _PackedVertex // 7/10 bytes (255 vertices = 1785/2550 bytes)
+{
+uint8 pos[3];
+uint8 norm[2]; // normal.x normal.y
+uint8 tc[2];
+uint8 skin[3]; // weight, bone1, bone2
+};
+*/
+
+struct Vertex // generic vertex, 36 bytes 
+{
+	Vec3 position; // 0
+	float16_t texcoord[2]; // 1
+	uint8 color[4]; // 2
+
+	union
+	{
+		struct
+		{
+			uint8 normal[4]; // 3
+			uint8 tangent[4]; // 4
+			uint8 weights[4]; // 5
+			uint8 indices[4]; // 6
+		};
+
+		struct
+		{
+			float16_t texcoord2[2]; // 7
+			float size[2]; // 8
+			float rotation; // 9
+
+		};
+	};
+};
+
+//----------------------------------------------------------------------------//
+// Shader
+//----------------------------------------------------------------------------//
+
+enum ShaderType	: uint
+{
+	ST_Vertex,
+	ST_Fragment,
+	ST_Geometry,
+};
+
+enum ShaderID
+{
+	VS_StaticModel,
+	VS_SkinnedModel,
+	VS_Sprite,
+	VS_Billboard,
+	VS_Terrain,
+
+	GS_Sprite,
+	GS_Terrain,
+
+	FS_Texture,
+	FS_NoTexture,
+};
+
+class Shader : public NonCopyable
+{
+public:
+
+	uint Handle(void) { return m_handle; }
+
+protected:
+	friend class Graphics;
+
+	Shader(void);
+	~Shader(void);
+	void _Init(ShaderType _type, const char* _common, const char* _src, uint _flags = 0);
+
+	ShaderType m_type;
+	uint m_flags;
+	uint m_handle;
+};
+
+//----------------------------------------------------------------------------//
+// Graphics
+//----------------------------------------------------------------------------//
+
+class Graphics : public Singleton<Graphics>
+{
+public:
+
+	Graphics(void);
+	~Graphics(void);
+
+	void BeginFrame(void);
+	void EndFrame(void);
+
+	void ClearFrameBuffers(uint _buffers, const Color& _color = 0x000000ff, float _depth = 1.0, uint _stencil = 0xff);
+
+	void SetVertexBuffer(Buffer* _buffer);
+	void SetIndexBuffer(Buffer* _buffer);
+	void SetUniformBuffer(uint _slot, Buffer* _buffer, uint _base = 0);	///!<\note redundant state is not ignored
+
+	void SetShader(ShaderType _type, Shader* _shader);
+
+	void Draw(PrimitiveType _type, uint _start, uint _count, uint _numInstances = 1);
+	void DrawIndexed(PrimitiveType _type, uint _baseVertex, uint _start, uint _count, uint _numInstances = 1);
+
+
+protected:
+
+	void _ResetState(void);
+	HDC m_dc;
+	HGLRC m_rc;
+
+
+	Shader m_shaders[MAX_SHADERS];
+	uint m_numShaders;
+	Shader* m_currentShader[3];
+	uint m_shaderPipeline;
+
+	Buffer* m_currentVertexBuffer;
+	Buffer* m_currentIndexBuffer;
+};
+
+#if 0
+
 #include "Shaders/Constants.h"
 #include <d3d9.h>
 
@@ -453,3 +665,5 @@ protected:
 //----------------------------------------------------------------------------//
 // 
 //----------------------------------------------------------------------------//
+
+#endif

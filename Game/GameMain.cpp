@@ -119,63 +119,7 @@ template <class F> F FuncCast(void* _func) { union { void* p; F f; }_fp = { _fun
 //
 //----------------------------------------------------------------------------//
 
-class String
-{
-public:
 
-	//void Append(const char)
-	void Append(const char* _str, int _length = -1)
-	{
-
-	}
-
-protected:
-
-	static int _Length(const char* _str, int _length)
-	{
-		return (uint)(_length >= 0 ? _length : strlen(_str ? _str : ""));
-	}
-
-	struct Buffer
-	{
-		Buffer* AddRef(void)
-		{
-			++refs;
-			return this;
-		}
-		void Release(void)
-		{
-			if (!--refs)
-				delete [] reinterpret_cast<uint8*>(this);
-		}
-
-		uint length = 0;
-		uint size = 1;
-		int refs = 1;
-		union
-		{
-			char ch = 0;
-			char str[1];
-		};
-	};
-
-	Buffer* _New(uint _maxLength)
-	{
-		if (!_maxLength)
-			return s_null.AddRef();
-
-		Buffer* _buff = reinterpret_cast<Buffer*>(new uint8[sizeof(Buffer) + _maxLength]);
-		new(_buff) Buffer();
-		_buff->size = _maxLength + 1;
-		return _buff;
-	}
-
-	Buffer* m_buffer;
-
-	static Buffer s_null;
-};
-
-String::Buffer String::s_null;
 
 //----------------------------------------------------------------------------//
 //
@@ -465,11 +409,8 @@ void main(void)
 			_tex.SetSize(2, 2, 1, 1);
 			_tex.SetData(_img);
 			_tex.GenerateLods(); */
-
-			LoadOpenGL();
-
 			
-			SamplerID _sampler = gGraphics->AddSampler({ TF_Trilinear, TW_Clamp, TW_Clamp });
+			/*SamplerID _sampler = gGraphics->AddSampler({ TF_Trilinear, TW_Clamp, TW_Clamp });
 
 			Texture _tex(TT_2D, PF_RGBA8, TU_Default);
 			FontInfo _fi;
@@ -485,10 +426,10 @@ void main(void)
 
 
 			VertexBuffer _vb(VF_Simple);
-			IndexBuffer _ib(IF_UShort);
+			IndexBuffer _ib(IF_UShort);	*/
 
 			{
-				_vb.Realloc(4 * sizeof(SimpleVertex));
+				//_vb.Realloc(4 * sizeof(SimpleVertex));
 				Vec2 _p(-1,-1);
 				Vec2 _s(2, 2);
 				/*SimpleVertex _vd[3] =  // xyz, tc, argb
@@ -503,7 +444,7 @@ void main(void)
 				1 0
 				3 2
 				*/
-				float _z = 0;
+				/*float _z = 0;
 				SimpleVertex _vd[4] =  // xyz, tc, rgba
 				{
 					//{ Vec3(_p.x,  _p.y, 0.5f), Vec2(0, 1), 0xff0000ff, }, // lt
@@ -526,14 +467,14 @@ void main(void)
 				{
 					0, 1, 3, 3, 1, 2,
 				};
-				_ib.Write(_idx, 0, 12);
+				_ib.Write(_idx, 0, 12);	*/
 
 			}
 
 			Mat44 _worldMatrix;
 			_worldMatrix.CreateTransform({0, 0, -5}, QUAT_IDENTITY);
 
-			gDevice->SetCursorMode(CM_Camera);
+			//gDevice->SetCursorMode(CM_Camera);
 
 
 			double _st, _et;
@@ -542,10 +483,10 @@ void main(void)
 			TestCamera _camera;
 
 			//SpriteBatch _spriteBatch;
-			RenderModel _spriteBatch(VF_Sprite, PT_Triangles, BU_Dynamic);
+			/*RenderModel _spriteBatch(VF_Sprite, PT_Triangles, BU_Dynamic);
 			Sprite _sprite({ 0, 0, -3 }, { 3 }, 1, 0, { 0 }, { 1 }, 0xffffffff);
 			Sprite _sprite2({ 250, 250, 0 }, { 300 }, 1, 0, _fi.chars['A'].tc[0], _fi.chars['A'].tc[1], 0xffffffff);
-
+			*/
 
 
 			//CreateHeightMap(_img, 1, 1000, 1);
@@ -579,7 +520,7 @@ void main(void)
 
 				gGraphics->BeginFrame();
 				gGraphics->ClearFrameBuffers(FBT_Color, _clearColor);
-				gGraphics->SetVertexShader(VS_Test);
+				/*gGraphics->SetVertexShader(VS_Test);
 				gGraphics->SetPixelShader(PS_Test);
 				//gGraphics->SetVertexFormat(VF_Simple);
 
@@ -621,7 +562,7 @@ void main(void)
 					gGraphics->SetFloatUniformVS(4, &_model, 4);
 
 					_spriteBatch.Draw(0, 6, 6);
-				}
+				} */
 
 				gGraphics->EndFrame();
 
