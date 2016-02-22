@@ -409,14 +409,20 @@ void main(void)
 			_tex.SetSize(2, 2, 1, 1);
 			_tex.SetData(_img);
 			_tex.GenerateLods(); */
+
+			ImagePtr _img = new Image;
+			FontInfo _fi;
+			_img->CreateBitmapFont(_fi, "Courier New TT", 16, 0.5f);
+
+			TexturePtr _tex = new Texture(TT_2D, PF_RGBA8);
+			_tex->Realloc(_img->Width(), _img->Height());
+			_tex->Write(_img->Format(), _img->Data());
+			_tex->GenerateMipmap();
 			
 			/*SamplerID _sampler = gGraphics->AddSampler({ TF_Trilinear, TW_Clamp, TW_Clamp });
 
 			Texture _tex(TT_2D, PF_RGBA8, TU_Default);
-			FontInfo _fi;
 			//ImagePtr _img = CreateBitmapFont(_fi, "Courier New TT", 32, 0.5f);
-			ImagePtr _img = new Image;
-			_img->CreateBitmapFont(_fi, "Courier New TT", 16, 0.5f);
 			//_img->CreateNoize(512, 0);
 			//_img->CreatePerlin(512, 0.05f, 0, 777, 4);
 			//_tex.SetSize(_img->Width(), _img->Height());
@@ -498,6 +504,29 @@ void main(void)
 			_entity->AddComponent(_transform);
 			_entity->SetScene(&_scene);
 
+
+			BufferPtr _vb = new Buffer;
+			{
+
+				Vertex _v[3];
+				_v[0].position.Set(250, 250, 0); // t	250 0
+				_v[2].position.Set(0, 250, 0); // r
+				_v[1].position.Set(250, 250, 0); // l
+				_v[0].size[0] = 300, _v[0].size[1] = 300;
+				_v[0].SetTexCoord(_fi.chars['A'].tc[0]);
+				_v[0].SetTexCoord2(_fi.chars['A'].tc[1]);
+				_vb->Realloc(sizeof(_v), &_v);
+			}
+			BufferPtr _cameraParams = new Buffer(BU_Dynamic);
+			BufferPtr _worldMatrices = new Buffer(BU_Dynamic);
+			{
+				_cameraParams->Realloc(sizeof(UCamera));
+				_worldMatrices->Realloc(sizeof(UInstanceMat));
+
+				gGraphics->SetUniformBuffer(U_Camera, _cameraParams);
+				gGraphics->SetUniformBuffer(U_InstanceMat, _worldMatrices);
+			}
+
 			bool _quit = false;
 			while (!_quit && !gDevice->ShouldClose())
 			{
@@ -520,6 +549,35 @@ void main(void)
 
 				gGraphics->BeginFrame();
 				gGraphics->ClearFrameBuffers(FBT_Color, _clearColor);
+
+
+				{
+					Vec2 _size = gDevice->WindowSize();
+
+					Mat44 _view, _proj, _model;
+					_view.SetIdentity();
+					_proj.CreateOrtho(0, _size.x, _size.y, 0, -1, 1);
+					_model.SetIdentity();
+
+					UCamera _cam;
+					_cam.ViewMat = _view;
+					_cam.ProjMat = _proj;
+					_cam.ViewProjMat = _proj * _view;
+
+					_cameraParams->Write(&_cam, 0, sizeof(_cam));
+					_worldMatrices->Write(&_model, 0, sizeof(_model));
+
+					gGraphics->SetShader(VS_Sprite);
+					gGraphics->SetShader(GS_Sprite);
+					gGraphics->SetShader(FS_NoTexture);
+
+					gGraphics->SetVertexBuffer(_vb);
+					gGraphics->Draw(PT_Points, 0, 1, 1);
+				}
+
+
+
+
 				/*gGraphics->SetVertexShader(VS_Test);
 				gGraphics->SetPixelShader(PS_Test);
 				//gGraphics->SetVertexFormat(VF_Simple);

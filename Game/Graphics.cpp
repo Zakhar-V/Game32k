@@ -8,49 +8,146 @@
 
 #include "OpenGL.inl"
 
+//----------------------------------------------------------------------------//
+// DebugOutput
+//----------------------------------------------------------------------------//
 
-enum
+#ifdef _DEBUG_OUTPUT
+
+bool g_DebugOutputEnabled = false;
+
+struct GLDebugPoint : public NonCopyable
 {
-	PF_RGB8,
-	PF_RGB10A2,
-	PF_R32F,
-	PF_RGBA16F,
-	PF_RG11B10F,
+	GLDebugPoint(const char* _func, const char* _file, int _line) :
+		func(_func),
+		file(_file),
+		line(_line),
+		prev(Top)
+	{
+		Top = this;
+	}
+	~GLDebugPoint(void)
+	{
+		Top = prev;
+	}
+	const char* func;
+	const char* file;
+	int line;
+	GLDebugPoint* prev;
+	static GLDebugPoint* Top;
 };
 
-struct GLPixelFormat
+GLDebugPoint* GLDebugPoint::Top = nullptr;
+
+#define GL_DEBUG_POINT() GLDebugPoint _gldbg_(__FUNCTION__, __FILE__, __LINE__)
+
+//----------------------------------------------------------------------------//
+void __stdcall _DebugProc(uint _source, uint _type, uint _id, uint _severity, int _length, const char* _message, const void* _ud)
 {
-	uint8 bpp;
-	bool compressed;
-	uint16 iformat;
-	uint16 format;
-	uint16 type;
-};
-GLPixelFormat GLPixelFormats[] =
-{
-	{ 24, false, GL_RGB8, GL_RGB, GL_UNSIGNED_BYTE }, //PF_RGB8
-	{ 32, false, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE }, //PF_RGBA8
-	{ 32, false, GL_RGB10_A2, GL_RGBA, GL_UNSIGNED_INT_2_10_10_10_REV }, //PF_RGB10A2
-	{ 32, false, GL_R32F, GL_RED, GL_FLOAT }, //PF_R32F
-	{ 64, false, GL_RGBA16F, GL_RGBA, GL_FLOAT }, //PF_RGBA16F
-	{ 32, false, GL_R11F_G11F_B10F, GL_RGB, GL_UNSIGNED_INT_10F_11F_11F_REV }, //PF_RG11B10F
-	{ 32, false, GL_DEPTH24_STENCIL8, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8 }, //PF_D24S8
-	{ 4, true, GL_COMPRESSED_RGB_S3TC_DXT1_EXT, 0, 0 }, //PF_DXT1
-	{ 8, true, GL_COMPRESSED_RGBA_S3TC_DXT5_EXT, 0, 0 }, //PF_DXT5
-};
+	const char* _src;
+	const char* _typeStr;
+	const char* _levelStr;
+	int  _level = 0;
+	const char* _func = nullptr;
+	const char* _file = nullptr;
+	int _line = 0;
 
-class _Texture
-{
+	switch (_source)
+	{
+	case GL_DEBUG_SOURCE_API_ARB:
+		_src = "OpenGL";
+		break;
+	case GL_DEBUG_SOURCE_WINDOW_SYSTEM_ARB:
+		_src = "Window system";
+		break;
+	case GL_DEBUG_SOURCE_SHADER_COMPILER_ARB:
+		_src = "Shader compiler";
+		break;
+	case GL_DEBUG_SOURCE_THIRD_PARTY_ARB:
+		_src = "Third party";
+		break;
+	case GL_DEBUG_SOURCE_APPLICATION_ARB:
+		_src = "Application";
+		break;
+	case GL_DEBUG_SOURCE_OTHER_ARB:
+		_src = "Other";
+		break;
+	default:
+		return;
+	}
 
-};
+	switch (_type)
+	{
+	case GL_DEBUG_TYPE_ERROR_ARB:
+		_typeStr = "Error";
+		break;
+	case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR_ARB:
+		_typeStr = "Deprecated behavior";
+		break;
+	case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR_ARB:
+		_typeStr = "Undefined behavior";
+		break;
+	case GL_DEBUG_TYPE_PORTABILITY_ARB:
+		_typeStr = "Portability";
+		break;
+	case GL_DEBUG_TYPE_PERFORMANCE_ARB:
+		_typeStr = "Performance";
+		break;
+	case GL_DEBUG_TYPE_OTHER_ARB:
+		_typeStr = "Message";
+		break;
+#if 0
+	case GL_DEBUG_TYPE_MARKER:
+		_dtype = "Marker";
+		break;
+	case GL_DEBUG_TYPE_PUSH_GROUP:
+		_dtype = "Push group";
+		break;
+	case GL_DEBUG_TYPE_POP_GROUP:
+		_dtype = "Pop group";
+		break;
+#endif
+	default:
+		return;
+	}
 
-class _Shader
-{
-public:
+	switch (_severity)
+	{
+	case GL_DEBUG_SEVERITY_HIGH_ARB:
+		_levelStr = "high";
+		_level = 1;
+		break;
+	case GL_DEBUG_SEVERITY_MEDIUM_ARB:
+		_levelStr = "medium";
+		_level = 0;
+		break;
+	case GL_DEBUG_SEVERITY_LOW_ARB:
+		_levelStr = "low";
+		_level = -1;
+		break;
+	case GL_DEBUG_SEVERITY_NOTIFICATION:
+		_levelStr = "notification";
+		_level = -2;
+		break;
+	default:
+		return;
+	}
 
-protected:
-};
+	if (_level >= 0 && g_DebugOutputEnabled)
+	{
+		if (GLDebugPoint::Top)
+			LOG("%s(%d)[%s]: %s: %s(%s): %s", GLDebugPoint::Top->file, GLDebugPoint::Top->line, GLDebugPoint::Top->func, _src, _typeStr, _levelStr, _message);
+		else
+			LOG("%s: %s(%s): %s", _src, _typeStr, _levelStr, _message);
+	}
+}
+//----------------------------------------------------------------------------//
 
+#else
+
+#define GL_DEBUG_POINT()
+
+#endif // _DEBUG_OUTPUT
 
 //----------------------------------------------------------------------------//
 // Buffer
@@ -62,18 +159,24 @@ Buffer::Buffer(BufferUsage _usage) :
 	m_size(0),
 	m_handle(0)
 {
+	GL_DEBUG_POINT();
+
 	glGenBuffers(1, &m_handle);
 	glBindBuffer(GL_ARRAY_BUFFER, m_handle);
 }
 //----------------------------------------------------------------------------//
 Buffer::~Buffer(void)
 {
+	GL_DEBUG_POINT();
+
 	glDeleteBuffers(1, &m_handle);
 }
 //----------------------------------------------------------------------------//
 void Buffer::Realloc(uint _newSize, const void* _data)
 {
-	if (m_size != _newSize)
+	GL_DEBUG_POINT();
+
+	if (m_size != _newSize || _data)
 	{
 		glNamedBufferDataEXT(m_handle, _newSize, _data, m_usage);
 		m_size = _newSize;
@@ -82,27 +185,35 @@ void Buffer::Realloc(uint _newSize, const void* _data)
 //----------------------------------------------------------------------------//
 uint8* Buffer::Map(LockMode _mode, uint _offset, uint _size)
 {
+	GL_DEBUG_POINT();
 	ASSERT(_offset + _size <= m_size);
+
 	return (uint8*)glMapNamedBufferRangeEXT(m_handle, _offset, _size, _mode);
 }
 //----------------------------------------------------------------------------//
 void Buffer::Unmap(void)
 {
+	GL_DEBUG_POINT();
+
 	glUnmapNamedBufferEXT(m_handle);
 }
 //----------------------------------------------------------------------------//
 void Buffer::Write(const void* _src, uint _offset, uint _size)
 {
+	GL_DEBUG_POINT();
 	ASSERT(_offset + _size <= m_size);
 	ASSERT(_src || !_size);
+
 	glNamedBufferSubDataEXT(m_handle, _offset, _size, _src);
 }
 //----------------------------------------------------------------------------//
 void Buffer::Copy(Buffer* _src, uint _srcOffset, uint _dstOffset, uint _size)
 {
+	GL_DEBUG_POINT();
 	ASSERT(_src != nullptr);
 	ASSERT(_dstOffset + _size <= m_size);
 	ASSERT(_srcOffset + _size <= _src->m_size);
+
 	glNamedCopyBufferSubDataEXT(_src->m_handle, m_handle, _srcOffset, _dstOffset, _size);
 }
 //----------------------------------------------------------------------------//
@@ -134,6 +245,272 @@ const GLVertexAttribs[] =
 };
 
 //----------------------------------------------------------------------------//
+// Texture
+//----------------------------------------------------------------------------//
+
+const uint16 GLTextureType[] =
+{
+	GL_TEXTURE_2D, // TT_2D
+	GL_TEXTURE_3D, // TT_3D
+	GL_TEXTURE_2D_ARRAY, // TT_Array
+	GL_TEXTURE_CUBE_MAP, // TT_Cube
+};
+
+const uint16 MaxTextureDepth[] =
+{
+	1, // TT_2D
+	4096, // TT_3D
+	4096, // TT_Array
+	6, // TT_Cube
+};
+const uint16 MinTextureDepth[] =
+{
+	1, // TT_2D
+	1, // TT_3D
+	1, // TT_Array
+	6, // TT_Cube
+};
+
+struct GLPixelFormat
+{
+	uint16 iformat;
+	uint16 format;
+	uint16 type;
+};
+const GLPixelFormat GLPixelFormats[] =
+{
+	{ GL_RGB8, GL_RGB, GL_UNSIGNED_BYTE }, //PF_RGB8
+	{ GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE }, //PF_RGBA8
+	{ GL_RGB10_A2, GL_RGBA, GL_UNSIGNED_INT_2_10_10_10_REV }, //PF_RGB10A2
+	{ GL_R32F, GL_RED, GL_FLOAT }, //PF_R32F
+	{ GL_RG32F, GL_RG, GL_FLOAT }, //PF_RG32F
+	{ GL_RGB32F, GL_RGB, GL_FLOAT }, //PF_RGB32F
+	{ GL_RGBA32F, GL_RGBA, GL_FLOAT }, //PF_RGBA32F
+	{ GL_RGBA16F, GL_RGBA, GL_FLOAT }, //PF_RGBA16F
+	{ GL_R11F_G11F_B10F, GL_RGB, GL_UNSIGNED_INT_10F_11F_11F_REV }, //PF_RG11B10F
+	{ GL_DEPTH24_STENCIL8, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8 }, //PF_D24S8
+	{ GL_COMPRESSED_RGB_S3TC_DXT1_EXT, 0, 0 }, //PF_DXT1
+	{ GL_COMPRESSED_RGBA_S3TC_DXT5_EXT, 0, 0 }, //PF_DXT5
+};
+
+//----------------------------------------------------------------------------//
+Texture::Texture(TextureType _type, PixelFormat _format, bool _mipmap) :
+	m_type(_type),
+	m_format(_format),
+	m_mipmap(_mipmap),
+	m_width(0),
+	m_height(0),
+	m_depth(0),
+	m_handle(0)
+{
+}
+//----------------------------------------------------------------------------//
+Texture::~Texture(void)
+{
+	GL_DEBUG_POINT();
+
+	if(m_handle)
+		glDeleteTextures(1, &m_handle);
+}
+//----------------------------------------------------------------------------//
+void Texture::Realloc(uint _width, uint _height, uint _depth)
+{
+	GL_DEBUG_POINT();
+
+	if (!_depth)
+		_depth = m_depth;
+	_depth = Clamp<uint>(_depth, MinTextureDepth[m_type], MaxTextureDepth[m_type]);
+
+	if (m_width == _width && m_height == _height && m_depth == _depth) // no changes
+		return;
+
+	uint _target = GLTextureType[m_type];
+
+	if(m_handle)
+		glDeleteTextures(1, &m_handle);
+	glGenTextures(1, &m_handle);
+	glBindMultiTextureEXT(GL_TEXTURE0 + MAX_TEXTURE_UNITS, _target, m_handle);
+
+
+	m_width = _width;
+	m_height = _height;
+	m_depth = _depth;
+
+	uint _side = Max(m_width, m_height);
+	uint _lods = (m_mipmap && _side) ? Log2i(_side) + 1 : 1;
+	uint _iformat = GLPixelFormats[m_format].iformat;
+	if (m_type == TT_2D || m_type == TT_Cube)
+		glTextureStorage2DEXT(m_handle, _target, _lods, _iformat, m_width, m_height);
+	else
+		glTextureStorage3DEXT(m_handle, _target, _lods, _iformat, m_width, m_height, m_depth);
+}
+//----------------------------------------------------------------------------//
+void Texture::Write(PixelFormat _format, const void* _src)
+{
+	GL_DEBUG_POINT();
+	ASSERT(_src != nullptr);
+
+	const GLPixelFormat& _pf = GLPixelFormats[_format];
+	bool _compressed = IsCompressed(_format);
+	uint _bpp = BitsPerPixel(_format);
+	uint _bpl = (m_width * m_height * _bpp) >> 3;
+	uint _bpi = _bpl * m_depth;
+	uint _target = GLTextureType[m_type];
+
+	if (m_type == TT_2D)
+	{
+		if (_compressed)
+			glCompressedTextureSubImage2DEXT(m_handle, _target, 0, 0, 0, m_width, m_height, _pf.iformat, _bpi, _src);
+		else
+			glTextureSubImage2DEXT(m_handle, _target, 0, 0, 0, m_width, m_height, _pf.format, _pf.type, _src);
+	}
+	else if (m_type == TT_3D || m_type == TT_Array)
+	{
+		if (_compressed)
+			glCompressedTextureSubImage3DEXT(m_handle, _target, 0, 0, 0, 0, m_width, m_height, m_depth, _pf.iformat, _bpi, _src);
+		else
+			glTextureSubImage3DEXT(m_handle, _target, 0, 0, 0, 0, m_width, m_height, m_depth, _pf.format, _pf.type, _src);
+	}
+	else // TT_Cube
+	{
+		for (uint i = 0; i < 6; ++i)
+		{
+			_target = GL_TEXTURE_CUBE_MAP_POSITIVE_X + i;
+			const void* _img = ((const uint8*)_src) + _bpl * i;
+			if (_compressed)
+				glCompressedTextureSubImage2DEXT(m_handle, _target, 0, 0, 0, m_width, m_height, _pf.iformat, _bpl, _img);
+			else
+				glTextureSubImage2DEXT(m_handle, _target, 0, 0, 0, m_width, m_height, _pf.format, _pf.type, _img);
+		}
+	}
+}
+//----------------------------------------------------------------------------//
+void Texture::Read(PixelFormat _format, void* _dst)
+{
+	GL_DEBUG_POINT();
+	ASSERT(_dst != nullptr);
+
+	const GLPixelFormat& _pf = GLPixelFormats[_format];
+	bool _compressed = IsCompressed(_format);
+	uint _target = GLTextureType[m_type];
+
+	ASSERT(!_compressed || m_format == _format, "Pixel format is mismatched");
+
+	if (m_type == TT_Cube)
+	{
+		uint _bpl = (m_width * m_height * BitsPerPixel(_format)) >> 3;
+		for (uint i = 0; i < 6; ++i)
+		{
+			_target = GL_TEXTURE_CUBE_MAP_POSITIVE_X + i;
+			void* _img = ((uint8*)_dst) + _bpl * i;
+			if (_compressed)
+				glGetCompressedTextureImageEXT(m_handle, _target, 0, _img);
+			else
+				glGetTextureImageEXT(m_handle, _target, 0, _pf.format, _pf.type, _img);
+		}
+	}
+	else
+	{
+		if (_compressed)
+			glGetCompressedTextureImageEXT(m_handle, _target, 0, _dst);
+		else
+			glGetTextureImageEXT(m_handle, _target, 0, _pf.format, _pf.type, _dst);
+	}
+}
+//----------------------------------------------------------------------------//
+void Texture::GenerateMipmap(void)
+{
+	if (m_mipmap && m_handle)
+		glGenerateTextureMipmapEXT(m_handle, GLTextureType[m_type]);
+}
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+// RenderTarget
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+RenderBuffer::RenderBuffer(PixelFormat _format)	:
+	m_format(_format),
+	m_iformat(GLPixelFormats[_format].iformat),
+	m_width(0),
+	m_height(0),
+	m_samples(0),
+	m_handle(0)
+{
+	glGenRenderbuffers(1, &m_handle);
+	glBindRenderbuffer(GL_RENDERBUFFER, m_handle);
+}
+//----------------------------------------------------------------------------//
+RenderBuffer::~RenderBuffer(void)
+{
+	glDeleteRenderbuffers(1, &m_handle);
+}
+//----------------------------------------------------------------------------//
+void RenderBuffer::Realloc(uint _width, uint _height, uint _samples)
+{
+	if (!_samples)
+		_samples = m_samples;
+	_samples = Clamp(_samples, 1u, 16u);
+
+	if (m_width == _width && m_height == _height && m_samples == _samples)
+		return;
+
+	m_width = _width;
+	m_height = _height;
+	m_samples = _samples;
+	glNamedRenderbufferStorageMultisampleEXT(m_handle, m_samples, m_iformat, m_width, m_height);
+}
+//----------------------------------------------------------------------------//
+void RenderBuffer::CopyToTexture(Texture* _texture, uint _z)
+{
+	ASSERT(_texture != nullptr);
+	ASSERT(_z < _texture->Depth());
+	ASSERT(m_format != PF_D24S8 || _texture->Format() == PF_D24S8);
+
+	uint _src = gGraphics->_SrcCopyFramebuffer();
+	uint _dst = gGraphics->_SrcCopyFramebuffer();
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, _dst);
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, _src);
+
+	uint _buffers;
+	if (m_format == PF_D24S8)
+	{
+		_buffers = GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT;
+		glNamedFramebufferRenderbufferEXT(_src, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_handle);
+		glNamedFramebufferRenderbufferEXT(_src, GL_STENCIL_ATTACHMENT, GL_RENDERBUFFER, m_handle);
+		_BindRenderTargetTexture(_dst, GL_DEPTH_ATTACHMENT, _texture, _z);
+		_BindRenderTargetTexture(_dst, GL_STENCIL_ATTACHMENT, _texture, _z);
+	}
+	else
+	{
+		_buffers = GL_COLOR_BUFFER_BIT;
+		glNamedFramebufferRenderbufferEXT(_src, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, m_handle);
+		_BindRenderTargetTexture(_dst, GL_COLOR_ATTACHMENT0, _texture, _z);
+	}
+
+	glBlitFramebuffer(0, 0, m_width, m_height, 0, 0, _texture->Width(), _texture->Height(), _buffers, GL_NEAREST);
+	_texture->GenerateMipmap();
+
+	glBindFramebuffer(GL_FRAMEBUFFER, gGraphics->IsRenderTargetsEnabled() ? gGraphics->_GetFramebuffer() : 0);
+}
+//----------------------------------------------------------------------------//
+void RenderBuffer::_BindRenderTargetTexture(uint _framebuffer, uint _attachment, Texture* _texture, uint _z)
+{
+	if (_texture)
+	{
+		uint _target = _texture->Type() == TT_Cube ? GL_TEXTURE_CUBE_MAP_POSITIVE_X + _z : GLTextureType[_texture->Type()];
+		if (_texture->Type() == TT_Array || _texture->Type() == TT_3D)
+			glNamedFramebufferTexture3DEXT(_framebuffer, _attachment, _target, _texture->Handle(), 0, _z);
+		else
+			glNamedFramebufferTexture2DEXT(_framebuffer, _attachment, _target, _texture->Handle(), 0);
+	}
+	else
+		glNamedFramebufferTextureEXT(_framebuffer, _attachment, 0, 0);
+}
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
 // Shader
 //----------------------------------------------------------------------------//
 
@@ -153,23 +530,24 @@ const uint16 GLShaderTypes[] =
 
 struct ShaderName
 {
-	ShaderType type;
 	const char* name;
-	uint flags;
+	ShaderType type;
+	uint16 flags;
 }
 const g_shaderNames[] =
 {
-	{ ST_Vertex, "Generic-VS.glsl", INSTANCED_BIT }, // VS_StaticModel
-	{ ST_Vertex, "Generic-VS.glsl", SKINNED_BIT }, // VS_SkinnedModel
-	{ ST_Vertex, "Generic-VS.glsl", SPRITE_BIT }, // VS_Sprite
-	{ ST_Vertex, "Generic-VS.glsl", BILLBOARD_BIT }, // VS_Billboard
-	{ ST_Vertex, "Generic-VS.glsl", TERRAIN_BIT }, // VS_Terrain
+	{ "Generic-VS.glsl", ST_Vertex, INSTANCED_BIT }, // VS_StaticModel
+	{ "Generic-VS.glsl", ST_Vertex, SKINNED_BIT }, // VS_SkinnedModel
+	{ "Generic-VS.glsl", ST_Vertex, SPRITE_BIT }, // VS_Sprite
+	{ "Generic-VS.glsl", ST_Vertex, BILLBOARD_BIT }, // VS_Billboard
+	{ "Generic-VS.glsl", ST_Vertex, TERRAIN_BIT }, // VS_Terrain
 
-	//{ ST_Geometry, "Sprite-GS.glsl", 0 }, // GS_Sprite
-	//{ ST_Geometry, "Terrain-GS.glsl", 0 }, // GS_Terrain
+	{ "Sprite-GS.glsl", ST_Geometry, SPRITE_BIT }, // GS_Sprite
+	{ "Sprite-GS.glsl", ST_Geometry, BILLBOARD_BIT }, // GS_Billboard
+	{ "Terrain-GS.glsl", ST_Geometry, TERRAIN_BIT }, // GS_Terrain
 
-	{ ST_Fragment, "FillGBuffer-PS.glsl", TEXTURE_BIT }, // FS_Texture
-	{ ST_Fragment, "FillGBuffer-PS.glsl", 0 }, // FS_NoTexture
+	{ "FillGBuffer-PS.glsl", ST_Fragment, TEXTURE_BIT }, // FS_Texture
+	{ "FillGBuffer-PS.glsl", ST_Fragment, 0 }, // FS_NoTexture
 
 };
 //----------------------------------------------------------------------------//
@@ -182,12 +560,15 @@ Shader::Shader(void) :
 //----------------------------------------------------------------------------//
 Shader::~Shader(void)
 {
+	GL_DEBUG_POINT();
+
 	//if (m_handle)
 	//	glDeleteProgram(m_handle);
 }
 //----------------------------------------------------------------------------//
-void Shader::_Init(ShaderType _type, const char* _common, const char* _src, uint _flags)
+void Shader::_Init(ShaderType _type, const char* _common, const char* _src, uint16 _flags)
 {
+	GL_DEBUG_POINT();
 	ASSERT(m_handle == 0);
 	ASSERT(_common != nullptr);
 	ASSERT(_src != nullptr);
@@ -198,22 +579,29 @@ void Shader::_Init(ShaderType _type, const char* _common, const char* _src, uint
 	char _header[256]; 
 	sprintf(_header, 
 		"#version 330 core\n"
-		"#extension GL_ARB_enhanced_layouts:enable\n"
+		//"#extension GL_ARB_enhanced_layouts:enable\n"
+		"#extension GL_ARB_shading_language_420pack:enable\n"
 		"#extension GL_ARB_separate_shader_objects:enable\n"
 		"#define FLAGS 0x%08x\n"
 		"#define COMPILE_%s 1\n"
 		"#define GLSL 330\n",
-		_flags ,
+		_flags,
 		ShaderPrefix[m_type]);
 
 	String _srcs = _header;
 	_srcs += _common;
-	_srcs += "\n#line 0";
+	_srcs += "\n";
+	_srcs += "\n#line 1 1\n";
 	_srcs += _src;
+	_srcs += "\n";
 
 	const char* _srcp = _srcs;
 
 	m_handle = glCreateShaderProgramv(GLShaderTypes[m_type], 1, &_srcp);
+
+	//if(!HasOpenGLExtension("GL_ARB_shading_language_420pack") && GLVersion < 42) // no explicit binding
+	//glUniformBlockBinding(m_handle, glGetUniformBlockIndex(m_handle, "UCamera"), U_Camera);
+	//glUniformBlockBinding(m_handle, glGetUniformBlockIndex(m_handle, "UInstanceMat"), U_InstanceMat);
 
 #ifdef _DEBUG_OUTPUT
 	int _length;
@@ -223,7 +611,7 @@ void Shader::_Init(ShaderType _type, const char* _common, const char* _src, uint
 		Array<char> _log(_length + 1);
 		glGetProgramInfoLog(m_handle, _length, &_length, *_log);
 		_log[_length] = 0;
-		LOG("%s\n", *_log);
+		LOG("%s", *_log);
 	}
 #endif
 
@@ -306,12 +694,30 @@ Graphics::Graphics(void)
 
 		CHECK(HasOpenGLExtension("GL_ARB_separate_shader_objects") || _ver >= 41, "No GL_ARB_separate_shader_objects extension");
 		CHECK(HasOpenGLExtension("GL_ARB_vertex_attrib_binding") || _ver >= 43, "No GL_ARB_vertex_attrib_binding extension");
-		CHECK(HasOpenGLExtension("GL_ARB_enhanced_layouts") || _ver >= 44, "No GL_ARB_enhanced_layouts extension");
+		//CHECK(HasOpenGLExtension("GL_ARB_enhanced_layouts") || _ver >= 44, "No GL_ARB_enhanced_layouts extension");
+		CHECK(HasOpenGLExtension("GL_ARB_shading_language_420pack") || _ver >= 42, "No GL_ARB_shading_language_420pack extension");
+		CHECK(HasOpenGLExtension("GL_ARB_texture_storage") || _ver >= 42, "No GL_ARB_texture_storage extension");
+		//CHECK(HasOpenGLExtension("GL_ARB_texture_storage_multisample") || _ver >= 43, "No GL_ARB_texture_storage_multisample extension");
 		CHECK(HasOpenGLExtension("GL_EXT_direct_state_access"), "No GL_EXT_direct_state_access extension");
 	}
 
+	// debug output
+#ifdef _DEBUG_OUTPUT
+	if(glDebugMessageCallback)
+	{
+		g_DebugOutputEnabled = true;
+		glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+		glDebugMessageCallback(&_DebugProc, nullptr);
+		glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_LOW, 0, nullptr, false);
+		glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_MEDIUM, 0, nullptr, true);
+		glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_HIGH, 0, nullptr, true);
+	}
+#endif
+
 	//shaders
 	{
+		GL_DEBUG_POINT();
+
 		RawData _commonFile = LoadFile("Common.h");
 		_commonFile.Push('\0');
 		const char* _common = (const char*)*_commonFile;
@@ -329,12 +735,30 @@ Graphics::Graphics(void)
 		}
 
 		//memset(m_currentShader, 0, sizeof(m_currentShader));
-		uint m_shaderPipeline = 0;
+		m_shaderPipeline = 0;
 		glGenProgramPipelines(1, &m_shaderPipeline);
-		//glBindProgramPipeline(m_shaderPipeline);
+		glBindProgramPipeline(m_shaderPipeline);
 	}
 
+	// geometry
+	{
+		m_vertexArray = 0;
+		glGenVertexArrays(1, &m_vertexArray);
+		glBindVertexArray(m_vertexArray);
+	}
 
+	// framebuffer
+	{
+	
+		m_drawToFramebuffer = false;
+
+		glGenFramebuffers(1, &m_framebuffer);
+		glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffer);
+
+		glGenFramebuffers(2, m_copyFramebuffer);
+		glBindFramebuffer(GL_FRAMEBUFFER, m_copyFramebuffer[0]);
+		glBindFramebuffer(GL_FRAMEBUFFER, m_copyFramebuffer[1]);
+	}
 
 	_ResetState();
 }
@@ -351,11 +775,77 @@ void Graphics::BeginFrame(void)
 //----------------------------------------------------------------------------//
 void Graphics::EndFrame(void)
 {
+#ifdef _DEBUG_OUTPUT
+	bool _dbg = g_DebugOutputEnabled;
+	g_DebugOutputEnabled = false;
+#endif
+
 	SwapBuffers(m_dc);
+
+#ifdef _DEBUG_OUTPUT
+	g_DebugOutputEnabled = _dbg;
+#endif
+}
+//----------------------------------------------------------------------------//
+void Graphics::EnableRenderTargets(bool _enabled)
+{
+	GL_DEBUG_POINT();
+
+	if (m_drawToFramebuffer != _enabled)
+	{
+		glBindFramebuffer(GL_FRAMEBUFFER, _enabled ? m_framebuffer : 0);
+		m_drawToFramebuffer = _enabled;
+	}
+}
+//----------------------------------------------------------------------------//
+void Graphics::ResetRenderTargets(void)
+{
+	GL_DEBUG_POINT();
+
+	SetDepthStencilBuffer(nullptr);
+	for (uint i = 0; i < MAX_RENDER_TARGETS; ++i)
+		SetRenderBuffer(i, nullptr);
+}
+//----------------------------------------------------------------------------//
+void Graphics::SetRenderBuffer(uint _slot, RenderBuffer* _target)
+{
+	GL_DEBUG_POINT();
+	ASSERT(_slot < MAX_RENDER_TARGETS);
+
+	glNamedFramebufferRenderbufferEXT(m_framebuffer, GL_COLOR_ATTACHMENT0 + _slot, GL_RENDERBUFFER, _target ? _target->Handle() : 0);
+}
+//----------------------------------------------------------------------------//
+void Graphics::SetDepthStencilBuffer(RenderBuffer* _target)
+{
+	GL_DEBUG_POINT();
+	ASSERT(!_target || _target->Format() == PF_D24S8);
+
+	uint _handle = _target ? _target->Handle() : 0;
+	glNamedFramebufferRenderbufferEXT(m_framebuffer, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, _handle);
+	glNamedFramebufferRenderbufferEXT(m_framebuffer, GL_STENCIL_ATTACHMENT, GL_RENDERBUFFER, _handle);
+}
+//----------------------------------------------------------------------------//
+void Graphics::SetRenderTargetTexture(uint _slot, Texture* _target, uint _z)
+{
+	GL_DEBUG_POINT();
+	ASSERT(_slot < MAX_RENDER_TARGETS);
+
+	RenderBuffer::_BindRenderTargetTexture(m_framebuffer, GL_COLOR_ATTACHMENT0 + _slot, _target, _z);
+}
+//----------------------------------------------------------------------------//
+void Graphics::SetDepthStencilTargetTexture(Texture* _target, uint _z)
+{
+	GL_DEBUG_POINT();
+	ASSERT(!_target || _target->Format() == PF_D24S8);
+
+	RenderBuffer::_BindRenderTargetTexture(m_framebuffer, GL_DEPTH_ATTACHMENT, _target, _z);
+	RenderBuffer::_BindRenderTargetTexture(m_framebuffer, GL_STENCIL_ATTACHMENT, _target, _z);
 }
 //----------------------------------------------------------------------------//
 void Graphics::ClearFrameBuffers(uint _buffers, const Color& _color, float _depth, uint _stencil)
 {
+	GL_DEBUG_POINT();
+
 	int _colorMask[4];
 	if (_buffers & FBT_Color)
 	{
@@ -410,6 +900,8 @@ void Graphics::ClearFrameBuffers(uint _buffers, const Color& _color, float _dept
 //----------------------------------------------------------------------------//
 void Graphics::SetVertexBuffer(Buffer* _buffer)
 {
+	GL_DEBUG_POINT();
+
 	if (m_currentVertexBuffer != _buffer)
 	{
 		glBindVertexBuffer(0, _buffer ? _buffer->Handle() : 0, 0, sizeof(Vertex));
@@ -419,6 +911,8 @@ void Graphics::SetVertexBuffer(Buffer* _buffer)
 //----------------------------------------------------------------------------//
 void Graphics::SetIndexBuffer(Buffer* _buffer)
 {
+	GL_DEBUG_POINT();
+
 	if (m_currentIndexBuffer != _buffer)
 	{
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _buffer ? _buffer->Handle() : 0);
@@ -428,6 +922,8 @@ void Graphics::SetIndexBuffer(Buffer* _buffer)
 //----------------------------------------------------------------------------//
 void Graphics::SetUniformBuffer(uint _slot, Buffer* _buffer, uint _base)
 {
+	GL_DEBUG_POINT();
+
 	ASSERT(_buffer != nullptr);
 	ASSERT(_base <= _buffer->Size());
 	// todo: check alignment
@@ -437,6 +933,8 @@ void Graphics::SetUniformBuffer(uint _slot, Buffer* _buffer, uint _base)
 //----------------------------------------------------------------------------//
 void Graphics::SetShader(ShaderType _type, Shader* _shader)
 {
+	GL_DEBUG_POINT();
+
 	if (m_currentShader[_type] != _shader)
 	{
 		glUseProgramStages(m_shaderPipeline, 1 << _type, _shader ? _shader->Handle() : 0);
@@ -446,13 +944,32 @@ void Graphics::SetShader(ShaderType _type, Shader* _shader)
 //----------------------------------------------------------------------------//
 void Graphics::Draw(PrimitiveType _type, uint _start, uint _count, uint _numInstances)
 {
+	GL_DEBUG_POINT();
 	ASSERT(m_currentVertexBuffer != nullptr);
+
+	/*glBindProgramPipeline(m_shaderPipeline);
+	glValidateProgramPipeline(m_shaderPipeline);
+	int _status;
+	glGetProgramPipelineiv(m_shaderPipeline, GL_VALIDATE_STATUS, &_status);
+	if (!_status)
+	{
+		int _length;
+		glGetProgramPipelineiv(m_shaderPipeline, GL_INFO_LOG_LENGTH, &_length);
+		if (_length > 1)
+		{
+			Array<char> _log(_length + 1);
+			glGetProgramPipelineInfoLog(m_shaderPipeline, _length, &_length, *_log);
+			_log[_length] = 0;
+			LOG("%s", *_log);
+		}
+	} */
 
 	glDrawArraysInstanced(GLPrimitiveType[_type], _start, _count, _numInstances);
 }
 //----------------------------------------------------------------------------//
 void Graphics::DrawIndexed(PrimitiveType _type, uint _baseVertex, uint _start, uint _count, uint _numInstances)
 {
+	GL_DEBUG_POINT();
 	ASSERT(m_currentVertexBuffer != nullptr);
 	ASSERT(m_currentIndexBuffer != nullptr);
 
@@ -461,11 +978,19 @@ void Graphics::DrawIndexed(PrimitiveType _type, uint _baseVertex, uint _start, u
 //----------------------------------------------------------------------------//
 void Graphics::_ResetState(void)
 {
+	GL_DEBUG_POINT();
+
 	// shaders
 	memset(m_currentShader, 0, sizeof(m_currentShader));
 	glBindProgramPipeline(m_shaderPipeline);
 	glUseProgramStages(m_shaderPipeline, GL_VERTEX_SHADER_BIT | GL_FRAGMENT_SHADER_BIT | GL_GEOMETRY_SHADER_BIT, 0);
 
+	// geometry
+	glBindVertexArray(m_vertexArray);
+	m_currentVertexBuffer = nullptr;
+	m_currentIndexBuffer = nullptr;
+
+	// vertex format
 	for (uint i = 0; i < sizeof(GLVertexAttribs) / sizeof(GLVertexAttribs[0]); ++i)
 	{
 		const GLVertexAttrib& _attrib = GLVertexAttribs[i];
@@ -477,802 +1002,23 @@ void Graphics::_ResetState(void)
 			glVertexAttribFormat(i, _attrib.components, _attrib.format, _attrib.normalized, _attrib.offset);
 	}
 
-	m_currentVertexBuffer = nullptr;
-	m_currentIndexBuffer = nullptr;
-	
+	// framebuffer
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	ResetRenderTargets();
+
+	for (uint i = 0; i < 2; ++i)
+	{
+		glNamedFramebufferTextureEXT(m_copyFramebuffer[i], GL_COLOR_ATTACHMENT0, 0, 0);
+		glNamedFramebufferTextureEXT(m_copyFramebuffer[i], GL_DEPTH_ATTACHMENT, 0, 0);
+		glNamedFramebufferTextureEXT(m_copyFramebuffer[i], GL_STENCIL_ATTACHMENT, 0, 0);
+	}
+
+
 	//glPrimitiveRestartIndex(0xffff);
 
 }
 //----------------------------------------------------------------------------//
 
-#if 0
-
-////////////////////////////////////////////////////////////////////////////////
 //----------------------------------------------------------------------------//
-// old Direct3D9 renderer
+//
 //----------------------------------------------------------------------------//
-////////////////////////////////////////////////////////////////////////////////
-
-//----------------------------------------------------------------------------//
-// Vertex
-//----------------------------------------------------------------------------//
-
-static const D3DVERTEXELEMENT9 VF_Base_Desc[] =
-{
-	{ 0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0 },
-	D3DDECL_END(),
-};
-
-static const D3DVERTEXELEMENT9 VF_Simple_Desc[] =
-{
-	{ 0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0 },
-	{ 0, offsetof(SimpleVertex, texcoord), D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0 },
-	{ 0, offsetof(SimpleVertex, color), D3DDECLTYPE_UBYTE4N, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR, 0 },
-	D3DDECL_END(),
-};
-static const D3DVERTEXELEMENT9 VF_Sprite_Desc[] =
-{
-	{ 0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0 },
-	{ 0, offsetof(SpriteVertex, color), D3DDECLTYPE_UBYTE4N, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR, 0 },
-	{ 0, offsetof(SpriteVertex, texcoord), D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0 },
-	{ 0, offsetof(SpriteVertex, size), D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1 },
-	//{ 0, offsetof(SpriteVertex, rotation), D3DDECLTYPE_FLOAT1, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 2 },
-	D3DDECL_END(),
-};
-
-static const D3DVERTEXELEMENT9 VF_Static_Desc[] =
-{
-	{ 0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0 },
-	{ 0, offsetof(StaticVertex, texcoord), D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0 },
-	{ 0, offsetof(StaticVertex, normal), D3DDECLTYPE_UBYTE4N, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_NORMAL, 0 },
-	{ 0, offsetof(StaticVertex, tangent), D3DDECLTYPE_UBYTE4N, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TANGENT, 0 },
-	D3DDECL_END(),
-};
-
-static const D3DVERTEXELEMENT9 VF_Skinned_Desc[] =
-{
-	{ 0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0 },
-	{ 0, offsetof(SkinnedVertex, texcoord), D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0 },
-	{ 0, offsetof(SkinnedVertex, normal), D3DDECLTYPE_UBYTE4N, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_NORMAL, 0 },
-	{ 0, offsetof(SkinnedVertex, tangent), D3DDECLTYPE_UBYTE4N, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TANGENT, 0 },
-	{ 0, offsetof(SkinnedVertex, bones), D3DDECLTYPE_UBYTE4N, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_BLENDINDICES, 0 },
-	{ 0, offsetof(SkinnedVertex, weights), D3DDECLTYPE_UBYTE4N, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_BLENDWEIGHT, 0 },
-	D3DDECL_END(),
-};
-
-//----------------------------------------------------------------------------//
-// VertexBuffer
-//----------------------------------------------------------------------------//
-
-//----------------------------------------------------------------------------//
-VertexBuffer::VertexBuffer(VertexFormat _format, BufferUsage _usage) :
-	m_usage(_usage),
-	m_format(_format),
-	m_size(0),
-	m_handle(nullptr)
-{
-}
-//----------------------------------------------------------------------------//
-VertexBuffer::~VertexBuffer(void)
-{
-	if (m_handle)
-		m_handle->Release();
-}
-//----------------------------------------------------------------------------//
-void VertexBuffer::Realloc(uint _newSize)
-{
-	if (_newSize != m_size)
-	{
-		if (m_handle)
-		{
-			m_handle->Release();
-			m_handle = nullptr;
-		}
-		m_size = _newSize;
-		gGraphicsDevice->CreateVertexBuffer(_newSize, m_usage, 0, m_usage == BU_Static ? D3DPOOL_MANAGED : D3DPOOL_DEFAULT, &m_handle, nullptr);
-		CHECK(m_handle != nullptr, "Couldn't create vertex buffer");
-		
-		if (gGraphics->GetVertexBuffer() == this)
-			gGraphicsDevice->SetStreamSource(0, m_handle, 0, VertexSize[m_format]);
-	}
-}
-//----------------------------------------------------------------------------//
-uint8* VertexBuffer::Lock(LockMode _mode, uint _offset, uint _size)
-{
-	ASSERT(m_handle != nullptr);
-	ASSERT(_offset + _size <= m_size);
-	void* _dst = nullptr;
-	m_handle->Lock(_offset, _size, &_dst, _mode);
-	return (uint8*)_dst;
-}
-//----------------------------------------------------------------------------//
-void VertexBuffer::Unlock(void)
-{
-	m_handle->Unlock();
-}
-//----------------------------------------------------------------------------//
-void VertexBuffer::Write(const void* _src, uint _offset, uint _size)
-{
-	memcpy(Lock(LM_WriteDiscard, _offset, _size), _src, _size);
-	m_handle->Unlock();
-}
-//----------------------------------------------------------------------------//
-
-//----------------------------------------------------------------------------//
-// IndexBuffer
-//----------------------------------------------------------------------------//
-
-//----------------------------------------------------------------------------//
-IndexBuffer::IndexBuffer(IndexFormat _format, BufferUsage _usage) :
-	m_usage(_usage),
-	m_format(_format),
-	m_size(0),
-	m_handle(nullptr)
-{
-}
-//----------------------------------------------------------------------------//
-IndexBuffer::~IndexBuffer(void)
-{
-	m_handle->Release();
-}
-//----------------------------------------------------------------------------//
-void IndexBuffer::Realloc(uint _newSize)
-{
-	if (_newSize != m_size)
-	{
-		if (m_handle)
-		{
-			m_handle->Release();
-			m_handle = nullptr;
-		}
-		m_size = _newSize;
-		gGraphicsDevice->CreateIndexBuffer(m_size, m_usage, (D3DFORMAT)m_format, m_usage == BU_Static ? D3DPOOL_MANAGED : D3DPOOL_DEFAULT, &m_handle, nullptr);
-		CHECK(m_handle != nullptr, "Couldn't create index buffer");
-
-		if (gGraphics->GetIndexBuffer() == this)
-			gGraphicsDevice->SetIndices(m_handle);
-	}
-}
-//----------------------------------------------------------------------------//
-uint8* IndexBuffer::Lock(LockMode _mode, uint _offset, uint _size)
-{
-	ASSERT(m_handle != nullptr);
-	ASSERT(_offset + _size <= m_size);
-	void* _dst = nullptr;
-	m_handle->Lock(_offset, _size, &_dst, _mode);
-	return (uint8*)_dst;
-}
-//----------------------------------------------------------------------------//
-void IndexBuffer::Unlock(void)
-{
-	m_handle->Unlock();
-}
-//----------------------------------------------------------------------------//
-void IndexBuffer::Write(const void* _src, uint _offset, uint _size)
-{
-	memcpy(Lock(LM_WriteDiscard, _offset, _size), _src, _size);
-	m_handle->Unlock();
-}
-//----------------------------------------------------------------------------//
-
-//----------------------------------------------------------------------------//
-// RenderModel
-//----------------------------------------------------------------------------//
-
-//----------------------------------------------------------------------------//
-RenderModel::RenderModel(VertexFormat _format, PrimitiveType _type, BufferUsage _usage) :
-	m_type(_type),
-	m_numVertices(0),
-	m_numIndices(0),
-	m_vertexBuffer(_format, (BufferUsage)_usage),
-	m_indexBuffer(IF_UShort, (BufferUsage)_usage)
-{
-	m_vertexSize = m_vertexBuffer.ElementSize();
-	m_indexSize = m_indexBuffer.ElementSize();
-}
-//----------------------------------------------------------------------------//
-RenderModel::~RenderModel(void)
-{
-}
-//----------------------------------------------------------------------------//
-void RenderModel::Bind(void)
-{
-	gGraphics->SetVertexBuffer(&m_vertexBuffer);
-	gGraphics->SetIndexBuffer(&m_indexBuffer);
-}
-//----------------------------------------------------------------------------//
-void RenderModel::Draw(uint _baseVertex, uint _start, uint _count)
-{
-	if (m_numIndices)
-		gGraphics->DrawIndexed(m_type, _baseVertex, _start, _count);
-	else
-		gGraphics->Draw(m_type, _baseVertex + _start, _count);
-}
-//----------------------------------------------------------------------------//
-void RenderModel::ReallocVertices(uint _count)
-{
-	if (m_vertexBuffer.ElementCount() < _count)
-	{
-		m_vertexBuffer.Realloc(_count * m_vertexSize);
-		m_numVertices = _count;
-	}
-}
-//----------------------------------------------------------------------------//
-Vertex* RenderModel::LockVertices(LockMode _mode, uint _offset, uint _count, bool _realloc, uint _newSize)
-{
-	if (_realloc)
-		ReallocVertices(_newSize);
-	return (Vertex*)m_vertexBuffer.Lock(_mode, _offset * m_vertexSize, _count * m_vertexSize);
-}
-//----------------------------------------------------------------------------//
-void RenderModel::UnlockVertices(void)
-{
-	m_vertexBuffer.Unlock();
-}
-//----------------------------------------------------------------------------//
-void RenderModel::SetVertices(const void* _data, uint _count)
-{
-	ReallocVertices(_count);
-	m_vertexBuffer.Write(_data, 0, _count * m_vertexSize);
-}
-//----------------------------------------------------------------------------//
-void RenderModel::ReallocIndices(uint _count)
-{
-	if (m_indexBuffer.ElementCount() < _count)
-	{
-		m_indexBuffer.Realloc(_count * m_indexSize);
-		m_numIndices = _count;
-	}
-}
-//----------------------------------------------------------------------------//
-uint16* RenderModel::LockIndices(LockMode _mode, uint _offset, uint _count, bool _realloc, uint _newSize)
-{
-	if (_realloc)
-		ReallocIndices(_newSize);
-	return (uint16*)m_indexBuffer.Lock(_mode, _offset * m_indexSize, _count * m_indexSize);
-}
-//----------------------------------------------------------------------------//
-void RenderModel::UnlockIndices(void)
-{
-	m_indexBuffer.Unlock();
-}
-//----------------------------------------------------------------------------//
-void RenderModel::SetIndices(const void* _data, uint _count)
-{
-	ReallocVertices(_count);
-	m_indexBuffer.Write(_data, 0, _count * m_indexSize);
-}
-//----------------------------------------------------------------------------//
-
-//----------------------------------------------------------------------------//
-// Texture
-//----------------------------------------------------------------------------//
-
-const D3DFORMAT DXPixelFormat[] = 
-{
-	D3DFMT_X8R8G8B8, // PF_RGB8
-	D3DFMT_A8R8G8B8, // PF_RGBA8
-	D3DFMT_D24S8, // PF_D24S8
-	D3DFMT_DXT1, // PF_DXT1
-	D3DFMT_DXT5, // PF_DXT5
-};
-
-//----------------------------------------------------------------------------//
-Texture::Texture(TextureType _type, PixelFormat _format, TextureUsage _usage, bool _useMipMaps) :
-	m_type(_type),
-	m_usage(_usage),
-	m_format(_format),
-	m_size(0),
-	m_depth(0),
-	m_lods(1),
-	m_useMipMaps(_useMipMaps),
-	m_handle(nullptr)
-{
-	if (m_usage == TU_RenderTarget)
-		m_useMipMaps = false;
-}
-//----------------------------------------------------------------------------//
-Texture::~Texture(void)
-{
-	_Destroy();
-}
-//----------------------------------------------------------------------------//
-void Texture::SetSize(uint _width, uint _height, uint _depth)
-{
-	m_size.Set(_width, _height);
-	m_depth = _depth;
-	uint _size = Max(_width, _height);
-	m_lods = (m_useMipMaps && _size) ? Log2i(_size) + 1 : 1;
-	_Create();
-}
-//----------------------------------------------------------------------------//
-void Texture::SetData(uint _lod, const void* _data)
-{
-	ASSERT(m_handle != nullptr);
-	ASSERT(_data != nullptr);
-
-	if (_lod >= m_lods)
-		return;
-
-	uint _bpp = BitsPerPixel(m_format);
-
-	if (m_type == TT_2D || m_type == TT_2DMultisample)
-	{
-		D3DLOCKED_RECT _dst;
-		RECT _rect;
-		_rect.left = 0;
-		_rect.right = m_size.x;
-		_rect.top = 0;
-		_rect.bottom = m_size.y;
-
-		for (uint i = _lod; i--;)
-		{
-			if (_rect.right > 1)
-				_rect.right >>= 1;
-			if (_rect.bottom > 1)
-				_rect.bottom >>= 1;
-		}
-			
-		m_texture2d->LockRect(_lod, &_dst, &_rect, D3DLOCK_DISCARD);
-
-		ASSERT(_dst.pBits != nullptr);
-
-		if (m_format == PF_RGBA8 || m_format == PF_RGBX8)
-			RgbaToArgb(_dst.pBits, _data, _rect.right * _rect.bottom);
-		//else // compressed
-		//	memcpy(_dst.pBits, _data, (m_size.x * m_size.y * _bpp) >> 3);
-
-		m_texture2d->UnlockRect(_lod);
-	}
-}
-//----------------------------------------------------------------------------//
-void Texture::SetImage(Image* _img)
-{
-	ASSERT(_img != nullptr);
-	if (m_usage == TU_RenderTarget)
-		return;
-	SetSize(_img->Width(), _img->Height());
-	ImagePtr _lod = _img;
-	for (uint i = 0; i < m_lods; ++i)
-	{
-		SetData(i, _lod->RawData());
-		_lod = _lod->CreateLod();
-	}
-}
-//----------------------------------------------------------------------------//
-void Texture::UpdateRenderTarget(void)
-{
-	//m_handle->GenerateMipSubLevels();
-}
-//----------------------------------------------------------------------------//
-void Texture::_Create(void)
-{
-	_Destroy();
-
-	D3DFORMAT _format = DXPixelFormat[m_format];
-	D3DPOOL _pool = m_usage == TU_Default ? D3DPOOL_MANAGED : D3DPOOL_DEFAULT;
-	uint _usage = m_usage;
-	if (m_format == PF_D24S8)
-		_usage |= D3DUSAGE_DEPTHSTENCIL;
-
-	switch (m_type)
-	{
-	case TT_2D:
-	case TT_2DMultisample:
-		gGraphicsDevice->CreateTexture(m_size.x, m_size.y, m_lods, _usage, _format, _pool, &m_texture2d, nullptr);
-		break;
-
-	default:
-		break;
-	}
-
-	if (!m_handle)
-		Fatal("Couldn't create texture");
-
-#if _DEBUG
-	LOG("Texture %dx%dx%d, %d lods", m_size.x, m_size.y, m_depth, m_handle->GetLevelCount());
-#endif
-}
-//----------------------------------------------------------------------------//
-void Texture::_Destroy(void)
-{
-	if (m_handle)
-		m_handle->Release();
-	m_handle = nullptr;
-	//if (m_target)
-	//	m_target->Release();
-}
-//----------------------------------------------------------------------------//
-void Texture::_Bind(uint _unit)
-{
-	//m_handle->SetLOD(2);
-	gGraphicsDevice->SetTexture(_unit, m_handle);
-
-	// lod bias, ...
-}
-//----------------------------------------------------------------------------//
-
-//----------------------------------------------------------------------------//
-// Sampler
-//----------------------------------------------------------------------------//
-
-const D3DTEXTUREADDRESS DXAddressing[] =
-{
-	D3DTADDRESS_WRAP, // TW_Repeat
-	D3DTADDRESS_MIRROR, // TW_Mirror
-	D3DTADDRESS_CLAMP, // TW_Clamp
-};
-
-const D3DTEXTUREFILTERTYPE DXMagFilter[] =
-{
-	D3DTEXF_ANISOTROPIC, // TF_Default
-	D3DTEXF_POINT, // TF_Nearest
-	D3DTEXF_LINEAR, // TF_Linear
-	D3DTEXF_ANISOTROPIC, // TF_Bilinear
-	D3DTEXF_ANISOTROPIC, // TF_Trilinear
-};
-
-const D3DTEXTUREFILTERTYPE DXMinFilter[] =
-{
-	D3DTEXF_ANISOTROPIC, // TF_Default
-	D3DTEXF_POINT, // TF_Nearest
-	D3DTEXF_LINEAR, // TF_Linear
-	D3DTEXF_ANISOTROPIC, // TF_Bilinear
-	D3DTEXF_ANISOTROPIC, // TF_Trilinear
-};
-
-const uint DXMipFilter[] =
-{
-	D3DTEXF_LINEAR, // TF_Default
-	D3DTEXF_NONE, // TF_Nearest
-	D3DTEXF_NONE, // TF_Linear
-	D3DTEXF_POINT, // TF_Bilinear
-	D3DTEXF_LINEAR, // TF_Trilinear
-};
-
-//----------------------------------------------------------------------------//
-Sampler::Sampler(void)
-{
-}
-//----------------------------------------------------------------------------//
-Sampler::Sampler(SamplerID _id, const Desc& _desc, uint _hash)	:
-	m_id(_id),
-	m_desc(_desc),
-	m_hash(_hash)
-{
-	m_filter = _desc.filter != TF_Default ? _desc.filter : gGraphics->GetDefaultTextureFilter();
-	m_dxwrap[0] = DXAddressing[_desc.wrapU];
-	m_dxwrap[1] = DXAddressing[_desc.wrapV];
-	m_dxwrap[2] = DXAddressing[_desc.wrapW];
-	m_dxfilter[0] = DXMagFilter[m_filter];
-	m_dxfilter[1] = DXMinFilter[m_filter];
-	m_dxfilter[2] = DXMipFilter[m_filter];
-	m_aniso = _desc.aniso ? _desc.aniso : gGraphics->GetDefaultTextureAnisotropy();
-	if (m_aniso > gGraphics->GetMaxTextureAnisotropy())
-		m_aniso = gGraphics->GetMaxTextureAnisotropy();
-}
-//----------------------------------------------------------------------------//
-Sampler::~Sampler(void)
-{
-}
-//----------------------------------------------------------------------------//
-Sampler& Sampler::operator = (const Sampler& _rhs)
-{
-	memcpy(this, &_rhs, sizeof(Sampler));
-	return *this;
-}
-//----------------------------------------------------------------------------//
-void Sampler::_SetDefaultFilter(TextureFilter _filter)
-{
-	if (m_desc.filter == TF_Default)
-	{
-		m_filter = _filter;
-		m_dxfilter[0] = DXMagFilter[_filter];
-		m_dxfilter[1] = DXMinFilter[_filter];
-		m_dxfilter[2] = DXMipFilter[_filter];
-	}
-}
-//----------------------------------------------------------------------------//
-void Sampler::_SetDefaultAniso(uint _aniso)
-{
-	if (m_desc.aniso == 0)
-	{
-		m_aniso = _aniso;
-	}
-}
-//----------------------------------------------------------------------------//
-void Sampler::_Bind(uint _unit)
-{
-	gGraphicsDevice->SetSamplerState(_unit, D3DSAMP_ADDRESSU, m_dxwrap[0]);
-	gGraphicsDevice->SetSamplerState(_unit, D3DSAMP_ADDRESSV, m_dxwrap[1]);
-	gGraphicsDevice->SetSamplerState(_unit, D3DSAMP_ADDRESSW, m_dxwrap[2]);
-	gGraphicsDevice->SetSamplerState(_unit, D3DSAMP_MAGFILTER, m_dxfilter[0]);
-	gGraphicsDevice->SetSamplerState(_unit, D3DSAMP_MINFILTER, m_dxfilter[1]);
-	gGraphicsDevice->SetSamplerState(_unit, D3DSAMP_MIPFILTER, m_dxfilter[2]);
-	gGraphicsDevice->SetSamplerState(_unit, D3DSAMP_MAXANISOTROPY, m_aniso);
-}
-//----------------------------------------------------------------------------//
-
-//----------------------------------------------------------------------------//
-// Shaders
-//----------------------------------------------------------------------------//
-
-const char* g_vertexShaderNames[] =
-{
-	"Test-VS.cso", // VS_Test
-	nullptr,
-};
-
-const char* g_pixelShaderNames[] =
-{
-	"Test-PS.cso", // PS_Test
-	nullptr,
-};
-
-//----------------------------------------------------------------------------//
-// Graphics
-//----------------------------------------------------------------------------//
-
-D3DPRIMITIVETYPE DXPrimitiveType[] =
-{
-	D3DPT_FORCE_DWORD,
-	D3DPT_POINTLIST, // PT_Points = 1,
-	D3DPT_LINELIST, // PT_Lines = 2,
-	D3DPT_TRIANGLELIST, // PT_Triangles = 3,
-};
-
-//----------------------------------------------------------------------------//
-Graphics::Graphics(void)
-{
-	LOG("Create Graphics");
-
-#ifdef _DEBUG
-	memset(m_vertexFormats, 0, sizeof(m_vertexFormats));
-	memset(m_vertexShaders, 0, sizeof(m_vertexShaders));
-	memset(m_pixelShaders, 0, sizeof(m_pixelShaders));
-#endif
-
-	ASSERT(gDevice != nullptr); // the window must be created before it
-
-	m_d3d = Direct3DCreate9(D3D_SDK_VERSION);
-	if (!m_d3d)
-		Fatal("Couldn't create IDirect3D9");
-
-	D3DPRESENT_PARAMETERS _pp; 
-	memset(&_pp, 0, sizeof(_pp));
-	_pp.Windowed = TRUE;
-	_pp.SwapEffect = D3DSWAPEFFECT_DISCARD;
-	_pp.BackBufferFormat = D3DFMT_UNKNOWN;
-
-	m_device = 0;
-	m_d3d->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, gDevice->WindowHandle(), D3DCREATE_SOFTWARE_VERTEXPROCESSING, &_pp, &m_device);
-	_CHECK(m_device, "Couldn't create IDirect3D9Device");
-
-	// vertex formats
-	{	 
-		DLOG("Create vertex declarations");
-
-		m_device->CreateVertexDeclaration(VF_Base_Desc, &m_vertexFormats[VF_Base]);
-		CHECK(m_vertexFormats[VF_Base], "Couldn't create vertex declaration");
-		m_device->CreateVertexDeclaration(VF_Simple_Desc, &m_vertexFormats[VF_Simple]);
-		CHECK(m_vertexFormats[VF_Simple], "Couldn't create vertex declaration");
-		m_device->CreateVertexDeclaration(VF_Sprite_Desc, &m_vertexFormats[VF_Sprite]);
-		CHECK(m_vertexFormats[VF_Sprite], "Couldn't create vertex declaration");
-		m_device->CreateVertexDeclaration(VF_Static_Desc, &m_vertexFormats[VF_Static]);
-		CHECK(m_vertexFormats[VF_Static], "Couldn't create vertex declaration");
-		m_device->CreateVertexDeclaration(VF_Skinned_Desc, &m_vertexFormats[VF_Skinned]);
-		CHECK(m_vertexFormats[VF_Skinned], "Couldn't create vertex declaration");
-	}
-
-	// geometry source
-	{
-		m_vertexFormat = VF_Base;
-		m_vertexBuffer = nullptr;
-		m_indexBuffer = nullptr;
-
-		m_device->SetVertexDeclaration(m_vertexFormats[m_vertexFormat]);
-	}
-
-	// vertex shaders
-	for (uint i = 0; g_vertexShaderNames[i]; ++i)
-	{
-		ASSERT(i < MAX_VERTEX_SHADERS);
-
-		const char* _name = g_vertexShaderNames[i];
-		LOG("Load VertexShader \"%s\"", _name);
-
-		RawData _bytecode = LoadFile(_name);
-		HRESULT _r = gGraphicsDevice->CreateVertexShader((const DWORD*)*_bytecode, m_vertexShaders + i);
-		CHECK(_r >= 0, "Couldn't create VertexShader");
-	}
-
-	// pixel shaders
-	for (uint i = 0; g_pixelShaderNames[i]; ++i)
-	{
-		ASSERT(i < MAX_PIXEL_SHADERS);
-
-		const char* _name = g_pixelShaderNames[i];
-		LOG("Load PixelShader \"%s\"", _name);
-
-		RawData _bytecode = LoadFile(_name);
-		HRESULT _r = gGraphicsDevice->CreatePixelShader((const DWORD*)*_bytecode, m_pixelShaders + i);
-		CHECK(_r >= 0, "Couldn't create PixelShader");
-	}
-
-	// samplers
-	{
-		m_maxTexAniso = 4; // todo:
-		m_defaultTexAniso = m_maxTexAniso;
-		m_defaultTexFilter = TF_Trilinear;
-		m_numSamplers = 0;
-		AddSampler(TF_Default);
-	}
-}
-//----------------------------------------------------------------------------//
-Graphics::~Graphics(void)
-{
-	LOG("Destroy Graphics");
-}
-//----------------------------------------------------------------------------//
-void Graphics::SetDefaultTextureFilter(TextureFilter _filter)
-{
-	if (_filter == TF_Default)
-		_filter = TF_Trilinear;
-	if (_filter != m_defaultTexFilter)
-	{
-		m_defaultTexFilter = _filter;
-		for (uint i = 0; i < m_numSamplers; ++i)
-			m_samplers[i]._SetDefaultFilter(_filter);
-	}
-}
-//----------------------------------------------------------------------------//
-void Graphics::SetDefaultTextureAnisotropy(uint _value)
-{
-	if (_value == 0 || _value > m_maxTexAniso)
-		_value = m_maxTexAniso;
-	if (_value != m_defaultTexAniso)
-	{
-		m_defaultTexAniso = _value;
-		for (uint i = 0; i < m_numSamplers; ++i)
-			m_samplers[i]._SetDefaultAniso(_value);
-	}
-}
-//----------------------------------------------------------------------------//
-SamplerID Graphics::AddSampler(const Sampler::Desc& _desc)
-{
-	uint _hash = Hash(&_desc, sizeof(_desc));
-	for (uint i = 0; i < m_numSamplers; ++i)
-	{
-		if (m_samplers[i].m_hash == _hash)
-			return i;
-	}
-	SamplerID _id = m_numSamplers++;
-	m_samplers[_id] = Sampler(_id, _desc, _hash);
-	return _id;
-}
-//----------------------------------------------------------------------------//
-void Graphics::BeginFrame(void)
-{
-	m_device->BeginScene();
-
-	// reset state
-
-	//m_device->SetRenderState(D3DRS_CULLMODE, D3DCULL_CW); // ccw == front face
-	m_device->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE); // ccw == front face
-
-	// ...
-}
-//----------------------------------------------------------------------------//
-void Graphics::EndFrame(void)
-{
-	m_device->EndScene();
-	m_device->Present(nullptr, nullptr, nullptr, nullptr);
-}
-//----------------------------------------------------------------------------//
-void Graphics::ClearFrameBuffers(uint _buffers, const Color& _color, float _depth, uint _stencil)
-{
-	m_device->Clear(0, nullptr, _buffers, _color.Argb(), _depth, _stencil);
-}
-//----------------------------------------------------------------------------//
-void Graphics::SetVertexBuffer(VertexBuffer* _buffer)
-{
-	ASSERT(_buffer != nullptr);
-
-	if (m_vertexBuffer != _buffer)
-	{
-		if (m_vertexFormat != _buffer->Format())
-		{
-			m_vertexFormat = _buffer->Format();
-			m_device->SetVertexDeclaration(m_vertexFormats[m_vertexFormat]);
-		}
-		m_vertexBuffer = _buffer;
-		m_device->SetStreamSource(0, _buffer->Handle(), 0, _buffer->ElementSize());
-	}
-}
-//----------------------------------------------------------------------------//
-void Graphics::SetIndexBuffer(IndexBuffer* _buffer)
-{
-	ASSERT(_buffer != nullptr);
-
-	if (m_indexBuffer != _buffer)
-	{
-		m_indexBuffer = _buffer;
-		m_device->SetIndices(m_indexBuffer->Handle());
-	}
-}
-//----------------------------------------------------------------------------//
-void Graphics::SetVertexShader(VertexShaderID _id)
-{
-	ASSERT(_id < MAX_VERTEX_SHADERS);
-	ASSERT(m_vertexShaders[_id] != nullptr);
-
-	m_device->SetVertexShader(m_vertexShaders[_id]);
-}
-//----------------------------------------------------------------------------//
-void Graphics::SetPixelShader(PixelShaderID _id)
-{
-	ASSERT(_id < MAX_PIXEL_SHADERS);
-	ASSERT(m_pixelShaders[_id] != nullptr);
-
-	m_device->SetPixelShader(m_pixelShaders[_id]);
-}
-//----------------------------------------------------------------------------//
-void Graphics::SetFloatUniformVS(uint _index, const void* _data, uint _num4)
-{
-	m_device->SetVertexShaderConstantF(_index, (const float*)_data, _num4);
-}
-//----------------------------------------------------------------------------//
-void Graphics::SetFloatUniformPS(uint _index, const void* _data, uint _num4)
-{
-	m_device->SetPixelShaderConstantF(_index, (const float*)_data, _num4);
-}
-//----------------------------------------------------------------------------//
-void Graphics::SetTexture(uint _unit, Texture* _texture)
-{
-	ASSERT(_unit < MAX_TEXTURE_UNITS);
-	TextureUnit& _tu = m_texUnit[_unit];
-	if (_tu.texture != _texture)
-	{
-		_tu.texture = _texture;
-		if (_texture)
-			_texture->_Bind(_unit);
-		else
-			m_device->SetTexture(_unit, nullptr);
-	}
-}
-//----------------------------------------------------------------------------//
-void Graphics::SetSampler(uint _unit, SamplerID _sampler)
-{
-	ASSERT(_unit < MAX_TEXTURE_UNITS);
-	TextureUnit& _tu = m_texUnit[_unit];
-	if (_tu.sampler != _sampler)
-	{
-		_tu.sampler = _sampler;
-		m_samplers[_sampler]._Bind(_unit);
-	}
-}
-//----------------------------------------------------------------------------//
-void Graphics::Draw(PrimitiveType _type, uint _start, uint _count)
-{
-	ASSERT(m_vertexBuffer != nullptr);
-	ASSERT(_start + _count <= m_vertexBuffer->ElementCount());
-
-	m_device->DrawPrimitive(DXPrimitiveType[_type], _start, _count / _type);
-}
-//----------------------------------------------------------------------------//
-void Graphics::DrawIndexed(PrimitiveType _type, uint _baseVertex, uint _start, uint _count)
-{
-	ASSERT(m_vertexBuffer != nullptr);
-	ASSERT(_baseVertex <= m_vertexBuffer->ElementCount());
-	ASSERT(m_indexBuffer != nullptr);
-	ASSERT(_start + _count <= m_indexBuffer->ElementCount());
-
-	m_device->DrawIndexedPrimitive(DXPrimitiveType[_type], _baseVertex, 0, m_vertexBuffer->ElementCount() - _baseVertex, _start, _count / _type);
-}
-//----------------------------------------------------------------------------//
-
-//----------------------------------------------------------------------------//
-// 
-//----------------------------------------------------------------------------//
-
-#endif

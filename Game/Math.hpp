@@ -433,7 +433,17 @@ struct Vec4
 	Vec4(float _s) : x(_s), y(_s), z(_s), w(_s) { }
 	Vec4(float _x, float _y, float _z, float _w) : x(_x), y(_y), z(_z), w(_w) { }
 
-	//vec4& set(float _x, float _y, float _z, float _w) { x = _x, y = _y, z = _z, w = _w; return *this; }
+	Vec4 Copy(void) const { return *this; }
+
+	const float operator [] (uint _index) const { return (&x)[_index]; }
+	float& operator [] (uint _index) { return (&x)[_index]; }
+	const float* operator * (void) const { return &x; }
+	float* operator * (void) { return &x; }
+
+	Vec4& Set(float _x, float _y, float _z, float _w) { x = _x, y = _y, z = _z, w = _w; return *this; }
+	Vec4& Set(float _s) { x = _s, y = _s, z = _s, w = _s; return *this; }
+	Vec4& Set(const Vec3& _xyz, float _w) { return Set(_xyz.x, _xyz.y, _xyz.z, _w); }
+	Vec4& Set(const Vec4& _other) { return *this = _other; }
 
 	union
 	{
@@ -443,6 +453,10 @@ struct Vec4
 	};
 };
 
+const Vec4 VEC4_ZERO(0);
+const Vec4 VEC4_ONE(1);
+const Vec4 VEC4_IDENTITY(0, 0, 0, 1);
+
 //----------------------------------------------------------------------------//
 // Color
 //----------------------------------------------------------------------------//
@@ -450,8 +464,8 @@ struct Vec4
 struct Color
 {
 	Color(void) { }
-	//Color(uint _rgba) : r((_rgba >> 24) & 0xff), g((_rgba >> 16) & 0xff), b((_rgba >> 8) & 0xff), a((_rgba >> 0) & 0xff) { }
-	Color(uint _rgba) : rgba(_rgba) { }
+	Color(uint _rgba) : r((_rgba >> 24) & 0xff), g((_rgba >> 16) & 0xff), b((_rgba >> 8) & 0xff), a((_rgba >> 0) & 0xff) { }
+	//Color(uint _rgba) : rgba(_rgba) { }
 	Color(uint8 _r, uint8 _g, uint8 _b, uint8 _a = 0xff) : r(_r), g(_g), b(_b), a(_a) { }
 	Color(const Vec4& _v) : r(FloatToByte(_v.r)), g(FloatToByte(_v.g)), b(FloatToByte(_v.b)), a(FloatToByte(_v.a)) { }
 	operator Vec4 (void) const { return Vec4(ByteToFloat(r), ByteToFloat(g), ByteToFloat(b), ByteToFloat(a)); }

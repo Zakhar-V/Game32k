@@ -30,7 +30,7 @@
 
 // c++/glsl
 #ifdef GLSL
-#	define UBUFFER(Id, Name) layout(/*location = Id,*/ std140) uniform U##Name
+#	define UBUFFER(Id, Name) layout(binding = Id, std140) uniform U##Name
 #else
 #	define vec2 Vec2
 #	define vec3 Vec3
@@ -38,25 +38,26 @@
 #	define mat3 Mat33
 #	define mat4 Mat44
 #	define UBUFFER(Id, Name) enum {U_##Name = Id}; struct U##Name
+#	define layout(...)
 #endif // GLSL
 
 UBUFFER(1, Camera)
 {
-	mat4 ViewMat;
-	mat4 ProjMat;
-	mat4 ViewProjMat;
+	layout(row_major) mat4 ViewMat;
+	layout(row_major) mat4 ProjMat;
+	layout(row_major) mat4 ViewProjMat;
 	//mat3 NormMat; // inverse(mat3(ViewMat))
 	//vec2 Depth;
 };
 
 UBUFFER(2, InstanceMat)
 {
-	mat4 WorldMat[MAX_INSTANCES];
+	layout(row_major) mat4 WorldMat[MAX_INSTANCES];
 };
 
 UBUFFER(3, SkinMat)
 {
-	mat4 SkinMat[MAX_BONES];
+	layout(row_major) mat4 SkinMat[MAX_BONES];
 };
 
 UBUFFER(4, ClipPlane)
@@ -85,6 +86,7 @@ UBUFFER(4, ClipPlane)
 #	define GS_IN_SUFFIX
 #endif
 #define IN(S, T, N) layout(location = S) in T In##N GS_IN_SUFFIX
+#define IN_FLAT(S, T, N) layout(location = S) flat in T In
 #define OUT(S, T, N) layout(location = S) out T Out##N
 #define INOUT(S, T, N) IN(S, T, N); OUT(S, T, N);
 
@@ -103,16 +105,18 @@ INOUT(9, float, Rot);
 OUT(10, vec4, WorldPos);
 OUT(11, vec3, Binormal);
 
+OUT(12, int, InstanceID);
+
 out gl_PerVertex
 {
 	vec4 gl_Position;
 	//float gl_PointSize;
 	float gl_ClipDistance[];
 };
-#endif
+#endif  
 
 #if COMPILE_GS
-INOUT(0, vec4, Pos);
+IN(0, vec4, Pos);
 INOUT(1, vec2, TexCoord);
 INOUT(2, vec2, Color);
 INOUT(3, vec3, Normal);
@@ -126,21 +130,33 @@ IN(9, float, Rot);
 INOUT(10, vec4, WorldPos);
 INOUT(11, vec3, Binormal);
 
+INOUT(12, int, InstanceID);
+
 in gl_PerVertex
 {
 	vec4 gl_Position;
-//float gl_PointSize;
+	//float gl_PointSize;
+	float gl_ClipDistance[];
+} gl_in[]; 
+
+out gl_PerVertex
+{
+	vec4 gl_Position;
+	//float gl_PointSize;
 	float gl_ClipDistance[];
 };
 #endif
 
-#if COMPILE_PS
+#if COMPILE_FS
 IN(1, vec2, TexCoord);
 IN(2, vec2, Color);
 IN(3, vec3, Normal);
 IN(4, vec3, Tangent);
 IN(10, vec4, WorldPos);
 IN(11, vec3, Binormal);
+IN_FLAT(12, int, InstanceID);
+
+OUT(0, vec4, Color);
 #endif
 
 #endif // GLSL

@@ -8,10 +8,17 @@
 //----------------------------------------------------------------------------//
 uint BitsPerPixel(PixelFormat _format)
 {
-	static const uint BPP[] =
+	static const uint8 BPP[] =
 	{
-		32, // PF_RGBX8
+		24, // PF_RGB8
 		32, // PF_RGBA8
+		32, // PF_RGB10A2
+		32, // PF_R32F
+		64, // PF_RG32F
+		96, // PF_RGB32F
+		128, // PF_RGBA32F
+		64, // PF_RGBA16F
+		32, // PF_RG11B10F
 		32, // PF_D24S8
 		4, // PF_DXT1
 		8, // PF_DXT5
@@ -21,36 +28,37 @@ uint BitsPerPixel(PixelFormat _format)
 //----------------------------------------------------------------------------//
 bool IsCompressed(PixelFormat _format)
 {
-	return _format == PF_DXT1 || _format == PF_DXT5;
+	return _format >= PF_DXT1; //_format == PF_DXT1 || _format == PF_DXT5;
 }
 //----------------------------------------------------------------------------//
-void RgbaToArgb(void* _dst, const void* _src, uint _numPixels)
+
+//----------------------------------------------------------------------------//
+// PixelBox
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+PixelBox::PixelBox(void) :
+	m_format(PF_RGBA8),
+	m_width(0),
+	m_height(0),
+	m_depth(0),
+	m_data(nullptr)
 {
-	uint32* _dstp = (uint32*)_dst;
-	uint32* _dste = _dstp + _numPixels;
-	const uint32* _srcp = (const uint32*)_src;
-	while (_dstp < _dste)
-	{
-		uint32 _color = *_srcp++;
-		*_dstp++ = (_color >> 8) | (_color << 24);
-	}
 }
 //----------------------------------------------------------------------------//
-/*void RgbToXrgb(void* _dst, const void* _src, uint _numPixels, uint8 _alpha)
+PixelBox::~PixelBox(void)
 {
-	uint32* _dstp = (uint32*)_dst;
-	uint32* _dste = _dstp + _numPixels;
-	const uint8* _srcp = (const uint8*)_src;
-	uint _a = _alpha << 24;
-	while (_dstp < _dste)
-	{
-		uint8 _r = _srcp[0];
-		uint8 _g = _srcp[1];
-		uint8 _b = _srcp[2];
-		_srcp += 3;
-		*_dstp++ = (_r << 16) | (_g << 8) | _b | _a;
-	}
-}*/
+}
+//----------------------------------------------------------------------------//
+void PixelBox::Realloc(PixelFormat _format, uint _width, uint _height, uint _depth)
+{
+	delete[] m_data;
+	m_format = _format;
+	m_width = _width;
+	m_height = _height;
+	m_depth = _depth;
+	m_data = new uint8[((_width * _height * BitsPerPixel(_format)) >> 3) * m_depth];
+}
 //----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
@@ -59,10 +67,10 @@ void RgbaToArgb(void* _dst, const void* _src, uint _numPixels)
 
 //----------------------------------------------------------------------------//
 Image::Image(void) :
-	m_format(PF_RGBA8),
 	m_width(0),
 	m_height(0),
 	m_invSize(0),
+	m_channels(1),
 	m_data(nullptr)
 {
 }
@@ -72,14 +80,14 @@ Image::~Image(void)
 	delete[] m_data;
 }
 //----------------------------------------------------------------------------//
-void Image::Realloc(PixelFormat _format, uint _width, uint _height)
+void Image::Realloc(uint _width, uint _height, uint _channels)
 {
+	ASSERT(_channels >= 1 && _channels <= 4);
 	delete[] m_data;
-	m_format = _format;
 	m_width = _width;
 	m_height = _height;
 	m_invSize.Set(1.0f / _width, 1.0f / _height);
-	m_data = new uint8[(_width * _height * BitsPerPixel(_format)) >> 3];
+	m_data = new float[_width * _height * _channels];
 }
 //----------------------------------------------------------------------------//
 Vec2 Image::GetCoord(const Vec2& _tc, bool _repeat)
@@ -104,58 +112,27 @@ Vec2 Image::GetCoord(const Vec2& _tc, bool _repeat)
 //----------------------------------------------------------------------------//
 Color Image::Sample(const Vec2& _tc, bool _smoothed, bool _repeat)
 {
-	ASSERT(m_format == PF_RGBA8 || m_format == PF_RGBX8);
-
-	if (_smoothed) // linear filter
+	Vec4 _r = VEC4_ZERO;
+	if (_smoothed) // linear
 	{
 		Vec2 _coord = GetCoord(_tc, _repeat); // 0..1 --> 0..size
 		Vec2i _lt = _coord;
 		Vec2i _rb = _lt + 1;
 		Vec2 _coeff = _coord - _lt;
-		Color _t = Mix(m_pixels[_lt.x + _lt.y * m_width], m_pixels[_rb.x + _lt.y * m_width], _coeff.x);
-		Color _b = Mix(m_pixels[_lt.x + _rb.y * m_width], m_pixels[_rb.x + _rb.y * m_width], _coeff.x);
-		return Mix(_t, _b, _coeff.y);
-	}
-
-	Vec2i _coord = GetCoord(_tc, _repeat);
-	return m_pixels[_coord.x + _coord.y * m_width];
-}
-//----------------------------------------------------------------------------//
-ImagePtr Image::CreateLod(void)
-{
-	ASSERT(m_format == PF_RGBA8 || m_format == PF_RGBX8);
-
-	if (m_width + m_height < 2)	// no lod
-		return nullptr;
-
-	if (IsPow2(m_width) && IsPow2(m_height))
-	{
-		ImagePtr _lod = new Image;
-		_lod->Realloc(m_format, m_width > 1 ? (m_width >> 1) : 1, m_height > 1 ? (m_height >> 1) : 1);
-
-		if (m_width > 1 && m_height > 1) // min 2x2
+		for (uint c = 0; c < m_channels; ++c)
 		{
-			for (uint y = 0, ly = 0; y < m_width; y += 2, ly += _lod->m_width)
-			{
-				uint y1 = y * m_width;
-				uint y2 = y * m_width + m_width;
-				for (uint x = 0, lx = 0; x < m_height; x += 2, ++lx)
-				{
-					uint x2 = x + 1;
-					_lod->m_pixels[lx + ly].Blend(m_pixels[x + y1], m_pixels[x2 + y1], m_pixels[x + y2], m_pixels[x2 + y2]);
-				}
-			}
+			float _t = Mix(m_data[_lt.x + _lt.y * m_width + c], m_data[_rb.x + _lt.y * m_width + c], _coeff.x);
+			float _b = Mix(m_data[_lt.x + _rb.y * m_width + c], m_data[_rb.x + _rb.y * m_width + c], _coeff.x);
+			_r[c] = Mix(_t, _b, _coeff.y);
 		}
-		else // 1x2 or 2x1
-			_lod->m_pixels[0].Blend(m_pixels[0], m_pixels[1]);
-		return _lod;
 	}
-	else
+	else // nearest
 	{
-		// TODO: ...
+		Vec2i _coord = GetCoord(_tc, _repeat);
+		for (uint c = 0; c < m_channels; ++c)
+			_r[c] = m_data[_coord.x + _coord.y * m_width + c];
 	}
-
-	return nullptr;
+	return _r;
 }
 //----------------------------------------------------------------------------//
 void Image::CreateBitmapFont(FontInfo& _info, const char* _name, uint _fheight, float _fwidth, bool _italic)
@@ -242,12 +219,16 @@ void Image::CreateBitmapFont(FontInfo& _info, const char* _name, uint _fheight, 
 	}
 	GdiFlush();
 
-	Realloc(PF_RGBA8, _texWidth, _texHeight);
-	Color* _dstp = m_pixels;
-	Color* _dste = _dstp + _texWidth * _texHeight;
+	Realloc(_texWidth, _texHeight, 4);
+	Vec4* _dstp = (Vec4*)m_data;
+	Vec4* _dste = _dstp + _texWidth * _texHeight;
 	while (_dstp < _dste)
 	{
-		*_dstp++ = _bmp->Abgr(); // abgr --> rgba
+		_dstp->r = ByteToFloat(_bmp->a);
+		_dstp->g = ByteToFloat(_bmp->r);
+		_dstp->b = ByteToFloat(_bmp->g);
+		_dstp->a = ByteToFloat(_bmp->b);
+		++_dstp;
 		++_bmp;
 	}
 
@@ -256,38 +237,29 @@ void Image::CreateBitmapFont(FontInfo& _info, const char* _name, uint _fheight, 
 	DeleteObject(_fnt);
 }
 //----------------------------------------------------------------------------//
-int Image::CreateNoize(uint _size, int _rseed)
+int Image::CreateNoize(uint _size, uint _channels, int _rseed)
 {
-	Realloc(PF_RGBX8, _size, _size);
-	Color* _dstp = m_pixels;
-	Color* _dste = _dstp + _size * _size;
-	Color _color(0, 0, 0, 0xff);
+	Realloc(_size, _size, _channels);
+	float* _dstp = m_data;
+	float* _dste = _dstp + _size * _size * _channels;
 	while (_dstp < _dste)
-	{
-		_color.x = (uint8)(Rand(_rseed) * 255);
-		_color.y = (uint8)(Rand(_rseed) * 255);
-		_color.z = (uint8)(Rand(_rseed) * 255);
-		*_dstp++ = _color;
-	}
+		*_dstp++ = Rand(_rseed);
 	return _rseed;
 }
 //----------------------------------------------------------------------------//
 void Image::CreatePerlin(uint _size, float _scale, const Vec2& _offset, int _rseed, uint _iterations)
 {
-	Realloc(PF_RGBX8, _size, _size);
-	Color* _dst = m_pixels;
-	Color _color(0, 0, 0, 0xff);
+	Realloc(_size, _size, 1);
+	float* _dstp = m_data;
 	for (uint y = 0; y < m_height; ++y)
 	{
 		for (uint x = 0; x < m_width; ++x)
 		{
-			_color.r = (uint8)(Perlin2d(x * _scale + _offset.x, y * _scale + _offset.y, _rseed, _iterations) * 255);
-			_color.g = _color.r;
-			_color.b = _color.r;
-			*_dst++ = _color;
+			*_dstp++ = Perlin2d(x * _scale + _offset.x, y * _scale + _offset.y, _rseed, _iterations);
 		}
 	}
 }
+//----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
 // 

@@ -1,3 +1,13 @@
+/*
+struct _PackedVertex // 7/10 bytes (255 vertices = 1785/2550 bytes)
+{
+uint8 pos[3];
+uint8 norm[2]; // normal.x normal.y
+uint8 tc[2];
+uint8 skin[3]; // weight, bone1, bone2
+};
+*/
+
 
 //----------------------------------------------------------------------------//
 //

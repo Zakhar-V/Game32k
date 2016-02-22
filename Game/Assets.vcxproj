@@ -207,10 +207,18 @@
   <ItemGroup>
     <None Include="..\Build\CreateBuiltinData.bat" />
     <None Include="Assets.inc" />
-    <None Include="Shaders\FillGBuffer-PS.glsl" />
-    <None Include="Shaders\Generic-VS.glsl" />
-    <None Include="Shaders\Sprite-GS.glsl" />
-    <None Include="Shaders\Terrain-GS.glsl" />
+    <ClInclude Include="Shaders\FillGBuffer-PS.glsl">
+      <FileType>Document</FileType>
+    </ClInclude>
+    <ClInclude Include="Shaders\Generic-VS.glsl">
+      <FileType>Document</FileType>
+    </ClInclude>
+    <ClInclude Include="Shaders\Sprite-GS.glsl">
+      <FileType>Document</FileType>
+    </ClInclude>
+    <ClInclude Include="Shaders\Terrain-GS.glsl">
+      <FileType>Document</FileType>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Shaders\Common.h" />
