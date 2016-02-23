@@ -16,6 +16,7 @@
 #include "Transform.cpp"
 #include "Physics.cpp"
 #include "Render.cpp"
+#include "Update.cpp"
 
 //----------------------------------------------------------------------------//
 //

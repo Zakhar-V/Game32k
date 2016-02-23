@@ -22,6 +22,8 @@ class PhysicsWorld;
 
 class RenderWorld;
 
+class UpdateSystem;
+
 //----------------------------------------------------------------------------//
 // 
 //----------------------------------------------------------------------------//
@@ -106,7 +108,7 @@ protected:
 	EET_SetParent,
 	EET_AttachChild,
 	EET_DetachChild,
-};*/
+};
 
 enum EntityAttachFlags
 {
@@ -116,7 +118,7 @@ enum EntityAttachFlags
 enum EntityEvent
 {
 	EE_,
-};
+};*/
 
 typedef Ptr<Entity> EntityPtr;
 typedef Ref<Entity> EntityRef;
@@ -140,8 +142,6 @@ public:
 	bool SetParent(Entity* _parent);
 	void DetachAllChildren(bool _remove = false);
 	void DetachThis(bool _remove = false);
-
-
 
 	bool SetManualTransformHierarchy(bool _state = true) { m_manualTransformHierarchy = _state; }
 	bool GetManualTransformHierarchy(void) { return m_manualTransformHierarchy; }
@@ -171,8 +171,7 @@ protected:
 
 	//Array<Ref<Component*>> m_listeners;
 
-	bool m_removed : 1;
-
+	//bool m_removed : 1;
 	//bool m_persistent : 1;
 	bool m_manualTransformHierarchy : 1;
 };
@@ -206,6 +205,7 @@ public:
 	TransformSystem* GetTransformSystem(void) { return m_transformSystem; }
 	PhysicsWorld* GetPhysicsWorld(void) { return m_physicsWorld; }
 	RenderWorld* GetRenderWorld(void) { return m_renderWorld; }
+	UpdateSystem* GetUpdateSystem(void) { return m_updateSystem; }
 
 	void Update(float _dt);
 	
@@ -220,6 +220,7 @@ protected:
 	TransformSystem* m_transformSystem;
 	PhysicsWorld* m_physicsWorld;
 	RenderWorld* m_renderWorld;
+	UpdateSystem* m_updateSystem;
 };
 
 //----------------------------------------------------------------------------//

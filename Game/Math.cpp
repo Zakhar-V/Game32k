@@ -270,6 +270,15 @@ Vec3 Mat44::TransformProj(const Vec3& _v) const
 		(m20 * _v.x + m21 * _v.y + m22 * _v.z + m23) * _iw);
 }
 //----------------------------------------------------------------------------//
+Vec4 Mat44::Transform(const Vec4& _v) const
+{
+	return Vec4(
+		m00 * _v.x + m01 * _v.y + m02 * _v.z + m03 * _v.w,
+		m10 * _v.x + m11 * _v.y + m12 * _v.z + m13 * _v.w,
+		m20 * _v.x + m21 * _v.y + m22 * _v.z + m23 * _v.w,
+		m30 * _v.x + m31 * _v.y + m32 * _v.z + m33 * _v.w);
+}
+//----------------------------------------------------------------------------//
 Mat44& Mat44::Mul(const Mat44& _rhs)
 {
 	Mat44 _r;
@@ -425,6 +434,173 @@ Mat44& Mat44::CreateOrtho2D(float _width, float _height)
 	return *this;
 }
 //----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+// AlignedBox
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+AlignedBox& AlignedBox::AddVertices(const void* _src, uint _count, size_t _stride, size_t _offset)
+{
+	ASSERT(_src || !_count);
+
+	union { const uint8* p; const Vec3* v; } _vertices = { ((const uint8*)_src) + _offset };
+
+	if (!_stride)
+		_stride = sizeof(Vec3);
+
+	for (uint i = 0; i < _count; ++i)
+	{
+		mn.SetMin(*_vertices.v);
+		mx.SetMax(*_vertices.v);
+		_vertices.p += _stride;
+	}
+
+	return *this;
+}
+//----------------------------------------------------------------------------//
+void AlignedBox::GetAllCorners(const void* _dst, size_t _stride, size_t _offset) const
+{
+	static const uint8 _idx[8][3] =
+	{
+		{ 0, 1, 2 }, // mn.x, mn.y, mn.z  BC_LeftBottomFar
+		{ 3, 1, 2 }, // mx.x, mn.y, mn.z  BC_RightBottomFar
+		{ 3, 1, 5 }, // mx.x, mn.y, mx.z  BC_RightBottomNear
+		{ 0, 1, 5 }, // mn.x, mn.y, mx.z  BC_LeftBottomNear
+		{ 3, 4, 5 }, // mx.x, mx.y, mx.z  BC_RightTopNear
+		{ 0, 4, 5 }, // mn.x, mx.y, mx.z  BC_LeftTopNear
+		{ 0, 4, 2 }, // mn.x, mx.y, mn.z  BC_LeftTopFar
+		{ 3, 4, 2 }, // mx.x, mx.y, mn.z  BC_RightTopFar
+	};
+
+	ASSERT(_dst != nullptr);
+
+	union { uint8_t* p; Vec3* v; } _vertices = { ((uint8_t*)_dst) + _offset };
+
+	if (!_stride)
+		_stride = sizeof(Vec3);
+
+	const float* _v = &mn.x;
+	for (uint i = 0; i < 8; ++i)
+	{
+		_vertices.v->Set(_v[_idx[i][0]], _v[_idx[i][1]], _v[_idx[i][2]]);
+		_vertices.p += _stride;
+	}
+}
+//----------------------------------------------------------------------------//
+AlignedBox AlignedBox::TransformProj(const Mat44& _rhs)
+{
+	Vec3 _v[8];
+	GetAllCorners(_v);
+	Reset();
+	for (uint i = 0; i < 8; ++i)
+		AddPoint(_v[i] * _rhs);
+	return *this;
+}
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+// Frustum
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+Frustum& Frustum::FromCameraMatrices(const Mat44& _view, const Mat44& _proj)
+{
+	Mat44 _m = _proj * _view; // _view_proj
+	GetPlanes(planes, _m);
+	origin = VEC3_ZERO * _view.Copy().Inverse();
+	box.FromViewProjMatrix(_m.Inverse());
+	box.GetAllCorners(corners);
+	return *this;
+}
+//----------------------------------------------------------------------------//
+bool Frustum::Intersects(const Vec3& _point) const
+{
+	for (uint i = 0; i < 6; ++i)
+	{
+		if (planes[i].Distance(_point) < 0)
+			return false;
+	}
+	return true;
+}
+//----------------------------------------------------------------------------//
+bool Frustum::Intersects(const Vec3& _center, float _radius) const
+{
+	for (uint i = 0; i < 6; ++i)
+	{
+		if (planes[i].Distance(_center, _radius) < 0)
+			return false;
+	}
+	return true;
+}
+//----------------------------------------------------------------------------//
+bool Frustum::Intersects(const AlignedBox& _box, bool* _contains) const
+{
+	if (box.Intersects(_box) && Intersects(_box.Center(), _box.Radius()))
+	{
+		if (_contains)
+		{
+			*_contains = true;
+			Vec3 _corners[8];
+			_box.GetAllCorners(_corners);
+			for (unsigned int i = 0; i < 8; ++i)
+			{
+				if (!Intersects(_corners[i]))
+				{
+					*_contains = false;
+					break;
+				}
+			}
+		}
+		return true;
+	}
+	return false;
+}
+//----------------------------------------------------------------------------//
+bool Frustum::Intersects(const Frustum& _frustum, bool* _contains) const
+{
+	if (box.Intersects(_frustum.box))
+	{
+		for (unsigned int i = 0; i < 6; ++i)
+		{
+			int _out = 0;
+			for (unsigned int j = 0; j < 8; ++j)
+				if (planes[i].Distance(_frustum.corners[j]) < 0)
+					++_out;
+			if (_out == 8)
+				return false;
+		}
+		if (_contains)
+		{
+			*_contains = true;
+			for (uint i = 0; i < 8; ++i)
+			{
+				if (!Intersects(_frustum.corners[i]))
+				{
+					*_contains = false;
+					break;
+				}
+			}
+		}
+		return true;
+	}
+	return false;
+}
+//----------------------------------------------------------------------------//
+void Frustum::GetPlanes(Plane* _planes, const Mat44& _m)
+{
+	float _m30 = _m[3][0];
+	float _m31 = _m[3][1];
+	float _m32 = _m[3][2];
+	float _m33 = _m[3][3];
+	for (uint i = 0, j = 0; i < 3; ++i, j += 2)
+	{
+		_planes[j].Set(_m30 - _m[i][0], _m31 - _m[i][1], _m32 - _m[i][2], _m33 - _m[i][3]).Normalize();
+		_planes[j].Set(_m30 + _m[i][0], _m31 + _m[i][1], _m32 + _m[i][2], _m33 + _m[i][3]).Normalize();
+	}
+}
+//----------------------------------------------------------------------------//
+
 
 //----------------------------------------------------------------------------//
 //

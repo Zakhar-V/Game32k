@@ -2,6 +2,7 @@
 
 #include "Scene.hpp"
 #include "Transform.hpp"
+#include "Update.hpp"
 #include "Physics.hpp"
 #include "Render.hpp"
 
@@ -50,7 +51,6 @@ Entity::Entity(void) :
 	m_prev(nullptr),
 	m_next(nullptr),
 	m_child(nullptr),
-	m_removed(false),
 	m_manualTransformHierarchy(false)
 {
 	memset(m_components, 0, sizeof(m_components));
@@ -275,6 +275,7 @@ Scene::Scene(void) :
 	m_transformSystem = new TransformSystem(this);
 	m_physicsWorld = new PhysicsWorld(this);
 	m_renderWorld = new RenderWorld(this);
+	m_updateSystem = new UpdateSystem(this);
 }
 //----------------------------------------------------------------------------//
 Scene::~Scene(void)
@@ -284,6 +285,7 @@ Scene::~Scene(void)
 
 	// ...
 
+	delete m_updateSystem;
 	delete m_renderWorld;
 	delete m_physicsWorld;
 	delete m_transformSystem;
@@ -291,7 +293,7 @@ Scene::~Scene(void)
 //----------------------------------------------------------------------------//
 void Scene::Update(float _dt)
 {
-	//m_updateSystem->Update(_dt);
+	m_updateSystem->Update(_dt);
 	//m_physicsWorld->Update(_dt);
 	m_transformSystem->Update(_dt);
 

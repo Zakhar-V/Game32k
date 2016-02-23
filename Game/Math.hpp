@@ -370,7 +370,7 @@ struct Vec3
 	friend Vec3 operator * (float _lhs, const Vec3& _rhs) { return Vec3(_lhs * _rhs.x, _lhs * _rhs.y, _lhs * _rhs.z); }
 
 	bool operator == (const Vec3& _rhs) const { return x == _rhs.x && y == _rhs.y && z == _rhs.z; }
-	bool operator != (const Vec3& _rhs) const { return x != _rhs.x || y != _rhs.y || z != _rhs.z; }
+	bool operator != (const Vec3& _rhs) const { return !(*this == _rhs); }
 
 	Vec3& Set(float _s) { x = _s, y = _s, z = _s; return *this; }
 	Vec3& Set(float _x, float _y, float _z) { x = _x, y = _y, z = _z; return *this; }
@@ -413,6 +413,11 @@ struct Vec3
 			_lp = RSqrt(_lp);
 		return ACos(Clamp<float>(Dot(_v) * _lp, -1, 1));
 	}
+
+	bool operator < (const Vec3& _rhs) const { return x < _rhs.x && y < _rhs.y && z < _rhs.z; }
+	bool operator > (const Vec3& _rhs) const { return x > _rhs.x && y > _rhs.y && z > _rhs.z; }
+	bool operator <= (const Vec3& _rhs) const { return !(*this > _rhs); }
+	bool operator >= (const Vec3& _rhs) const { return !(*this < _rhs); }
 
 	float x, y, z;
 };
@@ -618,7 +623,9 @@ struct Mat44
 	Vec3 TransformVectorAbs(const Vec3& _v) const;
 	Vec3 TransformVector(const Vec3& _v) const;
 	Vec3 TransformProj(const Vec3& _v) const;
+	Vec4 Transform(const Vec4& _v) const;
 	friend Vec3 operator * (const Vec3&_lhs, const Mat44& _rhs) { return _rhs.TransformProj(_lhs); }
+	friend Vec4 operator * (const Vec4&_lhs, const Mat44& _rhs) { return _rhs.Transform(_lhs); }
 
 	Mat44& Add(const Mat44& _rhs) { for (uint i = 0; i < 16; ++i) v[i] += _rhs.v[i]; return *this; }
 	Mat44 operator + (const Mat44& _rhs) const { return Copy().Add(_rhs); }
@@ -652,6 +659,15 @@ struct Mat44
 	Mat44& CreateInverseTransform(const Vec3& _t, const Quat& _r, const Vec3& _s = 1);
 	
 	Mat44& Inverse(void);
+	Mat44& Transpose(void)
+	{
+		Swap(m[0][1], m[1][0]);
+		Swap(m[0][2], m[2][0]);
+		Swap(m[1][2], m[2][1]);
+		Swap(m[1][3], m[3][1]);
+		Swap(m[2][3], m[3][2]);
+		return *this;
+	}
 
 	/*Mat44& CreateProjection(float _left, float _right, float _bottom, float _top, float _znear, float _zfar, uint _flags)
 	{
@@ -706,31 +722,164 @@ const Mat44 MAT44_ZERO(1);
 const Mat44 MAT44_IDENTITY(1);
 
 //----------------------------------------------------------------------------//
-// Plane
-//----------------------------------------------------------------------------//
-
-struct Plane
-{
-	Vec3 pos;
-	float d;
-};
-
-//----------------------------------------------------------------------------//
 // Ray 
 //----------------------------------------------------------------------------//
 
 struct Ray
 {
-	Vec3 origin;
-	Vec3 dir;
+	Ray(void) : origin(VEC3_ZERO), dir(VEC3_UNIT_Z) { }
+	Ray(const Vec3& _origin, const Vec3& _dir) : origin(_origin), dir(_dir) { }
+	Vec3 Point(float _t) const { return origin + dir * _t; }
+	Vec3 operator * (float _t) const { return Point(_t); }
+	friend Vec3 operator * (float _t, const Ray& _ray) { return _ray.Point(_t); }
+
+	Vec3 origin, dir;
+};
+
+//----------------------------------------------------------------------------//
+// 
+//----------------------------------------------------------------------------//
+
+inline Vec3 TriangleNormal(const Vec3& _v0, const Vec3& _v1, const Vec3& _v2)
+{
+	return (_v1 - _v0).Cross(_v2 - _v0);
+}
+
+//----------------------------------------------------------------------------//
+// Plane
+//----------------------------------------------------------------------------//
+
+struct Plane
+{
+	Plane(void) : normal(VEC3_ZERO), dist(0) { }
+	Plane(float _nx, float _ny, float _nz, float _d) : normal(_nx, _ny, _nz), dist(_d) { }
+	Plane(const Vec3& _n, float _d) : normal(_n), dist(_d) { }
+
+	Plane Copy(void) const { return *this; }
+
+	Plane& Set(const Plane& _other) { return *this = _other; }
+	Plane& Set(const Vec4& _v) { return Set(_v.x, _v.y, _v.z, Abs(_v.w)); }
+	Plane& Set(float _nx, float _ny, float _nz, float _d) { normal.Set(_nx, _ny, _nz); dist = _d; return *this; }
+	Plane& Set(const Vec3& _normal, float _distance) { normal = _normal, dist = _distance; return *this; }
+
+	Plane& FromNormalPoint(const Vec3& _normal, const Vec3& _point) { return Set(_normal, -_normal.AbsDot(_point)); }
+	Plane& FromTriangle(const Vec3& _v0, const Vec3& _v1, const Vec3& _v2) { return FromNormalPoint(TriangleNormal(_v0, _v1, _v2), _v0); }
+
+	Vec4& AsVec4(void) { return *(Vec4*)&normal; }
+	const Vec4& AsVec4(void) const { return *(const Vec4*)&normal; }
+
+	Plane& Normalize(void)
+	{
+		float _length = normal.LengthSq();
+		if (_length > EPSILON2)
+		{
+			_length = 1 / _length;
+			normal *= _length;
+			dist *= _length;
+		}
+		return *this;
+	}
+	Plane& Transform(const Mat44& _m) { return Set(AsVec4() * _m.Copy().Inverse().Transpose()); }
+
+	Plane operator * (const Mat44& _m) const { return Copy().Transform(_m); }
+	Plane& operator *= (const Mat44& _m) { return Transform(_m); }
+
+	float Distance(const Vec3& _point) const { return normal.Dot(_point) + dist; }
+	float Distance(const Vec3& _center, float _radius) const
+	{
+		float _d = normal.Dot(_center) + dist;
+		float _md = normal.AbsDot(_radius);
+		return (_d < -_md ? _d + _md : (_d > _md ? _d - _md : 0));
+	}
+
+	Mat44 GetReflectionMatrix(void) const 
+	{
+		Vec3 _n = -2 * normal;
+		Mat44 _m;
+		_m.SetIdentity();
+		for (uint r = 0; r < 3; ++r)
+		{
+			for (uint c = 0; c < 4; ++r)
+			{
+				_m[r][c] += _n[r] * AsVec4()[c];
+			}
+		}
+		return _m;
+	}
+
+	Vec3 normal;
+	float dist;
 };
 
 //----------------------------------------------------------------------------//
 // AlignedBox
 //----------------------------------------------------------------------------//
 
+const uint16 BOX_LINE_INDICES[24] = { 0, 1, 1, 2, 2, 3, 3, 0, 3, 5, 2, 4, 1, 7, 0, 6, 4, 5, 5, 6, 6, 7, 7, 4 };
+const uint16 BOX_QUAD_INDICES[24] = { 5, 3, 2, 4, 4, 2, 1, 7, 7, 1, 0, 6, 6, 0, 3, 5, 6, 5, 4, 7, 2, 3, 0, 1 };
+const uint16 BOX_TRIANLGE_INDICES[36] = { 5, 3, 2, 5, 2, 4, 4, 2, 1, 4, 1, 7, 7, 1, 0, 7, 0, 6, 6, 0, 3, 6, 3, 5, 6, 5, 4, 6, 4, 7, 3, 0, 1, 3, 1, 2 };
+
+enum BoxCorner : unsigned int
+{
+	BC_LeftBottomFar = 0,// min
+	BC_RightBottomFar,
+	BC_RightBottomNear,
+	BC_LeftBottomNear,
+	BC_RightTopNear, // max
+	BC_LeftTopNear,
+	BC_LeftTopFar,
+	BC_RightTopFar,
+};
+
 struct AlignedBox
 {
+	AlignedBox(void) : mn(999999.9f), mx(-999999.9f) { }
+	AlignedBox(const Vec3& _min, const Vec3& _max) : mn(_min), mx(_max) { }
+
+	AlignedBox Copy(void) const { return *this; }
+
+	AlignedBox& Set(const AlignedBox& _b) { return *this = _b; }
+	AlignedBox& Set(const Vec3& _min, const Vec3& _max) { mn.Set(_min), mx.Set(_max); return *this; }
+	AlignedBox& SetMinMax(const Vec3& _a, const Vec3& _b) { mn.SetMin(_a, _b), mx.SetMax(_a, _b); return *this; }
+	AlignedBox& SetZero(void) { mn = VEC3_ZERO, mx = VEC3_ZERO; return *this; }
+	AlignedBox& FromCenterExtends(const Vec3& _center, const Vec3& _extends) { return Set(_center - _extends, _center + _extends); }
+	AlignedBox& FromViewProjMatrix(const Mat44& _m) { return *this = AlignedBox(-1, 1).TransformProj(_m); }
+
+	AlignedBox& Reset(const Vec3& _pt) { return Set(_pt, _pt); }
+	AlignedBox& Reset(void) { mn = 999999.9f, mx = -999999.9f; return *this; }
+	AlignedBox& AddPoint(const Vec3& _pt) { mn.SetMin(_pt), mx.SetMax(_pt); return *this; }
+	AlignedBox& AddVertices(const void* _src, uint _count, size_t _stride = 0, size_t _offset = 0);
+
+	bool IsZero(void) const { return mn == mx && mn == VEC3_ZERO; }
+	bool IsFinite(void) const { return mn.x <= mx.x && mn.y <= mx.y && mn.z <= mx.z; }
+
+	Vec3 Size(void) const { return mx - mn; }
+	Vec3 Extends(void) const { return (mx - mn) * 0.5f; }
+	Vec3 Center(void) const { return (mx + mn) * 0.5f; }
+	//operator Sphere (void) const { return Sphere(Center(), Radius()); }
+	float Diagonal(void) const { return (mx - mn).Length(); }
+	float DiagonalSq(void) const { return (mx - mn).LengthSq(); }
+	float Radius(void) const { return Diagonal() * 0.5f; }
+	float Width(void) const { return mx.x - mn.x; }
+	float Height(void) const { return mx.y - mn.y; }
+	float Depth(void) const { return mx.z - mn.z; }
+	float Volume(void) const { return (mx - mn).LengthSq(); }
+	void GetAllCorners(const void* _dst, size_t _stride = 0, size_t _offset = 0) const;
+
+	AlignedBox TransformAffine(const Mat44& _rhs) { return FromCenterExtends(Center() * _rhs, _rhs.TransformVectorAbs(Extends())); }
+	AlignedBox TransformProj(const Mat44& _rhs);
+
+	AlignedBox operator + (const Vec3& _point) const { return Copy().AddPoint(_point); }
+	AlignedBox operator + (const AlignedBox& _box) const { return Copy().AddPoint(_box.mn).AddPoint(_box.mx); }
+	AlignedBox& operator += (const Vec3& _point) { return AddPoint(_point); }
+	AlignedBox& operator += (const AlignedBox& _box) { return AddPoint(_box.mn).AddPoint(_box.mx); }
+	AlignedBox& operator *= (const Mat44& _rhs) { return TransformAffine(_rhs); }
+	AlignedBox operator * (const Mat44& _rhs) const { return Copy().TransformAffine(_rhs); }
+
+	bool Contains(const Vec3& _point) const { return _point >= mn && _point <= mx; }
+	bool Contains(const AlignedBox& _box) const { return _box.mx <= mx && _box.mn >= mn; }
+	bool Intersects(const AlignedBox& _box) const { return _box.mx >= mn && _box.mn <= mx; }
+
 	Vec3 mn, mx;
 };
 
@@ -756,9 +905,38 @@ struct Sphere
 // Frustum
 //----------------------------------------------------------------------------//
 
+enum FrustumPlane : uint16
+{
+	FP_Left,
+	FP_Right,
+	FP_Bottom,
+	FP_Top,
+	FP_Near,
+	FP_Far,
+};
+
 struct Frustum
 {
+	Frustum(void) { }
 
+	Frustum& FromCameraMatrices(const Mat44& _view, const Mat44& _proj);
+
+	bool Intersects(const Vec3& _point) const;
+	bool Intersects(const Vec3& _center, float _radius) const;
+	bool Intersects(const AlignedBox& _box, bool* _contains = nullptr) const;
+	bool Intersects(const Frustum& _frustum, bool* _contains = nullptr) const;
+
+	float Distance(const Vec3& _point) const { return origin.Distance(_point); }
+	float Distance(const Vec3& _center, float _radius) const { float _d = origin.Distance(_center); return _d < _radius ? 0 : _d - _radius; }
+	float Distance(const AlignedBox& _box) const { return Distance(_box.Center(), _box.Radius()); }
+
+
+	static void GetPlanes(Plane* _planes, const Mat44& _m);
+
+	Plane planes[6];
+	Vec3 corners[8];
+	Vec3 origin;
+	AlignedBox box;
 };
 
 //----------------------------------------------------------------------------//
