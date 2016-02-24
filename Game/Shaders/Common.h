@@ -5,9 +5,13 @@
 // VS/GS flags
 #define INSTANCED_BIT 0x1
 #define SKINNED_BIT 0x2
+
 #define SPRITE_BIT 0x4
 #define BILLBOARD_BIT 0x8
-#define TERRAIN_BIT 0x10
+#define BILLBOARD_Y_BIT 0x10
+#define PARTICLES_BIT 0x20
+
+#define TERRAIN_BIT 0x20
 
 
 // PS flags
@@ -19,6 +23,8 @@
 #define SKINNED (FLAGS & SKINNED_BIT)
 #define SPRITE (FLAGS & SPRITE_BIT)
 #define BILLBOARD (FLAGS & BILLBOARD_BIT)
+#define BILLBOARD_Y (FLAGS & BILLBOARD_Y_BIT)
+#define PARTICLES (FLAGS & PARTICLES_BIT)
 #define TERRAIN (FLAGS & TERRAIN_BIT)
 #endif
 
@@ -31,13 +37,15 @@
 // c++/glsl
 #ifdef GLSL
 #	define UBUFFER(Id, Name) layout(binding = Id, std140) uniform U##Name
+#	define USAMPLER(Id, T, Name) layout(binding = Id) uniform sampler##T Name
 #else
 #	define vec2 Vec2
 #	define vec3 Vec3
 #	define vec4 Vec4
-#	define mat3 Mat33
+#	define mat3 Mat34
 #	define mat4 Mat44
 #	define UBUFFER(Id, Name) enum {U_##Name = Id}; struct U##Name
+#	define USAMPLER(Id, T, Name) enum {U_##Name = Id};
 #	define layout(...)
 #endif // GLSL
 
@@ -46,8 +54,11 @@ UBUFFER(1, Camera)
 	layout(row_major) mat4 ViewMat;
 	layout(row_major) mat4 ProjMat;
 	layout(row_major) mat4 ViewProjMat;
-	//mat3 NormMat; // inverse(mat3(ViewMat))
+	layout(row_major) mat3 NormMat; // inverse(mat3(ViewMat))
 	//vec2 Depth;
+	vec4 CameraPos;
+	vec4 Depth;
+
 };
 
 UBUFFER(2, InstanceMat)
@@ -65,6 +76,8 @@ UBUFFER(4, ClipPlane)
 	vec4 ClipPlane[6];
 	int NumClipPlanes;
 };
+
+USAMPLER(0, 2D, ColorMap);
 
 
 #ifdef GLSL
@@ -93,11 +106,12 @@ UBUFFER(4, ClipPlane)
 #if COMPILE_VS
 INOUT(0, vec4, Pos);
 INOUT(1, vec2, TexCoord);
-INOUT(2, vec2, Color);
+INOUT(2, vec4, Color);
 INOUT(3, vec3, Normal);
 INOUT(4, vec4, Tangent);
 IN(5, vec4, Weights);
 IN(6, vec4, Indices);
+
 INOUT(7, vec2, TexCoord2);
 INOUT(8, vec2, Size);
 INOUT(9, float, Rot);
@@ -118,12 +132,12 @@ out gl_PerVertex
 #if COMPILE_GS
 IN(0, vec4, Pos);
 INOUT(1, vec2, TexCoord);
-INOUT(2, vec2, Color);
+INOUT(2, vec4, Color);
 INOUT(3, vec3, Normal);
 INOUT(4, vec4, Tangent);
 //IN(5, vec4, Weights);
 //IN(6, vec4, Indices);
-IN(7, vec2, TexCoord2);
+IN(7, vec2, TexSize);
 IN(8, vec2, Size);
 IN(9, float, Rot);
 
@@ -149,7 +163,7 @@ out gl_PerVertex
 
 #if COMPILE_FS
 IN(1, vec2, TexCoord);
-IN(2, vec2, Color);
+IN(2, vec4, Color);
 IN(3, vec3, Normal);
 IN(4, vec3, Tangent);
 IN(10, vec4, WorldPos);
@@ -160,4 +174,5 @@ OUT(0, vec4, Color);
 #endif
 
 #endif // GLSL
+
 #endif//_ShaderCommon_h__

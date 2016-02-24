@@ -4,15 +4,19 @@ void main()
 	OutInstanceID = gl_InstanceID;
 
 	OutPos = InPos;
+#if PARTICLES
+	OutWorldPos = InPos;
+#else
 	OutWorldPos = WorldMat[gl_InstanceID] * InPos;
+#endif
 
 	OutColor = InColor;
 	OutTexCoord = InTexCoord;
 
-#if SPRITE || BILLBOARD
+#if SPRITE
 	OutSize = InSize;
 	OutRot = InRot;
-	OutTexCoord2 = InTexCoord2;
+	OutTexCoord2 = InTexCoord2 - InTexCoord;
 #else
 
 #endif

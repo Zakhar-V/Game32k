@@ -37,31 +37,32 @@ public:
 	void DetachAllChildren(void);
 
 	const Mat44& GetWorldMatrix(void);
-	void SetWorldMatrix(const Mat44& _matrix);
+	void SetWorldMatrix(const Mat44& _m, bool _orderIndependent = false);
 
-	void SetPosition(const Vec3& _position, TransformSpace _space = TS_Local);
-	Vec3 GetPosition(TransformSpace _space = TS_Local);
-	//Translate
-	
-	void SetRotation(const Quat& _rotation, TransformSpace _space = TS_Local);
-	Quat GetRotation(TransformSpace _space = TS_Local);
-	void SetDirection(const Vec3& _direction, TransformSpace _space = TS_Local);
-	Vec3 GetDirection(TransformSpace _space = TS_Local);
-	//LookAt
-	//Rotate
-	//RotateAround
+	void SetLocalPosition(const Vec3& _position);
+	const Vec3& GetLocalPosition(void);
+	void SetLocalRotation(const Quat& _rotation);
+	const Quat& GetLocalRotation(void);
+	void SetLocalScale(const Vec3& _scale);
+	const Vec3& GetLocalScale(void);
 
-	void SetScale(const Vec3& _scale, TransformSpace _space = TS_Local);
-	Vec3 GetScale(TransformSpace _space = TS_Local);
-	//Scale
+	void SetWorldPosition(const Vec3& _position);
+	const Vec3& GetWorldPosition(void);
+	void SetWorldRotation(const Quat& _rotation);
+	const Quat& GetWorldRotation(void);
+	void SetWorldScale(const Vec3& _scale);
+	const Vec3& GetWorldScale(void);
 
 protected:
 	friend class TransformSystem;
 
 	void _SetScene(Scene* _scene) override;
 	void _Invalidate(bool _fromChild = false);
+	void _UpdateRecursive(void);
+
 	void _UpdateMatrix(void);
-	void _Update(void);
+	void _UpdateLocalFromWorld(void);
+	void _UpdateWorldFromLocal(void);
 
 	TransformSystem* m_system;
 	Transform* m_parent;
@@ -71,10 +72,7 @@ protected:
 
 	Vec3 m_localPosition;
 	Quat m_localRotation;
-	Vec3 m_localScale; // todo: remove it
-	Vec3 m_worldPosition;
-	Quat m_worldRotation;
-	Vec3 m_worldScale;
+	Vec3 m_localScale;
 	Mat44 m_worldMatrix;
 
 	bool m_inheritPosition : 1;

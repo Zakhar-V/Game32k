@@ -83,9 +83,12 @@ Image::~Image(void)
 void Image::Realloc(uint _width, uint _height, uint _channels)
 {
 	ASSERT(_channels >= 1 && _channels <= 4);
+	if (m_width == _width && m_height == _height && m_channels == _channels)
+		return;
 	delete[] m_data;
 	m_width = _width;
 	m_height = _height;
+	m_channels = _channels;
 	m_invSize.Set(1.0f / _width, 1.0f / _height);
 	m_data = new float[_width * _height * _channels];
 }

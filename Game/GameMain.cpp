@@ -500,11 +500,22 @@ void main(void)
 			//CreateHeightMap(_img, 1, 1, 1);
 
 			Scene _scene;
-			EntityPtr _entity = new Entity;
-			Ptr<Transform> _transform = new Transform;
-			_entity->AddComponent(_transform);
-			_entity->SetScene(&_scene);
+			{
+				EntityPtr _entity = new Entity;
+				Ptr<Transform> _transform = new Transform;
+				_entity->AddComponent(_transform);
+				_entity->SetScene(&_scene);
 
+				EntityPtr _entity2 = new Entity;
+				Ptr<Transform> _transform2 = new Transform;
+				_entity2->AddComponent(_transform2);
+				_entity2->SetScene(&_scene);
+
+				_entity2->SetParent(_entity);
+
+				_transform->SetWorldPosition(1);
+				_transform2->SetWorldPosition(2);
+			}
 
 			BufferPtr _vb = new Buffer;
 			{
@@ -513,9 +524,15 @@ void main(void)
 				_v[0].position.Set(250, 250, 0); // t	250 0
 				_v[2].position.Set(0, 250, 0); // r
 				_v[1].position.Set(250, 250, 0); // l
-				_v[0].size[0] = 300, _v[0].size[1] = 300;
+				_v[0].size[0] = 130, _v[0].size[1] = 130;
 				_v[0].SetTexCoord(_fi.chars['A'].tc[0]);
 				_v[0].SetTexCoord2(_fi.chars['A'].tc[1]);
+				_v[0].color[0] = 0x00;
+				_v[0].color[1] = 0x00;
+				_v[0].color[2] = 0xff;
+				_v[0].color[3] = 0xff;
+				//_v[0].SetTexCoord(0);
+				//_v[0].SetTexCoord2(1);
 				_vb->Realloc(sizeof(_v), &_v);
 			}
 			BufferPtr _cameraParams = new Buffer(BU_Dynamic);
@@ -564,16 +581,37 @@ void main(void)
 					_cam.ViewMat = _view;
 					_cam.ProjMat = _proj;
 					_cam.ViewProjMat = _proj * _view;
+					_cam.NormMat = _view.Copy().Transpose(); // equal to inverse
 
 					_cameraParams->Write(&_cam, 0, sizeof(_cam));
-					_worldMatrices->Write(&_model, 0, sizeof(_model));
 
-					gGraphics->SetShader(VS_Sprite);
-					gGraphics->SetShader(GS_Sprite);
+					uint _numInstances = MAX_INSTANCES;
+					for (uint i = 0; i < _numInstances; ++i)
+					{
+						_model.SetIdentity();
+						_model.SetTranslation(Vec3(-50, -50, 0) + Vec3(i, i, 0) * 0.1f);
+						//_model.SetScale(0.01f);
+						_worldMatrices->Write(&_model, sizeof(_model) * i, sizeof(_model));
+					}
+
+
+					/*_model.SetScale(1);
+					_worldMatrices->Write(&_model, 0, sizeof(_model));
+					_model.SetScale(2);
+					_worldMatrices->Write(&_model, sizeof(_model), sizeof(_model));
+					 */
+
+					gGraphics->SetUniformBuffer(U_Camera, _cameraParams);
+					gGraphics->SetUniformBuffer(U_InstanceMat, _worldMatrices);
+
+					gGraphics->SetShader(VS_Particles);
+					gGraphics->SetShader(GS_Billboard);
 					gGraphics->SetShader(FS_NoTexture);
 
+					gGraphics->SetTexture(0, _tex);
+
 					gGraphics->SetVertexBuffer(_vb);
-					gGraphics->Draw(PT_Points, 0, 1, 1);
+					gGraphics->Draw(PT_Points, 0, 1, _numInstances);
 				}
 
 

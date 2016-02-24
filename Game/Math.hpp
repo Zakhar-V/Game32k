@@ -437,6 +437,7 @@ struct Vec4
 	Vec4(void) { }
 	Vec4(float _s) : x(_s), y(_s), z(_s), w(_s) { }
 	Vec4(float _x, float _y, float _z, float _w) : x(_x), y(_y), z(_z), w(_w) { }
+	Vec4(const Vec3& _v, float _w = 1) : x(_v.x), y(_v.y), z(_v.z), w(_w) { }
 
 	Vec4 Copy(void) const { return *this; }
 
@@ -444,10 +445,13 @@ struct Vec4
 	float& operator [] (uint _index) { return (&x)[_index]; }
 	const float* operator * (void) const { return &x; }
 	float* operator * (void) { return &x; }
+	
+	operator Vec3& (void) { return *(Vec3*)&x; }
+	operator const Vec3& (void) const { return *(const Vec3*)&x; }
 
 	Vec4& Set(float _x, float _y, float _z, float _w) { x = _x, y = _y, z = _z, w = _w; return *this; }
 	Vec4& Set(float _s) { x = _s, y = _s, z = _s, w = _s; return *this; }
-	Vec4& Set(const Vec3& _xyz, float _w) { return Set(_xyz.x, _xyz.y, _xyz.z, _w); }
+	Vec4& Set(const Vec3& _xyz, float _w = 1) { return Set(_xyz.x, _xyz.y, _xyz.z, _w); }
 	Vec4& Set(const Vec4& _other) { return *this = _other; }
 
 	union
@@ -572,19 +576,20 @@ inline Quat Mix(const Quat& _a, const Quat& _b, float _t)
 const Quat QUAT_ZERO(0);
 const Quat QUAT_IDENTITY(1);
 
-//----------------------------------------------------------------------------//
+/*//----------------------------------------------------------------------------//
 // Mat33
 //----------------------------------------------------------------------------//
 
 struct Mat33
 {
 	Vec3 r[3];
-};
+};*/
 
 //----------------------------------------------------------------------------//
 // Mat34
 //----------------------------------------------------------------------------//
 
+/// Row-major matrix 3x4 (for OpenGL 3x3 and 3x4 matrices in uniform blocks)
 struct Mat34
 {
 	Vec4 r[3];
@@ -601,6 +606,9 @@ struct Mat44
 	explicit Mat44(float _val) { SetIdentity(_val); }
 	explicit Mat44(const float* _m44) { FromPtr(_m44); }
 	Mat44(float _00, float _01, float _02, float _03, float _10, float _11, float _12, float _13, float _20, float _21, float _22, float _23, float _30, float _31, float _32, float _33);
+
+	operator Mat34& (void) { return *(Mat34*)v; }
+	operator const Mat34& (void) const { return *(Mat34*)v; }
 
 	Mat44 Copy(void) const { return *this; }
 	Mat44& FromPtr(const float* _m44);
@@ -791,6 +799,8 @@ struct Plane
 		float _md = normal.AbsDot(_radius);
 		return (_d < -_md ? _d + _md : (_d > _md ? _d - _md : 0));
 	}
+
+	Vec3 Reflect(const Vec3& _dir) const { return _dir - (2.f * normal.Dot(_dir) * normal); }
 
 	Mat44 GetReflectionMatrix(void) const 
 	{

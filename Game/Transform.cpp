@@ -16,9 +16,6 @@ Transform::Transform(void) :
 	m_localPosition(VEC3_ZERO),
 	m_localRotation(QUAT_IDENTITY),
 	m_localScale(VEC3_ONE),
-	m_worldPosition(VEC3_ZERO),
-	m_worldRotation(QUAT_IDENTITY),
-	m_worldScale(VEC3_ONE),
 	m_worldMatrix(MAT44_IDENTITY),
 	m_inheritPosition(true),
 	m_inheritRotation(true),
@@ -82,51 +79,90 @@ const Mat44& Transform::GetWorldMatrix(void)
 	return m_worldMatrix;
 }
 //----------------------------------------------------------------------------//
-void Transform::SetWorldMatrix(const Mat44& _matrix)
+void Transform::SetWorldMatrix(const Mat44& _m, bool _orderIndependent)
 {
+	m_worldMatrix = _m;
+	_UpdateLocalFromWorld();
+	m_updateLocalFromWorld = _orderIndependent;
 	_Invalidate();
-	m_worldMatrix = _matrix;
-	m_updateLocalFromWorld = true;
 }
 //----------------------------------------------------------------------------//
-void Transform::SetPosition(const Vec3& _position, TransformSpace _space)
+void Transform::SetLocalPosition(const Vec3& _position)
 {
-
+	m_localPosition = _position;
+	_Invalidate();
 }
 //----------------------------------------------------------------------------//
-Vec3 Transform::GetPosition(TransformSpace _space)
+const Vec3& Transform::GetLocalPosition(void)
 {
-	return VEC3_ZERO;
+	return m_localPosition;
 }
 //----------------------------------------------------------------------------//
-void Transform::SetRotation(const Quat& _rotation, TransformSpace _space)
+void Transform::SetLocalRotation(const Quat& _rotation)
 {
-
+	m_localRotation = _rotation;
+	_Invalidate();
 }
 //----------------------------------------------------------------------------//
-Quat Transform::GetRotation(TransformSpace _space)
+const Quat& Transform::GetLocalRotation(void)
 {
-	return QUAT_IDENTITY;
+	return m_localRotation;
 }
 //----------------------------------------------------------------------------//
-void Transform::SetDirection(const Vec3& _direction, TransformSpace _space)
+void Transform::SetLocalScale(const Vec3& _scale)
 {
-
+	m_localScale = _scale;
+	_Invalidate();
 }
 //----------------------------------------------------------------------------//
-Vec3 Transform::GetDirection(TransformSpace _space)
+const Vec3& Transform::GetLocalScale(void)
 {
-	return VEC3_ZERO;
+	return m_localScale;
 }
 //----------------------------------------------------------------------------//
-void Transform::SetScale(const Vec3& _scale, TransformSpace _space)
+void Transform::SetWorldPosition(const Vec3& _position)
 {
-
+	m_localPosition = _position;
+	if (m_inheritPosition && m_parent)
+		m_localPosition = m_parent->GetWorldMatrix().Copy().Inverse().Transform(m_localPosition);
+	_Invalidate();
 }
 //----------------------------------------------------------------------------//
-Vec3 Transform::GetScale(TransformSpace _space)
+const Vec3& Transform::GetWorldPosition(void)
 {
-	return VEC3_ONE;
+	if (!m_updated)
+		_UpdateMatrix();
+	return m_worldMatrix.GetTranslation();
+}
+//----------------------------------------------------------------------------//
+void Transform::SetWorldRotation(const Quat& _rotation)
+{
+	m_localRotation = _rotation;
+	if (m_inheritRotation && m_parent)
+		m_localRotation = m_parent->GetWorldMatrix().Copy().Inverse().GetRotation() * m_localRotation;
+	_Invalidate();
+}
+//----------------------------------------------------------------------------//
+const Quat& Transform::GetWorldRotation(void)
+{
+	if (!m_updated)
+		_UpdateMatrix();
+	return m_worldMatrix.GetRotation();
+}
+//----------------------------------------------------------------------------//
+void Transform::SetWorldScale(const Vec3& _scale)
+{
+	m_localScale = _scale;
+	if (m_inheritScale && m_parent)
+		m_localScale /= m_parent->GetWorldMatrix().GetScale();
+	_Invalidate();
+}
+//----------------------------------------------------------------------------//
+const Vec3& Transform::GetWorldScale(void)
+{
+	if (!m_updated)
+		_UpdateMatrix();
+	return m_worldMatrix.GetScale();
 }
 //----------------------------------------------------------------------------//
 void Transform::_SetScene(Scene* _scene)
@@ -190,36 +226,7 @@ void Transform::_Invalidate(bool _fromChild)
 	}
 }
 //----------------------------------------------------------------------------//
-void Transform::_UpdateMatrix(void)
-{
-	ASSERT(m_updated == false);
-	
-	m_updated = true;
-	m_worldMatrix.CreateTransform(m_worldPosition, m_worldRotation, m_worldScale);
-
-	/*if (m_updateLocalFromWorld)
-	{
-		m_localPosition = m_worldMatrix.GetTranslation();
-		m_localRotation = m_worldMatrix.GetRotation();
-		m_localScale = m_worldMatrix.GetScale();
-
-		if (m_parent)
-		{
-			Mat44 _m = m_parent->GetWorldMatrix().Copy().Inverse();
-			m_localPosition = _m.Transform(m_localPosition);
-			m_localRotation = _m.GetRotation() * m_localRotation;
-			m_localScale /= m_parent->GetWorldMatrix().GetScale();
-		}
-	}
-	else
-	{
-		m_worldMatrix.CreateTransform(m_localPosition, m_localRotation, m_localScale);
-		if (m_parent)
-			m_worldMatrix = m_parent->GetWorldMatrix() * m_worldMatrix;
-	}*/
-}
-//----------------------------------------------------------------------------//
-void Transform::_Update(void)
+void Transform::_UpdateRecursive(void)
 {
 	ASSERT(m_invalidated == true);
 
@@ -232,9 +239,61 @@ void Transform::_Update(void)
 	for (Transform* i = m_child; i; i = i->m_next)
 	{
 		if (i->m_invalidated)
-			i->_Update();
+			i->_UpdateRecursive();
 	}
 }
+//----------------------------------------------------------------------------//
+void Transform::_UpdateMatrix(void)
+{
+	ASSERT(m_updated == false);
+	
+	m_updated = true;
+
+	if (m_updateLocalFromWorld)
+		_UpdateLocalFromWorld();
+	else
+		_UpdateWorldFromLocal();
+}
+//----------------------------------------------------------------------------//
+void Transform::_UpdateLocalFromWorld(void)
+{
+	m_localPosition = m_worldMatrix.GetTranslation();
+	m_localRotation = m_worldMatrix.GetRotation();
+	m_localScale = m_worldMatrix.GetScale();
+
+	if (m_parent)
+	{
+		Mat44 _m = m_parent->GetWorldMatrix().Copy().Inverse();
+		if(m_inheritPosition)
+			m_localPosition = _m.Transform(m_localPosition);
+		if(m_inheritRotation)
+			m_localRotation = _m.GetRotation() * m_localRotation;
+		if(m_inheritScale)
+			m_localScale /= m_parent->GetWorldMatrix().GetScale();
+	}
+}
+//----------------------------------------------------------------------------//
+void Transform::_UpdateWorldFromLocal(void)
+{
+	Vec3 _pos = m_localPosition;
+	Quat _rot = m_localRotation;
+	Vec3 _scl = m_localScale;
+
+	if (m_parent)
+	{
+		const Mat44& _m = m_parent->GetWorldMatrix();
+		if (m_inheritPosition)
+			_pos = _m.Transform(m_localPosition);
+		if (m_inheritRotation)
+			_rot = _m.GetRotation() * m_localRotation;
+		if (m_inheritScale)
+			_scl *= m_parent->GetWorldMatrix().GetScale();
+	}
+
+	m_worldMatrix.CreateTransform(_pos, _rot, _scl);
+}
+//----------------------------------------------------------------------------//
+
 //----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
@@ -244,12 +303,15 @@ void Transform::_Update(void)
 //----------------------------------------------------------------------------//
 TransformSystem::TransformSystem(Scene* _scene) :
 	SceneSystem(_scene),
+	m_root(nullptr),
 	m_locked(false)
 {
 }
 //----------------------------------------------------------------------------//
 TransformSystem::~TransformSystem(void)
 {
+	while (m_root)
+		m_root->_SetScene(nullptr);
 }
 //----------------------------------------------------------------------------//
 void TransformSystem::Update(float _dt)
@@ -259,7 +321,7 @@ void TransformSystem::Update(float _dt)
 	{
 		Transform* _t = m_updates[i];
 		if (_t->m_invalidated)
-			_t->_Update();
+			_t->_UpdateRecursive();
 	}
 	m_updates.Clear();
 	m_locked = false;

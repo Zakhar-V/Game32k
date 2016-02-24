@@ -267,11 +267,13 @@ enum ShaderID
 	VS_StaticModel,
 	VS_SkinnedModel,
 	VS_Sprite,
-	VS_Billboard,
+	VS_Particles,
 	VS_Terrain,
 
 	GS_Sprite,
 	GS_Billboard,
+	GS_BillboardY,
+	GS_Particles,
 	GS_Terrain,
 
 	FS_Texture,
@@ -319,9 +321,10 @@ public:
 	void SetRenderTargetTexture(uint _slot, Texture* _target, uint _z = 0);
 	void SetDepthStencilTargetTexture(Texture* _target, uint _z = 0);
 
-	void ClearFrameBuffers(uint _buffers, const Color& _color = 0x000000ff, float _depth = 1.0, uint _stencil = 0xff);
+	void ResetTextures(void);
+	void SetTexture(uint _slot, Texture* _texture);
 
-	//void SetTexture(uint _slot, Texture* _texture);
+	void ClearFrameBuffers(uint _buffers, const Color& _color = 0x000000ff, float _depth = 1.0, uint _stencil = 0xff);
 
 	void SetVertexBuffer(Buffer* _buffer);
 	void SetIndexBuffer(Buffer* _buffer);
@@ -346,18 +349,38 @@ protected:
 	HDC m_dc;
 	HGLRC m_rc;
 
+	// shaders
+
 	Shader m_shaders[MAX_SHADER_OBJECTS];
 	uint m_numShaders;
 	Shader* m_currentShader[3];
 	uint m_shaderPipeline;
 
+	// geometry
+
 	uint m_vertexArray;
 	Buffer* m_currentVertexBuffer;
 	Buffer* m_currentIndexBuffer;
 
+	// framebuffer
+
+	struct FramebufferAttachment
+	{
+		Texture* texture;
+		RenderBuffer* buffer;
+		uint textureZ;
+	};
+
 	uint m_framebuffer;
 	uint m_copyFramebuffer[2];
 	bool m_drawToFramebuffer;
+	FramebufferAttachment m_renderTargets[MAX_RENDER_TARGETS];
+	FramebufferAttachment m_depthStencilTarget;
+
+	// textures
+
+	Texture* m_textures[MAX_TEXTURE_UNITS];
+	class Sampler* m_samplers[MAX_TEXTURE_UNITS];
 };
 
 //----------------------------------------------------------------------------//
