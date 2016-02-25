@@ -2,7 +2,6 @@
 
 #include "Math.hpp"
 #include "Object.hpp"
-#include "Image.hpp"
 #include "Shaders/Common.h"
 
 #include <Windows.h>
@@ -165,8 +164,61 @@ struct Vertex // generic vertex, 36 bytes
 };
 
 //----------------------------------------------------------------------------//
+// RenderMesh
+//----------------------------------------------------------------------------//
+
+typedef Ptr<class RenderMesh> RenderMeshPtr;
+
+class RenderMesh : public RefCounted
+{
+public:
+	RenderMesh(void);
+	~RenderMesh(void);
+
+	void SetVertexBuffer(Buffer* _buffer, uint _baseVertex = 0);
+	Buffer* GetVertexBuffer(void) { return m_vertices; }
+	uint GetBaseVertex(void) { return m_baseVertex; }
+	void SetIndexBuffer(Buffer* _buffer);
+	Buffer* GetIndexBuffer(void) { return m_indices; }
+	void SetType(PrimitiveType _type);
+	PrimitiveType GetType(void) { return m_type; }
+	void SetRange(uint _start, uint _count);
+	uint GetStart(void) { return m_start; }
+	uint GetCount(void) { return m_count; }
+	void Draw(uint _numInstances = 1);
+	int Compare(const RenderMesh* _rhs) const;
+
+protected:
+	PrimitiveType m_type;
+	uint m_baseVertex;
+	uint m_start;
+	uint m_count;
+	BufferPtr m_vertices;
+	BufferPtr m_indices;
+};
+
+//----------------------------------------------------------------------------//
 // Texture
 //----------------------------------------------------------------------------//
+
+enum PixelFormat : uint16
+{
+	PF_RGB8,
+	PF_RGBA8,
+	PF_RGB10A2,
+	PF_R32F,
+	PF_RG32F,
+	PF_RGB32F,
+	PF_RGBA32F,
+	PF_RGBA16F,
+	PF_RG11B10F,
+	PF_D24S8,
+	PF_DXT1,
+	PF_DXT5,
+};
+
+uint BitsPerPixel(PixelFormat _format);
+bool IsCompressed(PixelFormat _format);
 
 enum TextureType : uint16
 {

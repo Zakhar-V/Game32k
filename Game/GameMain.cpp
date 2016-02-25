@@ -364,8 +364,87 @@ class Player : public Character
 //
 //----------------------------------------------------------------------------//
 ////////////////////////////////////////////////////////////////////////////////
+
+void CreateCamera(Scene* _scene)
+{
+	EntityPtr _entity = new Entity;
+	Ptr<Transform> _transform = new Transform;
+	Ptr<Camera> _camera = new Camera;
+	_entity->AddComponent(_transform);
+	_entity->AddComponent(_camera);
+	_entity->SetScene(_scene);
+
+	_transform->SetWorldPosition({ 0, 0, 5 });
+
+	_scene->GetRenderWorld()->SetActiveCamera(_camera);
+}
+
+void CreatLevel(Scene* _scene)
+{
+	CreateCamera(_scene);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------//
+//
+//----------------------------------------------------------------------------//
+////////////////////////////////////////////////////////////////////////////////
+
 #pragma comment(lib, "opengl32.lib")
 
+void main(void)
+{
+	LOG("Startup ...");
+	LOG("Build %s", __DATE__);
+	CreateDirectory("Data", nullptr);
+	SetCurrentDirectory("Data");
+	bool _bdOutOfDate = ExtractBuiltinData();
+	if (_bdOutOfDate)
+	{
+		LOG("Generate resources ...");
+	}
+
+	new Device;
+	new Graphics;
+	new Renderer;
+	Scene* _level = new Scene;
+	CreatLevel(_level);
+
+	const Color _clearColor(0x7f7f9fff);
+	double _st, _et;
+	float _dt = 0;
+	bool _quit = false;
+	while (!_quit && !gDevice->ShouldClose())
+	{
+		gDevice->PollEvents();
+		_st = Time();
+
+		_quit = GetAsyncKeyState(VK_ESCAPE) != 0;
+
+		_level->Update(_dt);
+		gGraphics->BeginFrame();
+		gGraphics->ClearFrameBuffers(FBT_Color, _clearColor);
+		_level->GetRenderWorld()->Draw();
+		gGraphics->EndFrame();
+
+		_et = Time();
+		float _odt = _dt;
+		_dt = (float)(_et - _st);
+		_dt = _dt * 0.6f + _odt * 0.4f;
+	}
+
+	delete _level;
+	delete gRenderer;
+	delete gGraphics;
+	delete gDevice;
+
+#ifdef DEBUG
+	system("pause");
+#endif
+	ExitProcess(0);
+}
+
+#if 0
 void main(void)
 {
 	LOG("Startup ...");
@@ -698,4 +777,5 @@ void main(void)
 	}*/
 	ExitProcess(0);
 }
+#endif
 

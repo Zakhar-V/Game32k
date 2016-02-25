@@ -26,6 +26,9 @@
 #define BILLBOARD_Y (FLAGS & BILLBOARD_Y_BIT)
 #define PARTICLES (FLAGS & PARTICLES_BIT)
 #define TERRAIN (FLAGS & TERRAIN_BIT)
+
+#define TEXTURE (FLAGS & TEXTURE_BIT)
+
 #endif
 
 
@@ -54,11 +57,10 @@ UBUFFER(1, Camera)
 	layout(row_major) mat4 ViewMat;
 	layout(row_major) mat4 ProjMat;
 	layout(row_major) mat4 ViewProjMat;
+	layout(row_major) mat4 InvViewProjMat;
 	layout(row_major) mat3 NormMat; // inverse(mat3(ViewMat))
-	//vec2 Depth;
 	vec4 CameraPos;
-	vec4 Depth;
-
+	vec4 Depth;	// near, far, C=constant, FC = 1.0/log(far*C + 1)
 };
 
 UBUFFER(2, InstanceMat)
@@ -73,7 +75,7 @@ UBUFFER(3, SkinMat)
 
 UBUFFER(4, ClipPlane)
 {
-	vec4 ClipPlane[6];
+	vec4 ClipPlane[7];
 	int NumClipPlanes;
 };
 
@@ -120,6 +122,7 @@ OUT(10, vec4, WorldPos);
 OUT(11, vec3, Binormal);
 
 OUT(12, int, InstanceID);
+//OUT(13, float, LogZ);
 
 out gl_PerVertex
 {
@@ -145,6 +148,7 @@ INOUT(10, vec4, WorldPos);
 INOUT(11, vec3, Binormal);
 
 INOUT(12, int, InstanceID);
+//INOUT(13, float, LogZ);
 
 in gl_PerVertex
 {

@@ -219,7 +219,7 @@ void Buffer::Copy(Buffer* _src, uint _srcOffset, uint _dstOffset, uint _size)
 //----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
-// Buffer
+// Vertex
 //----------------------------------------------------------------------------//
 
 struct GLVertexAttrib
@@ -245,7 +245,107 @@ const GLVertexAttribs[] =
 };
 
 //----------------------------------------------------------------------------//
+// RenderMesh
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+RenderMesh::RenderMesh(void) :
+	m_type(PT_Points),
+	m_baseVertex(0),
+	m_start(0),
+	m_count(0)
+{
+}
+//----------------------------------------------------------------------------//
+RenderMesh::~RenderMesh(void)
+{
+}
+//----------------------------------------------------------------------------//
+void RenderMesh::SetVertexBuffer(Buffer* _buffer, uint _baseVertex)
+{
+	m_vertices = _buffer;
+	m_baseVertex = _baseVertex;
+}
+//----------------------------------------------------------------------------//
+void RenderMesh::SetIndexBuffer(Buffer* _buffer)
+{
+	m_indices = _buffer;
+}
+//----------------------------------------------------------------------------//
+void RenderMesh::SetType(PrimitiveType _type)
+{
+	m_type = _type;
+}
+//----------------------------------------------------------------------------//
+void RenderMesh::SetRange(uint _start, uint _count)
+{
+	m_start = _start;
+	m_count = _count;
+}
+//----------------------------------------------------------------------------//
+void RenderMesh::Draw(uint _numInstances)
+{
+	if (m_vertices)
+	{
+		gGraphics->SetVertexBuffer(m_vertices);
+		if (m_indices)
+		{
+			gGraphics->SetIndexBuffer(m_indices);
+			gGraphics->DrawIndexed(m_type, m_baseVertex, m_start, m_count, _numInstances);
+		}
+		else
+		{
+			gGraphics->Draw(m_type, m_baseVertex + m_start, m_count, _numInstances);
+		}
+	}
+}
+//----------------------------------------------------------------------------//
+int RenderMesh::Compare(const RenderMesh* _rhs) const
+{
+	ASSERT(_rhs != nullptr);
+	if (_rhs->m_vertices == m_vertices)
+		return (int)(m_indices - _rhs->m_indices);
+	return (int)(m_vertices - _rhs->m_vertices);
+}
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
 // Texture
+//----------------------------------------------------------------------------//
+
+struct GLPixelFormat
+{
+	uint16 bpp;
+	uint16 iformat;
+	uint16 format;
+	uint16 type;
+};
+const GLPixelFormat GLPixelFormats[] =
+{
+	{ 24, GL_RGB8, GL_RGB, GL_UNSIGNED_BYTE }, //PF_RGB8
+	{ 32, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE }, //PF_RGBA8
+	{ 32, GL_RGB10_A2, GL_RGBA, GL_UNSIGNED_INT_2_10_10_10_REV }, //PF_RGB10A2
+	{ 32, GL_R32F, GL_RED, GL_FLOAT }, //PF_R32F
+	{ 64, GL_RG32F, GL_RG, GL_FLOAT }, //PF_RG32F
+	{ 96, GL_RGB32F, GL_RGB, GL_FLOAT }, //PF_RGB32F
+	{ 128, GL_RGBA32F, GL_RGBA, GL_FLOAT }, //PF_RGBA32F
+	{ 64, GL_RGBA16F, GL_RGBA, GL_FLOAT }, //PF_RGBA16F
+	{ 32, GL_R11F_G11F_B10F, GL_RGB, GL_UNSIGNED_INT_10F_11F_11F_REV }, //PF_RG11B10F
+	{ 32, GL_DEPTH24_STENCIL8, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8 }, //PF_D24S8
+	{ 4, GL_COMPRESSED_RGB_S3TC_DXT1_EXT, 0, 0 }, //PF_DXT1
+	{ 8, GL_COMPRESSED_RGBA_S3TC_DXT5_EXT, 0, 0 }, //PF_DXT5
+};
+
+//----------------------------------------------------------------------------//
+uint BitsPerPixel(PixelFormat _format)
+{
+	return GLPixelFormats[_format].bpp;
+}
+//----------------------------------------------------------------------------//
+bool IsCompressed(PixelFormat _format)
+{
+	return _format >= PF_DXT1; //_format == PF_DXT1 || _format == PF_DXT5;
+}
 //----------------------------------------------------------------------------//
 
 const uint16 GLTextureType[] =
@@ -269,28 +369,6 @@ const uint16 MinTextureDepth[] =
 	1, // TT_3D
 	1, // TT_Array
 	6, // TT_Cube
-};
-
-struct GLPixelFormat
-{
-	uint16 iformat;
-	uint16 format;
-	uint16 type;
-};
-const GLPixelFormat GLPixelFormats[] =
-{
-	{ GL_RGB8, GL_RGB, GL_UNSIGNED_BYTE }, //PF_RGB8
-	{ GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE }, //PF_RGBA8
-	{ GL_RGB10_A2, GL_RGBA, GL_UNSIGNED_INT_2_10_10_10_REV }, //PF_RGB10A2
-	{ GL_R32F, GL_RED, GL_FLOAT }, //PF_R32F
-	{ GL_RG32F, GL_RG, GL_FLOAT }, //PF_RG32F
-	{ GL_RGB32F, GL_RGB, GL_FLOAT }, //PF_RGB32F
-	{ GL_RGBA32F, GL_RGBA, GL_FLOAT }, //PF_RGBA32F
-	{ GL_RGBA16F, GL_RGBA, GL_FLOAT }, //PF_RGBA16F
-	{ GL_R11F_G11F_B10F, GL_RGB, GL_UNSIGNED_INT_10F_11F_11F_REV }, //PF_RG11B10F
-	{ GL_DEPTH24_STENCIL8, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8 }, //PF_D24S8
-	{ GL_COMPRESSED_RGB_S3TC_DXT1_EXT, 0, 0 }, //PF_DXT1
-	{ GL_COMPRESSED_RGBA_S3TC_DXT5_EXT, 0, 0 }, //PF_DXT5
 };
 
 //----------------------------------------------------------------------------//
@@ -352,8 +430,7 @@ void Texture::Write(PixelFormat _format, const void* _src)
 
 	const GLPixelFormat& _pf = GLPixelFormats[_format];
 	bool _compressed = IsCompressed(_format);
-	uint _bpp = BitsPerPixel(_format);
-	uint _bpl = (m_width * m_height * _bpp) >> 3;
+	uint _bpl = (m_width * m_height * _pf.bpp) >> 3;
 	uint _bpi = _bpl * m_depth;
 	uint _target = GLTextureType[m_type];
 
@@ -777,6 +854,11 @@ Graphics::Graphics(void)
 Graphics::~Graphics(void)
 {
 	LOG("Destroy Graphics");
+
+	// delete vao
+	// delete framebuffers
+	// delete shaders
+	// delete context
 }
 //----------------------------------------------------------------------------//
 void Graphics::BeginFrame(void)

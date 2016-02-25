@@ -30,7 +30,7 @@ class UpdateSystem;
 
 enum EventType
 {
-	ET_TransformChanged, //!< transform was changed. \note do not change transform in this event
+	ET_TransformChanged = 1, //!< transform was changed. \note do not change transform in this event
 	ET_,
 	// ...
 };
@@ -46,7 +46,7 @@ enum ComponentType
 
 	CT_Camera,
 	CT_Light,
-	CT_Model,
+	CT_Mesh,
 	CT_DecalSet,
 	//CT_Sprite,
 	CT_Terrain,

@@ -95,9 +95,6 @@
     <ClInclude Include="Render.hpp">
       <Filter>Engine\Scene</Filter>
     </ClInclude>
-    <ClInclude Include="_OldDX9Renderer.h">
-      <Filter>Engine\System\Old</Filter>
-    </ClInclude>
     <ClInclude Include="Device.hpp">
       <Filter>Engine\System</Filter>
     </ClInclude>

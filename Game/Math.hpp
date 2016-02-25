@@ -687,7 +687,7 @@ struct Mat44
 
 	}*/
 
-	Mat44& CreatePerspective(float _fov, float _aspect, float _near, float _far, bool _reversed = false)
+	Mat44& CreatePerspective(float _fov, float _aspect, float _near, float _far)
 	{
 		if (_aspect != _aspect)
 			_aspect = 1; // NaN
@@ -698,8 +698,6 @@ struct Mat44
 		float _d = (_far - _near);
 		float _q = -(_far + _near) / _d;
 		float _qn = -2 * (_far * _near) / _d;
-		if (_reversed)
-			Swap(_q, _qn);
 		SetZero();
 		m00 = _w;
 		m11 = _h;

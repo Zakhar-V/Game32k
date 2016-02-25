@@ -2,6 +2,7 @@
 
 #include "Math.hpp"
 #include "Object.hpp"
+#include "Graphics.hpp"
 
 //----------------------------------------------------------------------------//
 // Defs
@@ -19,29 +20,6 @@ struct FontInfo
 	chars[256];
 	float height;
 };
-
-//----------------------------------------------------------------------------//
-// PixelFormat
-//----------------------------------------------------------------------------//
-
-enum PixelFormat : uint16
-{
-	PF_RGB8,
-	PF_RGBA8,
-	PF_RGB10A2,
-	PF_R32F,
-	PF_RG32F,
-	PF_RGB32F,
-	PF_RGBA32F,
-	PF_RGBA16F,
-	PF_RG11B10F,
-	PF_D24S8,
-	PF_DXT1,
-	PF_DXT5,
-};
-
-uint BitsPerPixel(PixelFormat _format);
-bool IsCompressed(PixelFormat _format);
 
 //----------------------------------------------------------------------------//
 // PixelBox

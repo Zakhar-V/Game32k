@@ -212,7 +212,6 @@
     <ClInclude Include="Scene.hpp" />
     <ClInclude Include="Transform.hpp" />
     <ClInclude Include="Update.hpp" />
-    <ClInclude Include="_OldDX9Renderer.h" />
     <ClInclude Include="_temp.hpp" />
     <ClInclude Include="Game.h" />
     <ClInclude Include="Graphics.hpp" />

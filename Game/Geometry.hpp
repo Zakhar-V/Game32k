@@ -5,6 +5,37 @@
 #include "Graphics.hpp"
 
 //----------------------------------------------------------------------------//
+// Geometry
+//----------------------------------------------------------------------------//
+
+typedef Ptr<class Geometry> GeometryPtr;
+
+class Geometry : public RefCounted
+{
+public:
+
+	// Merge
+	// Transform
+	// Mirror
+	// MakeAdjacency
+	// ComputeNormals
+	// ComputeTangents
+	// Load
+	// Save
+
+	void MakeRenderable(bool _forceUpdate = false) { }
+
+protected:
+
+	Array<Vertex> m_vertices;
+	Array<index_t> m_indices;
+
+
+	//BufferPtr m_vertexBuffer;
+	//BufferPtr m_indexBuffer;
+};
+
+//----------------------------------------------------------------------------//
 // Utils
 //----------------------------------------------------------------------------//
 
@@ -82,19 +113,6 @@ struct Sprite
 //----------------------------------------------------------------------------//
 
 
-
-//----------------------------------------------------------------------------//
-//
-//----------------------------------------------------------------------------//
-
-class Mesh : public RefCounted
-{
-public:
-
-protected:
-
-
-};
 
 //----------------------------------------------------------------------------//
 //
