@@ -106,16 +106,6 @@ uint Hash(const void* _data, uint _size, uint _hash = 0)
 	return _hash;
 }
 
-uint StrHash(const char* _str, uint _hash = 0)
-{
-	if (_str)
-	{
-		while (*_str)
-			_hash = *_str++ + (_hash << 6) + (_hash << 16) - _hash;
-	}
-	return _hash;
-}
-
 /*constexpr uint ConstHash(const char* _str, uint _hash = 0)
 {
 return *_str ? ConstHash(_str + 1, *_str + (_hash << 6) + (_hash << 16) - _hash) : _hash;
@@ -394,6 +384,25 @@ template <class T> void Unlink(T*& _head, T* _this, LinkedListNode<T>& _node)
 }
 
 //----------------------------------------------------------------------------//
+// StringUtils
+//----------------------------------------------------------------------------//
+
+inline char CharLower(char _ch) { return ((_ch >= 'A' && _ch <= 'Z') || (_ch >= 'a' && _ch <= 'z') || ((uint8)_ch >= 0xc0)) ? (_ch | 0x20) : _ch; }
+inline char CharUpper(char _ch) { return ((_ch >= 'A' && _ch <= 'Z') || (_ch >= 'a' && _ch <= 'z') || ((uint8)_ch >= 0xc0)) ? (_ch & ~0x20) : _ch; }
+
+uint StrHash(const char* _str, uint _hash = 0)
+{
+	if (_str)
+	{
+		while (*_str)
+			_hash = CharLower(*_str++) + (_hash << 6) + (_hash << 16) - _hash;
+	}
+	return _hash;
+}
+
+//int StrCompare(const char* _a, const char* _b)
+
+//----------------------------------------------------------------------------//
 // String
 //----------------------------------------------------------------------------//
 
@@ -437,7 +446,6 @@ public:
 	String& Append(char _ch) { return Append(&_ch, 1); }
 
 protected:
-
 
 	struct Buffer
 	{

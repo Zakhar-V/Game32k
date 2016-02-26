@@ -3,172 +3,6 @@
 #include "Render.hpp"
 #include "Device.hpp"
 
-//----------------------------------------------------------------------------//
-// Camera
-//----------------------------------------------------------------------------//
-
-//----------------------------------------------------------------------------//
-Camera::Camera(void) :
-	m_world(nullptr),
-	m_orthographic(false),
-	m_fov(PI / 4),
-	m_near(1),
-	m_far(1000),
-	m_zoom(1)
-{
-	//m_eventMask = 1 << ET_TransformChanged;
-}
-//----------------------------------------------------------------------------//
-Camera::~Camera(void)
-{
-}
-//----------------------------------------------------------------------------//
-void Camera::GetParams(float _x, float _y, float _w, float _h, UCamera& _params, Frustum& _frustum)
-{
-	Transform* _transform = GetEntityComponent<Transform>();
-	Mat44 _worldTM = _transform ? _transform->GetWorldMatrix() : MAT44_IDENTITY;
-
-	_params.CameraPos = _worldTM.GetTranslation();
-	_params.ViewMat.CreateInverseTransform(_worldTM.GetTranslation(), _worldTM.GetRotation(), 1);
-	_params.NormMat = _params.ViewMat.Copy().Inverse();
-
-	if (m_orthographic)
-	{
-		_params.ProjMat.CreateOrtho(_x, _x + _w, _y + _h, _h, m_near, m_far);
-	}
-	else
-	{
-		_params.ProjMat.CreatePerspective(m_fov, _w / _h, m_near, m_far);
-	}
-	_params.ProjMat.m00 *= m_zoom;
-	_params.ProjMat.m11 *= m_zoom;
-
-	_frustum.FromCameraMatrices(_params.ViewMat, _params.ProjMat);
-
-	_params.ViewProjMat = _params.ProjMat * _params.ViewMat;
-
-	Mat44 _proj = _params.ProjMat;
-	_proj.m22 = 0; // no near clip plane
-	_params.InvViewProjMat = (_proj * _params.ViewMat).Inverse();
-
-	// todo: depth params (near, far, C=constant, FC = 1.0/log(far*C + 1))
-}
-//----------------------------------------------------------------------------//
-void Camera::_SetScene(Scene* _scene)
-{
-	RenderWorld* _world = _scene ? _scene->GetRenderWorld() : nullptr;
-	if (m_world != _world)
-	{
-		bool _active = m_world && m_world->GetActiveCamera() == this;
-		if (_active)
-			m_world->SetActiveCamera(nullptr);
-
-		m_world = _world;
-
-		if(_active && m_world)
-			m_world->SetActiveCamera(this);
-	}
-}
-//----------------------------------------------------------------------------//
-
-//----------------------------------------------------------------------------//
-// RenderableObject
-//----------------------------------------------------------------------------//
-
-//----------------------------------------------------------------------------//
-RenderableObject::RenderableObject(RenderableType _type) :
-	m_prev(nullptr),
-	m_next(nullptr),
-	m_world(nullptr),
-	m_type(_type)
-{
-}
-//----------------------------------------------------------------------------//
-RenderableObject::~RenderableObject(void)
-{
-}
-//----------------------------------------------------------------------------//
-void RenderableObject::_SetScene(Scene* _scene)
-{
-	RenderWorld* _world = _scene ? _scene->GetRenderWorld() : nullptr;
-	if (m_world == _world)
-		return;
-
-	if (m_world)
-	{
-		Unlink(m_world->_ObjectList(), this, m_prev);
-	}
-
-	_SetWorldImpl(_world);
-
-	if (m_world)
-	{
-		Link(m_world->_ObjectList(), this, m_prev);
-	}
-}
-//----------------------------------------------------------------------------//
-
-//----------------------------------------------------------------------------//
-// Mesh
-//----------------------------------------------------------------------------//
-
-//----------------------------------------------------------------------------//
-Mesh::Mesh(void) :
-	RenderableObject(RT_StaticMesh)
-{
-
-}
-//----------------------------------------------------------------------------//
-Mesh::~Mesh(void)
-{
-
-}
-//----------------------------------------------------------------------------//
-void Mesh::SetSkinned(bool _skinned)
-{
-	m_type = _skinned ? RT_SkinnedMesh : RT_StaticMesh;
-}
-//----------------------------------------------------------------------------//
-
-//----------------------------------------------------------------------------//
-//
-//----------------------------------------------------------------------------//
-
-
-//----------------------------------------------------------------------------//
-// RenderWorld
-//----------------------------------------------------------------------------//
-
-//----------------------------------------------------------------------------//
-RenderWorld::RenderWorld(Scene* _scene) : 
-	SceneSystem(_scene),
-	m_activeCamera(nullptr)
-{
-}
-//----------------------------------------------------------------------------//
-RenderWorld::~RenderWorld(void)
-{
-	// ...
-
-	//if (m_activeCamera)
-	//	m_activeCamera->_SetScene(nullptr);
-}
-//----------------------------------------------------------------------------//
-void RenderWorld::Draw(void)
-{
-	if (!m_activeCamera)
-		return;
-
-	uint _wndWidth = gDevice->WindowWidth();
-	uint _wndHeight = gDevice->WindowHeight();
-	Vec2 _wndSize = gDevice->WindowSize();
-
-	gRenderer->Draw(this);
-
-
-
-}
-//----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
 // Renderer
@@ -232,11 +66,11 @@ Renderer::~Renderer(void)
 	//delete m_primaryDepthStencilBuffer;
 }
 //----------------------------------------------------------------------------//
-void Renderer::Draw(RenderWorld* _world)
+void Renderer::Draw(Scene* _scene)
 {
-	ASSERT(_world != nullptr);
+	ASSERT(_scene != nullptr);
 
-	Camera* _cam = _world->GetActiveCamera();
+	Camera* _cam = _scene->GetActiveCamera();
 	if (!_cam)
 		return;
 
@@ -253,14 +87,26 @@ void Renderer::Draw(RenderWorld* _world)
 	gGraphics->SetUniformBuffer(U_SkinMat, m_skinBuffer);
 
 
+	Mat44 _wm = MAT44_IDENTITY;
+	_wm.SetTranslation({ 0, 0, 0 });
+	//_wm.SetScale({ 5, 1, 1 });
+
 	m_cameraBuffer->Write(&_cp, 0, sizeof(_cp));
-	m_instanceBuffer->Write(&MAT44_IDENTITY, 0, sizeof(MAT44_IDENTITY));
+	m_instanceBuffer->Write(&_wm, 0, sizeof(_wm));
 
 	gGraphics->SetShader(VS_StaticModel);
 	gGraphics->SetShader(ST_Geometry, nullptr);
 	gGraphics->SetShader(FS_NoTexture);
-	m_testCube->Draw();
 
+	if(_frustum.Intersects(AlignedBox(-0.5f, 0.5f) * _wm))
+		m_testCube->Draw();
+
+
+	_wm = MAT44_IDENTITY;
+	_wm.SetTranslation({ 0, -10, 0 });
+	_wm.SetScale({ 100, 0.1f, 100 });
+	m_instanceBuffer->Write(&_wm, 0, sizeof(_wm));
+	m_testCube->Draw();
 }
 
 //----------------------------------------------------------------------------//

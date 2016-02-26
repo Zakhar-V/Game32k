@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Scene.hpp"
-#include "Transform.hpp"
 #include "Graphics.hpp"
 #include "Geometry.hpp"
 
@@ -9,6 +8,7 @@
 // Defs
 //----------------------------------------------------------------------------//
 
+class Scene;
 class Light;
 class Camera;
 class Terrain;
@@ -51,48 +51,12 @@ struct RenderItem
 // Camera
 //----------------------------------------------------------------------------//
 
-class Camera : public Component
-{
-public:
-	static ComponentType GetComponentTypeStatic(void) { return CT_Camera; }
-	ComponentType GetComponentType(void) override { return CT_Camera; }
-	bool IsSingleComponent(void) override { return true; }
-
-	Camera(void);
-	~Camera(void);
-
-	void SetFov(float _fovY) { m_fov = _fovY; }
-	float GetFov(void) { return m_fov; }
-	void SetNear(float _near) { m_near = _near; }
-	float GetNear(void) { return m_near; }
-	void SetFar(float _far) { m_far = _far; }
-	float GetFar(void) { return m_far; }
-	void SetZoom(float _zoom) { m_zoom = _zoom; }
-	float GetZoom(void) { return m_zoom; }
-	void SetOrtho(bool _ortho = true) { m_orthographic = _ortho; }
-	bool IsOrhto(void) { return m_orthographic; }
-
-	void GetParams(float _x, float _y, float _w, float _h, UCamera& _params, Frustum& _frustum);
-
-protected:
-	friend class RenderWorld;
-
-	void _SetScene(Scene* _scene) override;
-
-	RenderWorld* m_world;
-	bool m_orthographic;
-	//bool m_flipY;
-	float m_fov; // in radians
-	float m_near;
-	float m_far;
-	float m_zoom;
-};
 
 //----------------------------------------------------------------------------//
 // RenderableObject
 //----------------------------------------------------------------------------//
 
-enum RenderableType	: uint
+/*enum RenderableType	: uint
 {
 	RT_PointLight = 0x1,
 	RT_SpotLight = 0x2,
@@ -256,7 +220,7 @@ protected:
 	RenderableObject*& _ObjectList(void) { return m_objects; }
 
 	RenderableObject* m_objects;
-};
+};*/
 
 //----------------------------------------------------------------------------//
 // Renderer
@@ -273,7 +237,7 @@ public:
 	Renderer(void);
 	~Renderer(void);
 
-	void Draw(RenderWorld* _world);
+	void Draw(Scene* _scene);
 
 protected:
 

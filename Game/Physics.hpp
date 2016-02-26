@@ -11,12 +11,9 @@
 // PhysicsBody
 //----------------------------------------------------------------------------//
 
-class PhysicsBody : public Component
+class PhysicsBody : public Object
 {
 public:
-	static ComponentType GetComponentTypeStatic(void) { return CT_PhysicsBody; }
-	ComponentType GetComponentType(void) override { return CT_PhysicsBody; }
-	bool IsSingleComponent(void) override { return true; }
 
 };
 
@@ -35,24 +32,18 @@ enum PhysicsShapeType : uint
 	PST_Heightfield,
 };
 
-class PhysicsShape : public Component
+class PhysicsShape : public Object
 {
 public:
-	static ComponentType GetComponentTypeStatic(void) { return CT_PhysicsShape; }
-	ComponentType GetComponentType(void) override { return CT_PhysicsShape; }
-	uint GetComponentSubType(void) override { return PST_Empty; }
-	PhysicsShapeType GetShapeType(void) { return PST_Empty; }
 };
 
 //----------------------------------------------------------------------------//
 // PhysicsJoint
 //----------------------------------------------------------------------------//
 
-class PhysicsJoint : public Component
+class PhysicsJoint : public Object
 {
 public:
-	static ComponentType GetComponentTypeStatic(void) { return CT_PhysicsJoint; }
-	ComponentType GetComponentType(void) override { return CT_PhysicsJoint; }
 
 };
 
@@ -60,13 +51,15 @@ public:
 // PhysicsWorld
 //----------------------------------------------------------------------------//
 
-class PhysicsWorld : public SceneSystem
+class PhysicsWorld : public NonCopyable
 {
 public:
 	PhysicsWorld(Scene* _scene);
 	~PhysicsWorld(void);
 
 protected:
+
+	Scene* m_scene;
 };
 
 //----------------------------------------------------------------------------//

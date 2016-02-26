@@ -13,10 +13,8 @@
 #include "Geometry.cpp"
 
 #include "Scene.cpp"
-#include "Transform.cpp"
 #include "Physics.cpp"
 #include "Render.cpp"
-#include "Update.cpp"
 
 //----------------------------------------------------------------------------//
 //
@@ -238,124 +236,89 @@ double Time(void)
 //----------------------------------------------------------------------------//
 ////////////////////////////////////////////////////////////////////////////////
 
-enum : uint
+
+////////////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------//
+//
+//----------------------------------------------------------------------------//
+////////////////////////////////////////////////////////////////////////////////
+
+
+class FirstPersonCameraController : public Behavior
 {
-	MAX_TERRAIN_LODS = 7, // 64x64, 32x32 ...
-	TERRAIN_SECTOR_SIDE_M1 = (1 << (MAX_TERRAIN_LODS - 1)),
-	TERRAIN_SECTOR_SIDE = TERRAIN_SECTOR_SIDE_M1 + 1,
-	TERRAIN_SECTOR_VERTICES = TERRAIN_SECTOR_SIDE * TERRAIN_SECTOR_SIDE + TERRAIN_SECTOR_SIDE * 4,
-};
+public:
+	OBJECT("FirstPersonCameraController");
 
-struct HeightMap
-{
-	Array<uint16> incides;
-	uint lods[MAX_TERRAIN_LODS][2]; // start, count
-	uint sectors[2];
-	uint numSectors;
+	float m_yaw = 0;
+	float m_pitch = 0;
 
-};
-
-uint CreateTerrainSectorIndices(uint16* _dst, uint _side)
-{
-	uint16* _startP = _dst;
-
-
-
-	return (uint)(_dst - _startP);
-}
-
-void CreateHeightMap(Image* _img, float _scaleY, float _finalSize, float _desiredStep)
-{
-	// 65x65 33x33 17x17 9x9 5x5 3x3 2x2
-
-	// sectors
-
-	int _s = FirstPow2((int)(_finalSize / _desiredStep)) + 1;
-	if (_s < TERRAIN_SECTOR_SIDE)
-		_s = TERRAIN_SECTOR_SIDE;
-
-	uint _numSectors = _s / TERRAIN_SECTOR_SIDE_M1;
-	uint _numQuads = _numSectors * TERRAIN_SECTOR_SIDE_M1;
-	uint _numVertices = _numQuads + 1;
-	float _step = _finalSize / _numQuads;
-	float _texStep = 1.0f / _numVertices;
-	float _length = _step * _numQuads;
-	float _startPos = _length * -0.5f;
-
-	for (uint sy = 0; sy < _numSectors; ++sy)
+	FirstPersonCameraController(void)
 	{
-		for (uint sx = 0; sx < _numSectors; ++sx)
+
+	}
+
+	~FirstPersonCameraController(void)
+	{
+
+	}
+	void Update(const FrameInfo& _frame) override
+	{
+		gDevice->SetCursorMode(CM_Camera);
+
+		Quat _r = m_node->GetLocalRotation();
+		Vec2 _rot = gDevice->GetCameraDelta() * _frame.time * RADIANS;
+		if (_rot.x || _rot.y)
 		{
-			for (uint vy = 0; vy <= TERRAIN_SECTOR_SIDE; ++vy)
-			{
-				uint y = (sy * TERRAIN_SECTOR_SIDE_M1 + vy);
-				for (uint vx = 0; vx <= TERRAIN_SECTOR_SIDE; ++vx)
-				{
-					uint x = (sx * TERRAIN_SECTOR_SIDE_M1 + vx);
-					float tx = _texStep * x;
-					float ty = _texStep * y;
-					float px = _startPos + x * _step;
-					float py = _startPos + y * _step;
-					printf("%d %d {%f %f} {%f %f}\n", x, y, px, py, tx, ty);
+			m_pitch = Clamp<float>(m_pitch - _rot.y, -HALF_PI, HALF_PI);
+			m_yaw -= _rot.x;
 
+			Quat _rx, _ry;
+			_rx.FromAxisAngle(VEC3_UNIT_X, m_pitch);
+			_ry.FromAxisAngle(VEC3_UNIT_Y, m_yaw);
 
-				}
-			}
-			system("pause");
+			Vec3 _dir = -VEC3_UNIT_Z * _r;
+
+			m_node->SetLocalRotation(_rx * _ry);
 		}
 	}
 
-	printf("num sectors: %d, step: %f, size: %f\n", _numSectors, _step, _length);
-
-	// indices
-
-}
-
-////////////////////////////////////////////////////////////////////////////////
-//----------------------------------------------------------------------------//
-//
-//----------------------------------------------------------------------------//
-////////////////////////////////////////////////////////////////////////////////
-
-void CreateTerrain()
-{
-}
-
-void CreateTree(int _type)
-{
-}
-
-void CreateBuilding(int _type)
-{
-}
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//----------------------------------------------------------------------------//
-//
-//----------------------------------------------------------------------------//
-////////////////////////////////////////////////////////////////////////////////
-
-class LogicComponent : public Component
-{
+protected:
 };
 
-class SpawnZone : public LogicComponent
+class PlayerController : public Behavior
 {
-};
+public:
+	OBJECT("PlayerController");
 
-class Weapon : public LogicComponent
-{
+	void Update(const FrameInfo& _frame) override
+	{
+		Vec3 _vec = 0;
+		if ((GetAsyncKeyState('W') & 0x8000) != 0)
+			_vec.z -= 1;
+		if ((GetAsyncKeyState('S') & 0x8000) != 0)
+			_vec.z += 1;
 
-};
+		if ((GetAsyncKeyState('A') & 0x8000) != 0)
+			_vec.x -= 1;
+		if ((GetAsyncKeyState('D') & 0x8000) != 0)
+			_vec.x += 1;
 
-class Character : public LogicComponent
-{
-};
+		if ((GetAsyncKeyState('Q') & 0x8000) != 0)
+			_vec.y -= 1;
+		if ((GetAsyncKeyState('E') & 0x8000) != 0)
+			_vec.y += 1;
 
-class Player : public Character
-{
+		if ((GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0)
+			_vec *= 5;
+
+		Vec3 _pos = m_node->GetWorldPosition();
+		_pos += _vec * _frame.time;
+		m_node->SetWorldPosition(_pos);
+
+		//printf("%f %f %f\n", _pos.x, _pos.y, _pos.z);
+	}
+
+protected:
 };
 
 
@@ -365,23 +328,47 @@ class Player : public Character
 //----------------------------------------------------------------------------//
 ////////////////////////////////////////////////////////////////////////////////
 
-void CreateCamera(Scene* _scene)
+
+////////////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------//
+//
+//----------------------------------------------------------------------------//
+////////////////////////////////////////////////////////////////////////////////
+
+NodePtr CreateCamera(Scene* _scene)
 {
-	EntityPtr _entity = new Entity;
-	Ptr<Transform> _transform = new Transform;
 	Ptr<Camera> _camera = new Camera;
-	_entity->AddComponent(_transform);
-	_entity->AddComponent(_camera);
-	_entity->SetScene(_scene);
+	Ptr<FirstPersonCameraController> _controller = new FirstPersonCameraController;
+	_camera->AddBehavior(_controller);
+	_camera->SetScene(_scene);
+	_scene->SetActiveCamera(_camera);
 
-	_transform->SetWorldPosition({ 0, 0, 5 });
-
-	_scene->GetRenderWorld()->SetActiveCamera(_camera);
+	return &_camera;
 }
 
-void CreatLevel(Scene* _scene)
+void CreatePlayer(Scene* _scene)
 {
-	CreateCamera(_scene);
+	NodePtr _player = new Node;
+	Ptr<PlayerController> _controller = new PlayerController;
+
+	_player->AddBehavior(_controller);
+	_player->SetScene(_scene);
+	//_controller->Activate();
+
+	NodePtr _camera = CreateCamera(_scene);
+	_camera->SetParent(_player);
+}
+
+void CreatScene(Scene* _scene)
+{
+	CreatePlayer(_scene);
+
+	for (uint i = 0; i < 1000000; ++i)
+	{
+		NodePtr _test = new Node;
+		_test->SetSleepingThreshold(15);
+		_test->SetScene(_scene);
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -403,15 +390,26 @@ void main(void)
 	{
 		LOG("Generate resources ...");
 	}
+		/*
+	{
+
+		PRINT_SIZEOF(Node);
+		LOG("1KK nodes(%d) = %d mb", (sizeof(Node)), ((sizeof(Node)) * 1000000) / 1024 / 1024);
+		LOG("1KK nodes+dbvt(%d) = %d mb", (sizeof(Node) + sizeof(DbvTreeNode)), ((sizeof(Node) + sizeof(DbvTreeNode)) * 1000000) / 1024 / 1024);
+#ifdef DEBUG
+		system("pause");
+#endif
+		ExitProcess(0);
+	} */
 
 	new Device;
 	new Graphics;
 	new Renderer;
-	Scene* _level = new Scene;
-	CreatLevel(_level);
+	Scene* _scene = new Scene;
+	CreatScene(_scene);
 
 	const Color _clearColor(0x7f7f9fff);
-	double _st, _et;
+	double _st, _et, _at;
 	float _dt = 0;
 	bool _quit = false;
 	while (!_quit && !gDevice->ShouldClose())
@@ -421,19 +419,26 @@ void main(void)
 
 		_quit = GetAsyncKeyState(VK_ESCAPE) != 0;
 
-		_level->Update(_dt);
+		_scene->Update(_dt);
+
 		gGraphics->BeginFrame();
-		gGraphics->ClearFrameBuffers(FBT_Color, _clearColor);
-		_level->GetRenderWorld()->Draw();
+		gGraphics->ClearFrameBuffers(FBT_Color | FBT_DepthStencil, _clearColor, 1, 0xff);
+
+		glEnable(GL_DEPTH_TEST);
+		gRenderer->Draw(_scene);
+
+		wglSwapIntervalEXT(1);
 		gGraphics->EndFrame();
 
 		_et = Time();
 		float _odt = _dt;
 		_dt = (float)(_et - _st);
-		_dt = _dt * 0.6f + _odt * 0.4f;
+		_dt = _dt * 0.5f + _odt * 0.5f;
+		//if (_dt > 1 / 20.f)
+		//	_dt = 1 / 20.f;
 	}
 
-	delete _level;
+	delete _scene;
 	delete gRenderer;
 	delete gGraphics;
 	delete gDevice;

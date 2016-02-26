@@ -10,6 +10,8 @@
 static const float EPSILON = 1e-6f;
 static const float EPSILON2 = 1e-12f;
 static const float PI = 3.1415926535897932384626433832795f;
+static const float HALF_PI = PI * 0.5f;
+static const float QUAD_PI = PI * 0.25f;
 static const float DEGREES = 57.295779513082320876798154814105f;
 static const float RADIANS = 0.01745329251994329576923690768489f;
 static const float BYTE2FLOAT = 1.0f / 255.0f;

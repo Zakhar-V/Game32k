@@ -24,5 +24,5 @@ void main()
 #if SKINNED
 
 #endif
-	gl_Position =  ViewProjMat * vec4(InPos.xyz, 1.0);// *OutWorldPos;
+	gl_Position =  ViewProjMat * OutWorldPos;
 }

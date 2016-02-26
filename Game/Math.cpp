@@ -157,25 +157,32 @@ Quat& Quat::FromRotationMatrix(const float* _r0, const float* _r1, const float* 
 	{
 		_r = 3;
 		_root = Sqrt(_root + 1);
-		x = _r1[2] - _r2[1];
-		y = _r2[0] - _r0[2];
-		z = _r0[1] - _r1[0];
+		//x = _r1[2] - _r2[1];
+		//y = _r2[0] - _r0[2];
+		//z = _r0[1] - _r1[0];
+		x = _r2[1] - _r1[2];
+		y = _r0[2] - _r2[0];
+		z = _r1[0] - _r0[1];
 	}
 	else if (_r0[0] > _r1[1] && _r0[0] > _r2[2])
 	{
 		_r = 0;
+		//_root = Sqrt(_r0[0] - _r1[1] - _r2[2] + 1);
 		_root = Sqrt(_r0[0] - _r1[1] - _r2[2] + 1);
 		y = _r0[1] + _r1[0];
 		z = _r0[2] + _r2[0];
-		w = _r1[2] - _r2[1];
+		//w = _r1[2] - _r2[1];
+		w = _r2[1] - _r1[2];
 	}
 	else if (_r1[1] > _r0[0] && _r1[1] > _r2[2])
 	{
 		_r = 1;
-		_root = Sqrt(_r1[1] - _r2[2] - _r0[0] + 1);
+		//_root = Sqrt(_r1[1] - _r2[2] - _r0[0] + 1);
+		_root = Sqrt(_r1[1] - _r0[0] - _r2[2] + 1);
 		x = _r1[0] + _r0[1];
 		z = _r1[2] + _r2[1];
-		w = _r2[0] - _r0[2];
+		//w = _r2[0] - _r0[2];
+		w = _r0[2] - _r2[0];
 	}
 	else
 	{
@@ -183,7 +190,8 @@ Quat& Quat::FromRotationMatrix(const float* _r0, const float* _r1, const float* 
 		_root = Sqrt(_r2[2] - _r0[0] - _r1[1] + 1);
 		x = _r2[0] + _r0[2];
 		y = _r2[1] + _r1[2];
-		w = _r0[1] - _r1[0];
+		//w = _r0[1] - _r1[0];
+		w = _r1[0] - _r0[1];
 	}
 
 	float _invr = 0.5f / _root;

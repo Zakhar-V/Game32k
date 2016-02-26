@@ -1,3 +1,141 @@
+
+float Yaw(void) const
+{
+	return ATan2(2 * (y*z + w*x), w*w - x*x - y*y + z*z);
+}
+float Pitch(void) const
+{
+	return ASin(-2 * (x*z - w*y));
+}
+float Roll(void) const
+{
+	return ATan2(2 * (x*y + w*z), w*w + x*x - y*y - z*z);
+}
+
+Quat& FromEuler(const Vec3& _euler)	// yxz
+{
+	float _sx, _cx, _sy, _cy, _sz, _cz;
+	SinCos(_euler.x / 2, _sx, _cx);
+	SinCos(_euler.y / 2, _sy, _cy);
+	SinCos(_euler.z / 2, _sz, _cz);
+	w = _cy * _cx * _cz + _sy * _sx * _sz;
+	x = _cy * _sx * _cz + _sy * _cx * _sz;
+	y = _sy * _cx * _cz - _cy * _sx * _sz;
+	z = _cy * _cx * _sz - _sy * _sx * _cz;
+	return *this;
+	/*Quat _yaw, _pitch, _roll;
+	_yaw.FromAxisAngle(VEC3_UNIT_Y, _euler.y);
+	_pitch.FromAxisAngle(VEC3_UNIT_X, _euler.x);
+	_roll.FromAxisAngle(VEC3_UNIT_Z, _euler.z);
+	return *this = _yaw * (_pitch * _roll);*/
+}
+
+Vec3 ToEuler(void) const // yxz
+{
+	float _r0[3], _r1[3], _r2[3];
+	ToRotationMatrix(_r0, _r1, _r2);
+
+	float _yaw, _pitch, _roll = 0;
+
+	{
+		float _x = 2.0f * x;
+		float _y = 2.0f * y;
+		float _z = 2.0f * z;
+		float _wy = _y * w;
+		float _xx = _x * x;
+		float _xz = _z * x;
+		float _yy = _y * y;
+
+		_yaw = ATan2(_xz + _wy, 1 - (_xx + _yy));
+		//_yaw = ASin((x * z - w * y) * -2);
+	}
+	{
+		float _x = 2.0f * x;
+		float _z = 2.0f * z;
+		float _wx = _x * w;
+		float _xx = _x * x;
+		float _yz = _z * y;
+		float _zz = _z * z;
+
+		_pitch = ATan2(_yz + _wx, 1 - (_xx + _zz));
+		//_pitch = ATan2((y * z + w * x) * 2, w * w - x * x - y * y + z * z);
+	}
+	{
+		float _y = 2.0f * y;
+		float _z = 2.0f * z;
+		float _wz = _z * w;
+		float _xy = _y * x;
+		float _yy = _y * y;
+		float _zz = _z * z;
+
+		_roll = ATan2(_xy + _wz, 1 - (_yy + _zz));
+		//_roll = ATan2((x * y + w * z) * 2, w * w + x * x - y * y - z * z);
+
+	}
+	/*_pitch = ASin(-_r2[1]);
+
+	if (_pitch < HALF_PI)
+	{
+	if (_pitch > -HALF_PI)
+	_yaw = ATan2(_r2[0], _r2[2]), _roll = ATan2(_r0[1], _r1[1]);
+	else
+	_yaw = -ATan2(-_r0[1], _r0[0]);
+	}
+	else
+	_yaw = ATan2(-_r0[1], _r0[0]);	*/
+
+	//return Vec3(_pitch, _yaw, _roll);
+
+	//return Vec3(Pitch(), Yaw(), Roll());
+
+	float _xx = x * x;
+	float _yy = y * y;
+	float _zz = z * z;
+	float _r00 = 1 - 2 * (_yy + _zz);
+	float _r01 = 2 * (x * y + w * z);
+	float _r02 = 2 * (x * z - w * y);
+	float _r11 = 1 - 2 * (_xx + _zz);
+	float _r20 = 2 * (x * z + w * y);
+	float _r21 = 2 * (-y * z + w * x);
+	float _r22 = 1 - 2 * (_xx + _yy);
+
+	/*if (_r21 < -1)
+	return Vec3(-HALF_PI, 0, -ATan2(_r02, _r00));
+	if (_r21 > 1)
+	return Vec3(HALF_PI, 0, ATan2(_r02, _r00));
+
+	return Vec3(ASin(_r21), ATan2(_r20, _r22), ATan2(_r01, _r11));
+	*/
+	float check = 2.0f * (-y * z + w * x);
+
+	if (check < -0.995f)
+	{
+		return Vec3(
+			-HALF_PI,
+			0.0f,
+			-atan2f(2.0f * (x * z - w * y), 1.0f - 2.0f * (y * y + z * z))
+			);
+	}
+	else if (check > 0.995f)
+	{
+		return Vec3(
+			HALF_PI,
+			0.0f,
+			atan2f(2.0f * (x * z - w * y), 1.0f - 2.0f * (y * y + z * z))
+			);
+	}
+	else
+	{
+		return Vec3(
+			asinf(check),
+			atan2f(2.0f * (x * z + w * y), 1.0f - 2.0f * (x * x + y * y)),
+			atan2f(2.0f * (x * y + w * z), 1.0f - 2.0f * (x * x + z * z))
+			);
+	}
+
+}
+
+
 /*
 struct _PackedVertex // 7/10 bytes (255 vertices = 1785/2550 bytes)
 {

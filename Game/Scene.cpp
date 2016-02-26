@@ -1,135 +1,105 @@
 #pragma once
 
 #include "Scene.hpp"
-#include "Transform.hpp"
-#include "Update.hpp"
 #include "Physics.hpp"
 #include "Render.hpp"
 
 //----------------------------------------------------------------------------//
-// Component
+// Node
 //----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
-Component::Component(void) :
-	m_entity(nullptr),
-	m_prev(nullptr),
-	m_next(nullptr),
-	m_eventMask(0)
-{
-}
-//----------------------------------------------------------------------------//
-Component::~Component(void)
-{
-}
-//----------------------------------------------------------------------------//
-Scene* Component::GetScene(void)
-{
-	return m_entity ? m_entity->GetScene() : nullptr;
-}
-//----------------------------------------------------------------------------//
-Component* Component::GetEntityComponent(ComponentType _type, uint _index)
-{
-	return m_entity ? m_entity->GetComponent(_type, _index) : nullptr;
-}
-//----------------------------------------------------------------------------//
-void Component::SendEvent(uint _type, void* _arg)
-{
-	if (m_entity)
-		m_entity->SendEvent(_type, this, _arg);
-}
-//----------------------------------------------------------------------------//
-
-//----------------------------------------------------------------------------//
-// Entity 
-//----------------------------------------------------------------------------//
-
-//----------------------------------------------------------------------------//
-Entity::Entity(void) :
+Node::Node(void) :
+	m_id(0),
+	m_layerMask(0xffff),
+	m_tags(0),
+	m_localPosition(VEC3_ZERO),
+	m_localRotation(QUAT_IDENTITY),
+	m_localScale(VEC3_ONE),
+	m_worldTransform(MAT44_IDENTITY),
+	m_worldRotation(QUAT_IDENTITY),
 	m_scene(nullptr),
+	m_entity(nullptr),
 	m_parent(nullptr),
 	m_prev(nullptr),
 	m_next(nullptr),
 	m_child(nullptr),
-	m_manualTransformHierarchy(false)
+	m_prevActive(nullptr),
+	m_nextActive(nullptr),
+	m_behaviors(nullptr),
+	m_dbvtNode(nullptr),
+	m_physics(nullptr),
+	m_active(false),
+	m_transformUpdated(true),
+	m_transformChanged(false),
+	m_lastUpdateFrame(0),
+	m_lastViewFrame(0),
+	m_updatePolicy(UP_Auto),
+	m_sleepingThreshold(0.1f), // 100 ms = ~6 frames on 60 fps
+	m_activeTime(0)
 {
-	memset(m_components, 0, sizeof(m_components));
 }
 //----------------------------------------------------------------------------//
-Entity::~Entity(void)
+Node::~Node(void)
 {
-	RemoveAllComponents();
-	DetachAllChildren(true);
+	DetachChildren(true);
+	RemoveAllBehaviors();
+	delete m_dbvtNode;
 }
 //----------------------------------------------------------------------------//
-bool Entity::SetScene(Scene* _scene)
+void Node::SetScene(Scene* _scene)
 {
 	if (m_scene == _scene)
-		return true;
+		return;
 
 	if (m_parent && m_parent->m_scene != _scene)
-		return false;
+		return;
 
 	if (!m_parent && !m_scene)
 		AddRef();
 
 	if (m_scene)
-	{
-		//m_scene->_FreeID(m_id);
-		if (!m_parent)
-			Unlink(m_scene->_RootEntityRef(), this, m_prev);
-	}
+		m_scene->_RemoveNode(this);
 
-	m_scene = _scene;
+	_SetSceneImpl(_scene);
 
 	if (m_scene)
+		m_scene->_AddNode(this);
+
+	for (Behavior* i = m_behaviors; i; i = i->m_next)
 	{
-		//m_id = m_scene->_NewID(this);
-		if (!m_parent)
-			Link(m_scene->_RootEntityRef(), this, m_prev);
+		i->_SetScene(m_scene);
 	}
 
-	for (uint i = 0; i < CT_MaxTypes; ++i)
-	{
-		for (Component* c = m_components[i]; c; c = c->GetNextComponent())
-		{
-			c->_SetScene(m_scene);
-		}
-	}
-
-	for (Entity* i = m_child; i; i = i->m_next)
+	for (Node* i = m_child; i; i = i->m_next)
 	{
 		i->SetScene(m_scene);
 	}
 
 	if (!m_parent && !m_scene)
 		Release();
-
-	return true;
 }
 //----------------------------------------------------------------------------//
-bool Entity::SetParent(Entity* _parent)
+void Node::SetParent(Node* _parent)
 {
 	if (m_parent == _parent)
-		return true;
+		return;
 
-	for (Entity* i = _parent; i; i = i->m_parent)
+	for (Node* i = _parent; i; i = i->m_parent)
 	{
-		if (i == this)
-			return false;
+		if (i == this) // child cannot be parent
+			return;
 	}
 
 	if (!m_parent && !m_scene)
 		AddRef();
 
+	Mat44 _worldTM = GetWorldTransform(); // get current world transform
+
 	if (m_parent)
-	{
 		Unlink(m_parent->m_child, this, m_prev);
-	}
 	else if (m_scene)
-	{
-		Unlink(m_scene->_RootEntityRef(), this, m_prev);
-	}
+		m_scene->_RemoveRootNode(this);
 
 	m_parent = _parent;
 
@@ -142,125 +112,318 @@ bool Entity::SetParent(Entity* _parent)
 	}
 	else if (m_scene)
 	{
-		Link(m_scene->_RootEntityRef(), this, m_prev);
+		m_scene->_AddRootNode(this);
 	}
 
-	if (!m_manualTransformHierarchy)
-		SetParentTransform(m_parent);
+	SetWorldTransform(_worldTM); // keep world transform
 
 	if (!m_parent && !m_scene)
 		Release();
-
-	return true;
 }
 //----------------------------------------------------------------------------//
-void Entity::DetachAllChildren(bool _remove)
+void Node::DetachChildren(bool _remove)
 {
-	for (Entity *n, *i = m_child; i;)
+	for (Node *i = m_child; i;)
 	{
-		n = i;
+		NodePtr n = i;
 		i = i->m_next;
-		n->DetachThis(_remove);
+
+		n->SetParent(nullptr);
+		if (_remove && !n->m_entity)
+			n->SetScene(nullptr);
 	}
 }
 //----------------------------------------------------------------------------//
-void Entity::DetachThis(bool _remove)
+void Node::AddBehavior(Behavior* _b)
 {
-	EntityPtr _addref(this);
-	SetParent(nullptr);
-	if(_remove)
-		SetScene(nullptr);
+	if (!_b || _b->m_node)
+		return;
+
+	Link(m_behaviors, _b, _b->m_prev);
+	_b->AddRef();
+	_b->_SetNode(this);
+	_b->_SetScene(m_scene);
+
+	if (!m_active && _b->IsEnabled() && !_b->IsSleepingAllowed())
+		WakeUp();
 }
 //----------------------------------------------------------------------------//
-Entity* Entity::GetParentTransform(void)
+void Node::RemoveBehavior(Behavior* _b)
 {
-	Transform* _t = GetComponent<Transform>();
-	Transform* _parent = _t ? _t->GetParent() : nullptr;
-	return _parent ? _parent->GetEntity() : nullptr;
+	if (!_b || _b->m_node != this)
+		return;
+
+	Unlink(m_behaviors, _b, _b->m_prev);
+	_b->_SetNode(nullptr);
+	_b->_SetScene(nullptr);
+	_b->Release();
 }
 //----------------------------------------------------------------------------//
-void Entity::SetParentTransform(Entity* _parent)
+void Node::RemoveAllBehaviors(void)
 {
-	Transform* _t = GetComponent<Transform>();
-	if (_t)
-		_t->SetParent(_parent ? _parent->GetComponent<Transform>() : nullptr);
+	while (m_behaviors)
+		RemoveBehavior(m_behaviors);
 }
 //----------------------------------------------------------------------------//
-Component* Entity::GetComponent(ComponentType _type, uint _index)
+Behavior* Node::GetBehavior(uint _class, uint _index)
 {
-	ASSERT(_type < CT_MaxTypes);
-	Component* _c = m_components[_type];
-	while (_c && _index--)
-		_c = _c->m_next;
-	return _c;
-}
-//----------------------------------------------------------------------------//
-bool Entity::AddComponent(Component* _c)
-{
-	if (!_c)
-		return false;
-
-	if (_c->m_entity)
-		return _c->m_entity == this;
-
-	ComponentType _type = _c->GetComponentType();
-
-	if (m_components[_type] && m_components[_type]->IsSingleComponent())
-		return false;
-
-	_c->AddRef();
-
-	/*if (_c->m_entity)
+	for (Behavior* i = m_behaviors; i; i = i->m_next)
 	{
-		Unlink(_c->m_entity->m_components[_type], _c, _c->m_prev);
-		_c->Release();
-	}*/
-
-	Link(m_components[_type], _c, _c->m_prev);
-
-	_c->_SetEntity(this);
-	_c->_SetScene(m_scene);
-	
-	return true;
+		if (i->IsClass(_class) && _index--)
+			return i;
+	}
+	return nullptr;
 }
 //----------------------------------------------------------------------------//
-void Entity::RemoveComponent(Component* _c)
+void Node::WakeUp(void)
 {
-	if (_c && _c->m_entity == this)
+	m_activeTime = 0;
+
+	if (m_scene && !m_active)
 	{
-		ComponentType _type = _c->GetComponentType();
-		Unlink(m_components[_type], _c, _c->m_prev);
-		_c->_SetEntity(nullptr);
-		_c->_SetScene(nullptr);
-		_c->Release();
+		m_scene->_AddActiveNode(this);
+		m_active = true;
 	}
 }
 //----------------------------------------------------------------------------//
-void Entity::RemoveAllComponents(void)
+void Node::Update(const FrameInfo& _frame)
 {
-	for (uint i = 0; i < CT_MaxTypes; ++i)
+	if (m_lastUpdateFrame == _frame.id)
+		return;
+
+	m_lastUpdateFrame = _frame.id;
+	m_activeTime += _frame.time;
+
+	if (m_parent && m_parent->m_lastUpdateFrame != _frame.id) // parent must be updated before it
 	{
-		for (Component* c = m_components[i]; c; c = c->GetNextComponent())
+		m_parent->Update(_frame);
+	}
+
+	m_behaviorAllowSleep = true;
+	for (Behavior* i = m_behaviors; i;)
+	{
+		BehaviorPtr b = i;
+		i = i->m_next;
+		if (b->IsEnabled())
 		{
-			c->_SetEntity(nullptr);
-			c->_SetScene(nullptr);
+			m_behaviorAllowSleep = m_behaviorAllowSleep && b->IsSleepingAllowed();
+			b->Update(_frame);
 		}
 	}
+
+	_UpdateImpl(_frame);
 }
 //----------------------------------------------------------------------------//
-void Entity::SendEvent(uint _type, Component* _sender, void* _arg)
+void Node::PostUpdate(const FrameInfo& _frame)
 {
-	uint _mask = 1 << _type;
-	for (uint i = 0; i < CT_MaxTypes; ++i)
+	if (m_activeTime >= m_sleepingThreshold)
 	{
-		for (Component* c = m_components[i]; c;)
+		m_activeTime = 0;
+
+		if (m_active && m_scene && m_updatePolicy != UP_Always && m_behaviorAllowSleep)
 		{
-			Component* _next = c->GetNextComponent();
-			if (c->GetEventMask() & _mask)
-				c->OnEvent(_type, this, _sender, _arg);
-			c = _next;
+			m_scene->_RemoveActiveNode(this);
+			m_active = false;
 		}
 	}
+	/*
+	if(m_worldBoundsChanged || m_transformChanged)
+	_UpdateDbvtNode();
+	*/
+	m_transformChanged = false;
+}
+//----------------------------------------------------------------------------//
+const Mat44& Node::GetWorldTransform(void)
+{
+	_UpdateTransform();
+	return m_worldTransform;
+}
+//----------------------------------------------------------------------------//
+void Node::SetWorldTransform(const Mat44& _tm)
+{
+	SetWorldPosition(_tm.GetTranslation());
+	SetWorldRotation(_tm.GetRotation());
+	SetWorldScale(_tm.GetScale());
+}
+//----------------------------------------------------------------------------//
+void Node::SetLocalPosition(const Vec3& _position)
+{
+	m_localPosition = _position;
+	_InvalidateTransform();
+}
+//----------------------------------------------------------------------------//
+const Vec3& Node::GetLocalPosition(void)
+{
+	return m_localPosition;
+}
+//----------------------------------------------------------------------------//
+void Node::SetLocalRotation(const Quat& _rotation)
+{
+	m_localRotation = _rotation;
+	_InvalidateTransform();
+}
+//----------------------------------------------------------------------------//
+const Quat& Node::GetLocalRotation(void)
+{
+	return m_localRotation;
+}
+//----------------------------------------------------------------------------//
+void Node::SetLocalScale(const Vec3& _scale)
+{
+	m_localScale = _scale;
+	_InvalidateTransform();
+}
+//----------------------------------------------------------------------------//
+const Vec3& Node::GetLocalScale(void)
+{
+	return m_localScale;
+}
+//----------------------------------------------------------------------------//
+void Node::SetWorldPosition(const Vec3& _position)
+{
+	m_localPosition = _position;
+	if (m_inheritPosition && m_parent)
+		m_localPosition = m_parent->GetWorldTransform().Copy().Inverse().Transform(m_localPosition);
+	_InvalidateTransform();
+}
+//----------------------------------------------------------------------------//
+Vec3 Node::GetWorldPosition(void)
+{
+	_UpdateTransform();
+	return m_worldTransform.GetTranslation();
+}
+//----------------------------------------------------------------------------//
+void Node::SetWorldRotation(const Quat& _rotation)
+{
+	m_localRotation = _rotation;
+	if (m_inheritRotation && m_parent)
+		//m_localRotation = m_parent->GetWorldMatrix().Copy().Inverse().GetRotation() * m_localRotation;
+		m_localRotation = m_parent->GetWorldRotation().Copy().Inverse() * m_localRotation;
+	_InvalidateTransform();
+}
+//----------------------------------------------------------------------------//
+const Quat& Node::GetWorldRotation(void)
+{
+	_UpdateTransform();
+	return m_worldRotation;
+}
+//----------------------------------------------------------------------------//
+void Node::SetWorldScale(const Vec3& _scale)
+{
+	m_localScale = _scale;
+	if (m_inheritScale && m_parent)
+		m_localScale /= m_parent->GetWorldTransform().GetScale();
+	_InvalidateTransform();
+}
+//----------------------------------------------------------------------------//
+Vec3 Node::GetWorldScale(void)
+{
+	_UpdateTransform();
+	return m_worldTransform.GetScale();
+}
+//----------------------------------------------------------------------------//
+void Node::SetInheritPosition(bool _enabled)
+{
+	if (m_inheritPosition != _enabled)
+	{
+		Vec3 _pos = GetWorldPosition();
+		m_inheritPosition = _enabled;
+		SetWorldPosition(_pos);
+	}
+}
+//----------------------------------------------------------------------------//
+void Node::SetInheritRotation(bool _enabled)
+{
+	if (m_inheritRotation != _enabled)
+	{
+		Quat _rot = GetWorldRotation();
+		m_inheritRotation = _enabled;
+		SetWorldRotation(_rot);
+	}
+}
+//----------------------------------------------------------------------------//
+void Node::SetInheritScale(bool _enabled)
+{
+	if (m_inheritScale != _enabled)
+	{
+		Vec3 _scl = GetWorldScale();
+		m_inheritScale = _enabled;
+		SetWorldScale(_scl);
+	}
+}
+//----------------------------------------------------------------------------//
+void Node::_InvalidateTransform(void)
+{
+	if (m_transformUpdated)
+	{
+		WakeUp();
+		m_transformUpdated = false;
+		m_transformChanged = true;
+		for (Node* i = m_child; i; i = i->m_next) // invalidate and activate all children
+			i->_InvalidateTransform();
+	}
+}
+//----------------------------------------------------------------------------//
+void Node::_UpdateTransform(void)
+{
+	if (!m_transformUpdated)
+	{
+		m_worldTransform.CreateTransform(m_localPosition, m_localRotation, m_localScale);
+		if (m_parent)
+			m_worldTransform = m_parent->GetWorldTransform() * m_worldTransform;
+		m_worldRotation = m_worldTransform.GetRotation();
+		m_transformUpdated = true;
+	}
+}
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+// Camera
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+Camera::Camera(void) :
+	m_orthographic(false),
+	m_fov(QUAD_PI), // 45
+	m_near(0.001f),
+	m_far(1000),
+	m_zoom(1)
+{
+}
+//----------------------------------------------------------------------------//
+Camera::~Camera(void)
+{
+
+}
+//----------------------------------------------------------------------------//
+void Camera::GetParams(float _x, float _y, float _w, float _h, UCamera& _params, Frustum& _frustum)
+{
+	const Mat44& _worldTM = GetWorldTransform();
+
+	_params.CameraPos = _worldTM.GetTranslation();
+	_params.ViewMat.CreateTransform(_worldTM.GetTranslation(), _worldTM.GetRotation(), 1).Inverse();
+	_params.NormMat = _params.ViewMat.Copy().Inverse();
+
+	if (m_orthographic)
+	{
+		_params.ProjMat.CreateOrtho(_x, _x + _w, _y + _h, _h, m_near, m_far);
+	}
+	else
+	{
+		_params.ProjMat.CreatePerspective(m_fov, _w / _h, m_near, m_far);
+	}
+	_params.ProjMat.m00 *= m_zoom;
+	_params.ProjMat.m11 *= m_zoom;
+
+	_frustum.FromCameraMatrices(_params.ViewMat, _params.ProjMat);
+
+	_params.ViewProjMat = _params.ProjMat * _params.ViewMat;
+
+	Mat44 _proj = _params.ProjMat;
+	_proj.m22 = 0; // no near clip plane
+	_params.InvViewProjMat = (_proj * _params.ViewMat).Inverse();
+
+	// todo: depth params (near, far, C=constant, FC = 1.0/log(far*C + 1))
 }
 //----------------------------------------------------------------------------//
 
@@ -270,41 +433,100 @@ void Entity::SendEvent(uint _type, Component* _sender, void* _arg)
 
 //----------------------------------------------------------------------------//
 Scene::Scene(void) :
-	m_rootEntity(nullptr)
+	m_frame(0),
+	m_rootNodes(nullptr),
+	m_activeNodes(nullptr),
+	m_numNodes(0),
+	m_numActiveNodes(0),
+	m_numRootNodes(0)
 {
-	m_transformSystem = new TransformSystem(this);
-	m_physicsWorld = new PhysicsWorld(this);
-	m_renderWorld = new RenderWorld(this);
-	m_updateSystem = new UpdateSystem(this);
 }
 //----------------------------------------------------------------------------//
 Scene::~Scene(void)
 {
-	while (m_rootEntity)
-		m_rootEntity->DetachThis(true);
+	m_activeCamera = nullptr;
+
+	while (m_rootNodes)
+		m_rootNodes->SetScene(nullptr);
 
 	// ...
-
-	delete m_updateSystem;
-	delete m_renderWorld;
-	delete m_physicsWorld;
-	delete m_transformSystem;
 }
 //----------------------------------------------------------------------------//
 void Scene::Update(float _dt)
 {
-	m_updateSystem->Update(_dt);
-	//m_physicsWorld->Update(_dt);
-	m_transformSystem->Update(_dt);
+	FrameInfo _frame;
+	_frame.id = ++m_frame;
+	_frame.time = _dt;
 
-	/*
-	1. анимация объектов (любое перемещение объектов)
-	2. обновление иерархии трансформаций
-	3. передача трансформаций в физический движок
-	4. обновление физ. движка
-	5. получение трансформаций из физ. движка
-	6. обновление иерархии трансформаций
-	*/
+	uint _active = m_numActiveNodes;
+	for (Node* i = m_activeNodes; i; i = i->m_nextActive)
+	{
+		i->Update(_frame);
+	}
+
+	for (Node* i = m_activeNodes; i; )
+	{
+		NodePtr n = i;
+		i = i->m_nextActive;
+		n->PostUpdate(_frame);
+	}
+
+	//printf("active nodes: %d --> %d (%f)\n", _active, m_numActiveNodes, m_activeNodes->m_activeTime);
+}
+//----------------------------------------------------------------------------//
+void Scene::_AddActiveNode(Node* _node)
+{
+	Link(m_activeNodes, _node, _node->m_prevActive);
+	++m_numActiveNodes;
+}
+//----------------------------------------------------------------------------//
+void Scene::_RemoveActiveNode(Node* _node)
+{
+	Unlink(m_activeNodes, _node, _node->m_prevActive);
+	--m_numActiveNodes;
+}
+//----------------------------------------------------------------------------//
+void Scene::_AddRootNode(Node* _node)
+{
+	Link(m_rootNodes, _node, _node->m_prev);
+	++m_numRootNodes;
+}
+//----------------------------------------------------------------------------//
+void Scene::_RemoveRootNode(Node* _node)
+{
+	Unlink(m_rootNodes, _node, _node->m_prev);
+	--m_numRootNodes;
+}
+//----------------------------------------------------------------------------//
+void Scene::_AddNode(Node* _node)
+{
+	// activate
+	_AddActiveNode(_node);
+	_node->m_activeTime = 0;
+	_node->m_active = true;
+
+	if (!_node->m_parent)
+		_AddRootNode(_node);
+
+	//if (_node->m_dbvtNode)
+	//	m_dbvt->AddNode(_node->m_dbvtNode);
+
+	++m_numNodes;
+}
+//----------------------------------------------------------------------------//
+void Scene::_RemoveNode(Node* _node)
+{
+	if (_node->m_active)
+		_RemoveActiveNode(_node);
+	if (!_node->m_parent)
+		_RemoveRootNode(_node);
+
+	// ...
+
+	//if (_node->m_dbvtNode)
+	//	m_dbvt->RemoveNode(_node->m_dbvtNode);
+
+	--m_numNodes;
 }
 //----------------------------------------------------------------------------//
 

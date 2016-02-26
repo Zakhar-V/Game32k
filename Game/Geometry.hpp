@@ -14,7 +14,10 @@ class Geometry : public RefCounted
 {
 public:
 
-	// Merge
+	Geometry(void);
+	~Geometry(void);
+
+	void Merge(const Vertex* _vertices, uint _numVertices, const index_t* _indices, uint _numIndices);
 	// Transform
 	// Mirror
 	// MakeAdjacency

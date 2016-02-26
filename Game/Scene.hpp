@@ -7,220 +7,223 @@
 // Defs
 //----------------------------------------------------------------------------//
 
-class Component;
-class Entity;
-class SceneSystem;
 class Scene;
+class Entity;
+class PhysicsEntity;
 
-class Transform;
-class TransformSystem;
+typedef Ptr<class Behavior> BehaviorPtr;
+typedef Ptr<class Node> NodePtr;
+typedef Ptr<class Camera> CameraPtr;
 
-class PhysicsBody;
-class PhysicsShape;
-class PhysicsJoint;
-class PhysicsWorld;
-
-class RenderWorld;
-
-class UpdateSystem;
-
-//----------------------------------------------------------------------------//
-// 
-//----------------------------------------------------------------------------//
-
-enum EventType
+struct FrameInfo
 {
-	ET_TransformChanged = 1, //!< transform was changed. \note do not change transform in this event
-	ET_,
-	// ...
+	float time; // in seconds
+	uint16 id;
+};
+
+enum UpdatePolicy : uint8
+{
+	UP_Auto, // update if necessary; deactivate after some time 
+	UP_Always, // update each frame; never not deactivate
 };
 
 //----------------------------------------------------------------------------//
-// 
+// Behavior
 //----------------------------------------------------------------------------//
 
-enum ComponentType
-{
-	CT_Transform = 0,
-
-
-	CT_Camera,
-	CT_Light,
-	CT_Mesh,
-	CT_DecalSet,
-	//CT_Sprite,
-	CT_Terrain,
-
-	CT_PhysicsBody,
-	CT_PhysicsShape,
-	CT_PhysicsJoint,
-
-	CT_Unknown,
-	CT_MaxTypes,
-};
-
-class Component : public Object
+class Behavior : public Object
 {
 public:
+	OBJECT("Behavior");
 
-	static ComponentType GetComponentTypeStatic(void) { return CT_Unknown; }
-	virtual ComponentType GetComponentType(void) { return CT_Unknown; }
-	virtual bool IsSingleComponent(void) { return false; }
-	virtual uint GetComponentSubType(void) { return 0; }
-
-	Component(void);
-	~Component(void);
-
-	Entity* GetEntity(void) { return m_entity; }
-	Scene* GetScene(void);
-
-	Component* GetNextComponent(void) { return m_next; }
-
-	template <class T> T* GetEntityComponent(uint _index = 0) { return static_cast<T*>(GetEntityComponent(T::GetComponentTypeStatic(), _index)); }
-	Component* GetEntityComponent(ComponentType _type, uint _index = 0);
-
-
-	virtual void TransformUpdated(void) { }
-
-	uint GetEventMask(void) { return m_eventMask; }
-	virtual void OnEvent(uint _type, Entity* _entity, Component* _component, void* _arg) { }
-	void SendEvent(uint _type, void* _arg = nullptr);
+	virtual bool IsSleepingAllowed(void) { return true; }
+	virtual bool IsEnabled(void) { return true; }
+	virtual void Update(const FrameInfo& _frame) { }
 
 protected:
-	friend class Entity;
+	friend class Node;
 
-	virtual void _SetScene(Scene* _scene) { }
-	virtual void _SetEntity(Entity* _entity) { m_entity = _entity; }
+	void _SetNode(Node* _node) { m_node = _node; }
 
-	Entity* m_entity;
-	Component* m_prev;
-	Component* m_next;
-	uint m_eventMask;
+	void _SetScene(Scene* _scene) { }
+
+	Node* m_node = nullptr;
+	Behavior* m_prev = nullptr;
+	Behavior* m_next = nullptr;
 };
 
 //----------------------------------------------------------------------------//
-// Entity
+// Node
 //----------------------------------------------------------------------------//
 
-/*enum EntityEventType
-{
-	EET_SetScene,
-	EET_SetParent,
-	EET_AttachChild,
-	EET_DetachChild,
-};
-
-enum EntityAttachFlags
-{
-	EAF_InheritTransform,
-};
-
-enum EntityEvent
-{
-	EE_,
-};*/
-
-typedef Ptr<Entity> EntityPtr;
-typedef Ref<Entity> EntityRef;
-
-/*struct EntityEventReceiver
-{
-	Ref<Component> receiver;
-	uint mask;
-};*/
-
-class Entity final : public Object
+class Node : public Object
 {
 public:
+	OBJECT("Node");
 
-	Entity(void);
-	~Entity(void);
+	Node(void);
+	~Node(void);
 
-	Scene* GetScene(void) { return m_scene; }
-	bool SetScene(Scene* _scene);
-	Entity* GetParent(void) { return m_parent; }
-	bool SetParent(Entity* _parent);
-	void DetachAllChildren(bool _remove = false);
-	void DetachThis(bool _remove = false);
+	void SetScene(Scene* _scene);
+	void SetParent(Node* _parent);
 
-	bool SetManualTransformHierarchy(bool _state = true) { m_manualTransformHierarchy = _state; }
-	bool GetManualTransformHierarchy(void) { return m_manualTransformHierarchy; }
-	Entity* GetParentTransform(void);
-	void SetParentTransform(Entity* _parent);
+	void DetachChildren(bool _remove = false);
 
-	template <class T> T* GetComponent(uint _index = 0) { return static_cast<T*>(GetComponent(T::GetComponentTypeStatic(), _index)); }
-	Component* GetComponent(ComponentType _type, uint _index = 0);
-	bool AddComponent(Component* _c);
-	void RemoveComponent(Component* _c);
-	void RemoveAllComponents(void);
+	void AddBehavior(Behavior* _b);
+	void RemoveBehavior(Behavior* _b);
+	void RemoveAllBehaviors(void);
+	Behavior* GetBehavior(uint _class, uint _index = 0);
+	template <class T> T* GetBehavior(uint _index = 0) { return static_cast<T*>(GetBehavior(_index)); }
 
-	//void AddListener()
-	void SendEvent(uint _type, Component* _sender, void* _arg = nullptr);
+	void WakeUp(void);
+	void SetSleepingThreshold(float _seconds) { m_sleepingThreshold = _seconds; }
+	void SetUpdatePolicy(UpdatePolicy _policy) { m_updatePolicy = _policy; }
+	UpdatePolicy GetUpdatePolicy(void) { return m_updatePolicy; }
+
+	void Update(const FrameInfo& _frame);
+	void PostUpdate(const FrameInfo& _frame);
+
+	const Mat44& GetWorldTransform(void);
+	void SetWorldTransform(const Mat44& _tm);
+	void SetLocalPosition(const Vec3& _position);
+	const Vec3& GetLocalPosition(void);
+	void SetLocalRotation(const Quat& _rotation);
+	const Quat& GetLocalRotation(void);
+	void SetLocalScale(const Vec3& _scale);
+	const Vec3& GetLocalScale(void);
+	void SetWorldPosition(const Vec3& _position);
+	Vec3 GetWorldPosition(void);
+	void SetWorldRotation(const Quat& _rotation);
+	const Quat& GetWorldRotation(void);
+	void SetWorldScale(const Vec3& _scale);
+	Vec3 GetWorldScale(void);
+
+	void SetInheritPosition(bool _enabled = true);
+	bool GetInheritPosition(void) { return m_inheritPosition; }
+	void SetInheritRotation(bool _enabled = true);
+	bool GetInheritRotation(void) { return m_inheritRotation; }
+	void SetInheritScale(bool _enabled = true);
+	bool GetInheritScale(void) { return m_inheritScale; }
+
 
 protected:
 	friend class Scene;
-	friend class Component;
+
+	virtual void _SetSceneImpl(Scene* _scene) { m_scene = _scene; }
+	virtual void _UpdateImpl(const FrameInfo& _frame) { }
+
+	void _InvalidateTransform(void);
+	void _UpdateTransform(void);
+
+	String m_name;
+	int m_id;
+	uint16 m_layerMask;
+	uint16 m_tags;
+
+	Vec3 m_localPosition;
+	Quat m_localRotation;
+	Vec3 m_localScale;
+	Mat44 m_worldTransform;
+	Quat m_worldRotation;
 
 	Scene* m_scene;
-	Entity* m_parent;
-	Entity* m_prev;
-	Entity* m_next;
-	Entity* m_child;
+	Entity* m_entity;
+	Node* m_parent;
+	Node* m_prev;
+	Node* m_next;
+	Node* m_child;
 
-	Component* m_components[CT_MaxTypes];
+	Node* m_prevActive;
+	Node* m_nextActive;
 
-	//Array<Ref<Component*>> m_listeners;
+	Behavior* m_behaviors;
 
-	//bool m_removed : 1;
-	//bool m_persistent : 1;
-	bool m_manualTransformHierarchy : 1;
+	DbvTreeNode* m_dbvtNode;
+	PhysicsEntity* m_physics;
+
+	bool m_active : 1;
+	bool m_behaviorAllowSleep : 1;
+	bool m_transformUpdated : 1;
+	bool m_transformChanged : 1;
+	bool m_inheritPosition : 1;
+	bool m_inheritRotation : 1;
+	bool m_inheritScale : 1;
+
+	UpdatePolicy m_updatePolicy;
+
+	uint16 m_lastUpdateFrame;
+	uint16 m_lastViewFrame;
+
+	float m_sleepingThreshold;
+	float m_activeTime;
 };
 
 //----------------------------------------------------------------------------//
-// SceneSystem
+// Camera
 //----------------------------------------------------------------------------//
 
-class SceneSystem : public NonCopyable
+class Camera : public Node
 {
 public:
-	SceneSystem(Scene* _scene) : m_scene(_scene) { }
-	virtual ~SceneSystem(void) { }
+	Camera(void);
+	~Camera(void);
+
+	void SetFov(float _fovY) { m_fov = _fovY; }
+	float GetFov(void) { return m_fov; }
+	void SetNear(float _near) { m_near = _near; }
+	float GetNear(void) { return m_near; }
+	void SetFar(float _far) { m_far = _far; }
+	float GetFar(void) { return m_far; }
+	void SetZoom(float _zoom) { m_zoom = _zoom; }
+	float GetZoom(void) { return m_zoom; }
+	void SetOrtho(bool _ortho = true) { m_orthographic = _ortho; }
+	bool IsOrhto(void) { return m_orthographic; }
+
+	void GetParams(float _x, float _y, float _w, float _h, UCamera& _params, Frustum& _frustum);
 
 protected:
 
-	Scene* m_scene;
+	bool m_orthographic;
+	//bool m_flipY;
+	float m_fov; // in radians
+	float m_near;
+	float m_far;
+	float m_zoom;
 };
 
 //----------------------------------------------------------------------------//
 // Scene
 //----------------------------------------------------------------------------//
 
-class Scene : public NonCopyable
+class Scene	: public NonCopyable
 {
 public:
-
 	Scene(void);
 	~Scene(void);
 
-	TransformSystem* GetTransformSystem(void) { return m_transformSystem; }
-	PhysicsWorld* GetPhysicsWorld(void) { return m_physicsWorld; }
-	RenderWorld* GetRenderWorld(void) { return m_renderWorld; }
-	UpdateSystem* GetUpdateSystem(void) { return m_updateSystem; }
-
 	void Update(float _dt);
-	
+
+	void SetActiveCamera(Camera* _camera) { m_activeCamera = _camera; }
+	Camera* GetActiveCamera(void) { return m_activeCamera; }
 
 protected:
-	friend class Entity;
+	friend class Node;
 
-	Entity*& _RootEntityRef(void) { return m_rootEntity; }
+	void _AddActiveNode(Node* _node);
+	void _RemoveActiveNode(Node* _node);
+	void _AddRootNode(Node* _node);
+	void _RemoveRootNode(Node* _node);
+	void _AddNode(Node* _node);
+	void _RemoveNode(Node* _node);
 
-	Entity* m_rootEntity;
+	uint16 m_frame;
+	Node* m_rootNodes;
+	Node* m_activeNodes;
+	uint m_numNodes;
+	uint m_numActiveNodes;
+	uint m_numRootNodes;
 
-	TransformSystem* m_transformSystem;
-	PhysicsWorld* m_physicsWorld;
-	RenderWorld* m_renderWorld;
-	UpdateSystem* m_updateSystem;
+	CameraPtr m_activeCamera;
 };
 
 //----------------------------------------------------------------------------//
