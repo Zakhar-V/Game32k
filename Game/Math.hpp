@@ -487,6 +487,7 @@ struct Vec3
 			_lp = RSqrt(_lp);
 		return ACos(Clamp<float>(Dot(_v) * _lp, -1, 1));
 	}
+	float AbsSum(void) const { return Abs(x) + Abs(y) + Abs(z); }
 
 	bool operator < (const Vec3& _rhs) const { return x < _rhs.x && y < _rhs.y && z < _rhs.z; }
 	bool operator > (const Vec3& _rhs) const { return x > _rhs.x && y > _rhs.y && z > _rhs.z; }
@@ -948,6 +949,10 @@ struct AlignedBox
 	float Volume(void) const { return (mx - mn).LengthSq(); }
 	void GetAllCorners(const void* _dst, size_t _stride = 0, size_t _offset = 0) const;
 
+	// for dbvt
+	float Proximity(const AlignedBox& _other) const { return ((mn + mx) - (_other.mn + _other.mx)).AbsSum(); }
+	int Select(const AlignedBox& _a, const AlignedBox& _b) const { return Proximity(_a) < Proximity(_b) ? 0 : 1; }
+
 	AlignedBox TransformAffine(const Mat44& _rhs) { return FromCenterExtends(Center() * _rhs, _rhs.TransformVectorAbs(Extends())); }
 	AlignedBox TransformProj(const Mat44& _rhs);
 
@@ -957,6 +962,9 @@ struct AlignedBox
 	AlignedBox& operator += (const AlignedBox& _box) { return AddPoint(_box.mn).AddPoint(_box.mx); }
 	AlignedBox& operator *= (const Mat44& _rhs) { return TransformAffine(_rhs); }
 	AlignedBox operator * (const Mat44& _rhs) const { return Copy().TransformAffine(_rhs); }
+
+	bool operator == (const AlignedBox& _rhs) const { return mn == _rhs.mn && mx == _rhs.mx; }
+	bool operator != (const AlignedBox& _rhs) const { return !(*this == _rhs); }
 
 	bool Contains(const Vec3& _point) const { return _point >= mn && _point <= mx; }
 	bool Contains(const AlignedBox& _box) const { return _box.mx <= mx && _box.mn >= mn; }
@@ -1025,32 +1033,80 @@ struct Frustum
 // DbvtNode
 //----------------------------------------------------------------------------//
 
-struct DbvTreeNode
+struct DbvtNode
 {
-	DbvTreeNode* parent;
+	DbvtNode(void) : child0(nullptr), child1(nullptr) { }
+	bool IsLeaf(void) const { return child[0] == 0; }
+	bool IsNode(void) const { return child[0] != 0; }
+	bool IsValidLeaf(void) const { return IsLeaf() && object && box.IsFinite(); }
+
 	AlignedBox box;
+	DbvtNode* parent = nullptr;
 	union
 	{
-		DbvTreeNode* child[2];
+		DbvtNode* child[2];
 		struct
 		{
-			void* object;
-			bool leaf;
+			DbvtNode* child0;
+			DbvtNode* child1;
 		};
+		void* object;
+		int value;
 	};
 };
 
 //----------------------------------------------------------------------------//
-// DbvTree
+// DbvtCallback
 //----------------------------------------------------------------------------//
 
-class DbvTree
+struct DbvtCallback
 {
+	enum TestResult
+	{
+		TR_Stop = 0, // stop callback
+		TR_Skip,	// skip node
+		TR_WithTest, // add all leafs in node with test
+		TR_WithoutTest, // add all leafs in node without test
+	};
+
+	virtual TestResult TestNode(DbvtNode* _node) { return TR_WithoutTest; }
+	virtual void AddLeaf(DbvtNode* _leaf, TestResult _testResult) { }
+};
+
+//----------------------------------------------------------------------------//
+// Dbvt
+//----------------------------------------------------------------------------//
+
+class Dbvt
+{
+	Dbvt(const Dbvt&) = delete;
+	Dbvt& operator = (const Dbvt&) = delete;
 public:
+
+	typedef DbvtNode Node;
+	typedef DbvtCallback Callback;
+
+	Dbvt(void);
+	~Dbvt(void);
+
+	void Insert(Node* _leaf);
+	void Remove(Node* _leaf);
+	void Update(Node* _leaf);
+
+	Node* Root(void) { return m_root; }
+	void Enum(Callback* _cb, bool _withTest = true);
+
+	// TODO: enum directional
 
 protected:
 
-	DbvTreeNode* m_root;
+	void _Insert(Node* _leaf, Node* _root);
+	Node* _Remove(Node* _leaf);
+	void _Delete(Node* _node);
+	void _Clear(void);
+
+	Node* m_root;
+	Node* m_free; // last deleted node
 };
 
 //----------------------------------------------------------------------------//

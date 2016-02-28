@@ -134,7 +134,7 @@ template <typename T> void Swap(T& _a, T& _b)
 // Array
 //----------------------------------------------------------------------------//
 
-template <class T> class Array
+template <class T, bool IsPOD = true> class Array
 {
 public:
 	Array(void)
@@ -247,8 +247,15 @@ public:
 	{
 		uint _newUsed = m_used + _count;
 		_Realloc(_newUsed, _quantize);
-		for (T *_dst = m_data + m_used, *_end = m_data + _newUsed; _dst < _end;)
-			*_dst++ = *_e++;
+		if (IsPOD)
+		{
+			memcpy(m_data + m_used, _e, _count * sizeof(T));
+		}
+		else
+		{
+			for (T *_dst = m_data + m_used, *_end = m_data + _newUsed; _dst < _end;)
+				*_dst++ = *_e++;
+		}
 		m_used = _newUsed;
 		return *this;
 	}
@@ -266,8 +273,11 @@ public:
 		if (_count > m_used)
 			_count = m_used;
 		uint _newUsed = m_used - _count;
-		for (T *_p = m_data + m_used, *_end = m_data + _newUsed; _p < _end; --_p)
-			_p->~T();
+		if (!IsPOD)
+		{
+			for (T *_p = m_data + m_used, *_end = m_data + _newUsed; _p < _end; --_p)
+				_p->~T();
+		}
 		m_used = _newUsed;
 		return *this;
 	}
@@ -277,8 +287,15 @@ public:
 		{
 			if (*_p == _e)
 			{
-				*_p = Move(*_end);
-				_end->~T();
+				if (IsPOD)
+				{
+					*_p = Move(*_end);
+					_end->~T();
+				}
+				else
+				{
+					*_p = *_end;
+				}
 				--m_used;
 				break;
 			}
@@ -294,10 +311,18 @@ protected:
 		if (_quantize)
 			_newSize = (_newSize + 1) << 1;
 		T* _newData = reinterpret_cast<T*>(new uint8[_newSize * sizeof(T)]);
-		for (T *_new = _newData, *_old = m_data, *_end = m_data + m_used; _old < _end; ++_new, ++_old)
+
+		if (IsPOD)
 		{
-			new(reinterpret_cast<void*>(_new)) T(Move(*_old));
-			_old->~T();
+			for (T *_new = _newData, *_old = m_data, *_end = m_data + m_used; _old < _end; ++_new, ++_old)
+			{
+				new(reinterpret_cast<void*>(_new)) T(Move(*_old));
+				_old->~T();
+			}
+		}
+		else
+		{
+			memcpy(_newData, m_data, m_used * sizeof(T));
 		}
 
 		delete[] reinterpret_cast<uint8*>(m_data);

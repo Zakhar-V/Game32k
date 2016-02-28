@@ -609,6 +609,212 @@ void Frustum::GetPlanes(Plane* _planes, const Mat44& _m)
 }
 //----------------------------------------------------------------------------//
 
+//----------------------------------------------------------------------------//
+// Dbvt
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+Dbvt::Dbvt(void) :
+	m_root(nullptr),
+	m_free(nullptr)
+{
+}
+//----------------------------------------------------------------------------//
+Dbvt::~Dbvt(void)
+{
+	_Clear();
+}
+//----------------------------------------------------------------------------//
+void Dbvt::Insert(Node* _leaf)
+{
+	ASSERT(_leaf != nullptr && _leaf->IsValidLeaf());
+	ASSERT(_leaf->parent == nullptr && _leaf != m_root);
+
+	_Insert(_leaf, m_root);
+}
+//----------------------------------------------------------------------------//
+void Dbvt::Remove(Node* _leaf)
+{
+	ASSERT(_leaf != nullptr && _leaf->IsValidLeaf());
+
+	_Remove(_leaf);
+	_leaf->parent = nullptr;
+}
+//----------------------------------------------------------------------------//
+void Dbvt::Update(Node* _leaf)
+{
+	ASSERT(_leaf != nullptr);
+	ASSERT(_leaf->object != nullptr && _leaf->box.IsFinite());
+
+	Node* _root = _Remove(_leaf);
+	while (_root && !_root->box.Contains(_leaf->box))
+		_root = _root->parent;
+	_Insert(_leaf, _root ? _root : m_root);
+}
+//----------------------------------------------------------------------------//
+void Dbvt::Enum(Callback* _cb, bool _withTest)
+{
+	Node* _stackBase[32];
+	Node** _stack = _stackBase;
+	*_stack++ = m_root;
+	do
+	{
+		Node* _node = *_stack--;
+		Callback::TestResult _result = _withTest ? _cb->TestNode(_node) : Callback::TR_WithoutTest;
+		if (_result == Callback::TR_Stop)
+			break;
+		else if (_result == Callback::TR_Skip)
+			continue;
+		else if (_result == Callback::TR_WithTest)
+		{
+			if (_node->IsNode())
+			{
+				*_stack++ = _node->child0;
+				*_stack++ = _node->child1;
+			}
+			else
+				_cb->AddLeaf(_node, _result);
+		}
+		else
+		{
+			Node** _stack2 = _stack;
+			*_stack2++ = _node;
+			do
+			{
+				_node = *_stack2--;
+				if (_node->IsNode())
+				{
+					*_stack2++ = _node->child0;
+					*_stack2++ = _node->child1;
+				}
+				else
+					_cb->AddLeaf(_node, _result);
+
+			} while (_stack2 > _stack);
+		}
+
+	} while (_stack > _stackBase);
+}
+//----------------------------------------------------------------------------//
+void Dbvt::_Insert(Node* _leaf, Node* _root)
+{
+	if (!m_root) // it's new root
+	{
+		m_root = _leaf;
+		return;
+	}
+
+	// the target node for insertion instead of him
+	ASSERT(_root != nullptr);
+	Node* _target = _root;
+	while (_target->IsNode())
+		_target = _target->child[_leaf->box.Select(_target->child0->box, _target->child1->box)];
+
+	// parent node
+	Node* _parent = _target->parent;
+
+	// new node
+	Node* _node = m_free ? m_free : new Node;
+	m_free = nullptr;
+	_node->box = _target->box + _leaf->box;
+	_node->parent = _parent;
+
+	// do insert target and leaf
+	_node->child0 = _target;
+	_target->parent = _node;
+	_node->child1 = _leaf;
+	_leaf->parent = _node;
+
+	if (_parent) // it's not root
+	{
+		_parent->child[_parent->child1 == _target ? 1 : 0] = _node; // do insert new node instead of target
+		while (_parent && !_parent->box.Contains(_node->box)) // update bbox for parents
+		{
+			_parent->box = _parent->child0->box + _parent->child1->box;
+			_node = _parent;
+			_parent = _node->parent;
+		}
+	}
+	else // it's new root
+	{
+		m_root = _node;
+	}
+}
+//----------------------------------------------------------------------------//
+Dbvt::Node* Dbvt::_Remove(Node* _leaf)
+{
+	Node* _parent = _leaf->parent;
+	_leaf->parent = nullptr;
+
+	if (_leaf == m_root) // it's root
+	{
+		m_root = nullptr;
+		return nullptr;
+	}
+
+	Node* _prev = _parent->parent;
+	Node* _sibling = _parent->child[_parent->child0 == _leaf ? 1 : 0];
+
+	if (_prev) // in depth of tree
+	{
+		// remove parent
+		_prev->child[_prev->child1 == _parent ? 1 : 0] = _sibling;
+		_sibling->parent = _prev;
+		_Delete(_parent);
+
+		// update bbox for parents
+		AlignedBox _box;
+		while (_prev)
+		{
+			_box = _prev->box;
+			_prev->box = _prev->child0->box + _prev->child1->box;
+			if (_box == _prev->box) // no changes 
+				break;
+			_prev = _prev->parent;
+		}
+		return _prev;
+	}
+
+	// it's child of root
+	m_root = _sibling;
+	_sibling->parent = nullptr;
+	_Delete(_parent);
+	return m_root;
+}
+//----------------------------------------------------------------------------//
+void Dbvt::_Delete(Node* _node)
+{
+	if (!m_free)
+		m_free = _node;
+	else
+		delete _node;
+}
+//----------------------------------------------------------------------------//
+void Dbvt::_Clear(void)
+{
+	Node* _stackBase[32];
+	Node** _stack = _stackBase;
+	*_stack++ = m_root;
+	do
+	{
+		Node* _top = *_stack--;
+		if (_top->IsNode())
+		{
+			ASSERT(_stack - _stackBase < 30);
+			*_stack++ = _top->child0;
+			*_stack++ = _top->child1;
+			delete _top;
+		}
+		else
+			_top->parent = nullptr;
+
+	} while (_stack > _stackBase);
+
+	delete m_free;
+	m_free = nullptr;
+	m_root = nullptr;
+}
+//----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
 //

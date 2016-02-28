@@ -144,7 +144,7 @@ protected:
 
 	Behavior* m_behaviors;
 
-	DbvTreeNode* m_dbvtNode;
+	DbvtNode* m_dbvtNode;
 	PhysicsEntity* m_physics;
 
 	bool m_active : 1;
@@ -221,6 +221,8 @@ protected:
 	void _RemoveRootNode(Node* _node);
 	void _AddNode(Node* _node);
 	void _RemoveNode(Node* _node);
+	uint _NewID(Node* _node);
+	void _FreeID(uint _id);
 
 	uint16 m_frame;
 	Node* m_rootNodes;
@@ -229,7 +231,11 @@ protected:
 	uint m_numActiveNodes;
 	uint m_numRootNodes;
 
+	Array<Node*> m_nodes;
+	Array<uint> m_freeIds;
+
 	CameraPtr m_activeCamera;
+
 };
 
 //----------------------------------------------------------------------------//

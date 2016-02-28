@@ -514,6 +514,8 @@ void Scene::_AddNode(Node* _node)
 	if (!_node->m_parent)
 		_AddRootNode(_node);
 
+	_node->m_id = _NewID(_node);
+
 	//if (_node->m_dbvtNode)
 	//	m_dbvt->AddNode(_node->m_dbvtNode);
 
@@ -527,12 +529,39 @@ void Scene::_RemoveNode(Node* _node)
 	if (!_node->m_parent)
 		_RemoveRootNode(_node);
 
+	_FreeID(_node->m_id);
+
 	// ...
 
 	//if (_node->m_dbvtNode)
 	//	m_dbvt->RemoveNode(_node->m_dbvtNode);
 
 	--m_numNodes;
+}
+//----------------------------------------------------------------------------//
+uint Scene::_NewID(Node* _node)
+{
+	uint _id;
+	if (m_freeIds.Size())
+	{
+		_id = m_freeIds.Top();
+		m_freeIds.Pop();
+	}
+	else
+	{
+		_id = m_nodes.Size();
+		m_nodes.Upsize(1, true);
+	}
+	m_nodes[_id] = _node;
+	return _id;
+}
+//----------------------------------------------------------------------------//
+void Scene::_FreeID(uint _id)
+{
+	ASSERT(_id < m_nodes.Size());
+	ASSERT(m_nodes[_id] != nullptr);
+	m_nodes[_id] = nullptr;
+	m_freeIds.Push(_id);
 }
 //----------------------------------------------------------------------------//
 

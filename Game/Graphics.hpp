@@ -17,6 +17,9 @@
 #if defined(_DEBUG) || 0
 #define _DEBUG_OUTPUT
 #endif
+#if defined(_DEBUG) || 0
+#define _DEBUG_DRAW
+#endif
 
 #define MAX_SHADER_OBJECTS 64
 #define MAX_SAMPLER_OBJECTS 16
