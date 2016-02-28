@@ -11,7 +11,7 @@
 #define BILLBOARD_Y_BIT 0x10
 #define PARTICLES_BIT 0x20
 
-#define TERRAIN_BIT 0x20
+#define TERRAIN_BIT 0x40
 
 
 // PS flags
@@ -52,25 +52,27 @@
 #	define layout(...)
 #endif // GLSL
 
+#define ROWMAJOR layout(row_major)
+
 UBUFFER(1, Camera)
 {
-	layout(row_major) mat4 ViewMat;
-	layout(row_major) mat4 ProjMat;
-	layout(row_major) mat4 ViewProjMat;
-	layout(row_major) mat4 InvViewProjMat;
-	layout(row_major) mat3 NormMat; // inverse(mat3(ViewMat))
+	ROWMAJOR mat4 ViewMat;
+	ROWMAJOR mat4 ProjMat;
+	ROWMAJOR mat4 ViewProjMat;
+	ROWMAJOR mat4 InvViewProjMat;
+	ROWMAJOR mat3 NormMat; // inverse(mat3(ViewMat))
 	vec4 CameraPos;
 	vec4 Depth;	// near, far, C=constant, FC = 1.0/log(far*C + 1)
 };
 
 UBUFFER(2, InstanceMat)
 {
-	layout(row_major) mat4 WorldMat[MAX_INSTANCES];
+	ROWMAJOR mat4 WorldMat[MAX_INSTANCES];
 };
 
 UBUFFER(3, SkinMat)
 {
-	layout(row_major) mat4 SkinMat[MAX_BONES];
+	ROWMAJOR mat4 SkinMat[MAX_BONES];
 };
 
 UBUFFER(4, ClipPlane)
@@ -80,30 +82,36 @@ UBUFFER(4, ClipPlane)
 };
 
 USAMPLER(0, 2D, ColorMap);
+USAMPLER(1, 2D, HeightMap);
 
 
 #ifdef GLSL
 
+#define VARGS(A)  #A
+
 #ifndef COMPILE_VS
-#	define COMPILE_VS 0
+#define COMPILE_VS 0
 #endif
 #ifndef COMPILE_GS
-#	define COMPILE_GS 0
+#define COMPILE_GS 0
 #endif
 #ifndef COMPILE_FS
-#	define COMPILE_FS 0
+#define COMPILE_FS 0
 #endif
-#define USE_GS (FLAGS & (SPRITE | BILLBOARD | TERRAIN))
 
 #if COMPILE_GS
-#	define GS_IN_SUFFIX []
+#define GS_IN_SUFFIX []
 #else
-#	define GS_IN_SUFFIX
+#define GS_IN_SUFFIX
 #endif
-#define IN(S, T, N) layout(location = S) in T In##N GS_IN_SUFFIX
-#define IN_FLAT(S, T, N) layout(location = S) flat in T In
-#define OUT(S, T, N) layout(location = S) out T Out##N
-#define INOUT(S, T, N) IN(S, T, N); OUT(S, T, N);
+
+#define _INOUT(S, IO, T, P, N) layout(location = S) IO T P##N
+#define IN(S, T, N) _INOUT(S, in, T, In, N) GS_IN_SUFFIX
+#define IN_FLAT(S, T, N) _INOUT(S, flat in, T, In, N) 
+#define OUT(S, T, N) _INOUT(S, out, T, Out, N)
+#define INOUT(S, T, N) IN(S, T, N); OUT(S, T, N)
+
+#define _PerVertex gl_PerVertex { vec4 gl_Position; /*float gl_ClipDistance[];*/ }
 
 #if COMPILE_VS
 INOUT(0, vec4, Pos);
@@ -113,23 +121,14 @@ INOUT(3, vec3, Normal);
 INOUT(4, vec4, Tangent);
 IN(5, vec4, Weights);
 IN(6, vec4, Indices);
-
 INOUT(7, vec2, TexCoord2);
 INOUT(8, vec2, Size);
 INOUT(9, float, Rot);
-
 OUT(10, vec4, WorldPos);
 OUT(11, vec3, Binormal);
-
 OUT(12, int, InstanceID);
-//OUT(13, float, LogZ);
-
-out gl_PerVertex
-{
-	vec4 gl_Position;
-	//float gl_PointSize;
-	float gl_ClipDistance[];
-};
+OUT(13, float, LogZ);
+out _PerVertex;
 #endif  
 
 #if COMPILE_GS
@@ -143,26 +142,12 @@ INOUT(4, vec4, Tangent);
 IN(7, vec2, TexSize);
 IN(8, vec2, Size);
 IN(9, float, Rot);
-
 INOUT(10, vec4, WorldPos);
 INOUT(11, vec3, Binormal);
-
 INOUT(12, int, InstanceID);
-//INOUT(13, float, LogZ);
-
-in gl_PerVertex
-{
-	vec4 gl_Position;
-	//float gl_PointSize;
-	float gl_ClipDistance[];
-} gl_in[]; 
-
-out gl_PerVertex
-{
-	vec4 gl_Position;
-	//float gl_PointSize;
-	float gl_ClipDistance[];
-};
+OUT(13, float, LogZ);
+in _PerVertex gl_in[];
+out _PerVertex;
 #endif
 
 #if COMPILE_FS
@@ -173,9 +158,13 @@ IN(4, vec3, Tangent);
 IN(10, vec4, WorldPos);
 IN(11, vec3, Binormal);
 IN_FLAT(12, int, InstanceID);
-
+IN(13, float, LogZ);
 OUT(0, vec4, Color);
 #endif
+
+#define UNIT_X vec3(1, 0, 0)
+#define UNIT_Y vec3(0, 1, 0)
+#define UNIT_Z vec3(0, 0, 1)
 
 #endif // GLSL
 

@@ -161,8 +161,21 @@ inline float ACos(float _x)
 	return _r;
 #endif
 }
+inline float Log(float _x)
+{
+#if USE_CRT_MATH
+	return logf(_x);
+#else
+	float _r;
+	__asm fldln2
+	__asm fld _x
+	__asm fyl2x
+	__asm fstp _r
+	return _r;
+#endif
+}
 inline float Log2(float _x)
-{ 
+{
 #if USE_CRT_MATH
 	return log2f(_x);
 #else
@@ -240,12 +253,71 @@ typedef uint16_t float16_t;
 inline uint16_t FloatToHalf(float _value)
 {
 	union { float f; uint32 i; }_fb = { _value };
+#if 0
 	return (uint16)((_fb.i >> 16) & 0x8000) | ((((_fb.i & 0x7f800000) - 0x38000000) >> 13) & 0x7c00) | ((_fb.i >> 13) & 0x03ff);
+#else
+	uint32 _s = (_fb.i >> 16) & 0x00008000; // sign
+	int32 _e = ((_fb.i >> 23) & 0x000000ff) - 0x00000070; // exponent
+	uint32 _r = _fb.i & 0x007fffff; // mantissa
+	if (_e < 1)
+	{
+		if (_e < -10)
+			return 0;
+		_r = (_r | 0x00800000) >> (14 - _e);
+		return (uint16)(_s | _r);
+	}
+	else if (_e == 0x00000071)
+	{
+		if (_r == 0)
+			return (uint16)(_s | 0x7c00); // Inf
+		else
+			return (uint16)(((_s | 0x7c00) | (_r >>= 13)) | (_r == 0)); // NAN
+	}
+	if (_e > 30)
+		return (uint16)(_s | 0x7c00); // Overflow
+	return (uint16)((_s | (_e << 10)) | (_r >> 13));
+#endif
 }
 inline float HalfToFloat(uint16 _value)
 {
 	union { uint32 i; float f; }_fb;
+#if 0
 	_fb.i = ((_value & 0x8000) << 16) | (((_value & 0x7c00) + 0x1C000) << 13) | ((_value & 0x03FF) << 13);
+#else
+	int32 _s = (_value >> 15) & 0x00000001; // sign
+	int32 _e = (_value >> 10) & 0x0000001f; // exponent
+	int32 _r = _value & 0x000003ff; // mantissa
+	if (_e == 0)
+	{
+		if (_r == 0) // Plus or minus zero
+		{
+			_fb.i = _s << 31;
+			return _fb.f;
+		}
+		else // Denormalized number -- renormalize it
+		{
+			for (; !(_r & 0x00000400); _r <<= 1, _e -= 1);
+			_e += 1;
+			_r &= ~0x00000400;
+		}
+	}
+	else if (_e == 31)
+	{
+		if (_r == 0) // Inf
+		{
+			_fb.i = (_s << 31) | 0x7f800000;
+			return _fb.f;
+		}
+		else // NaN
+		{
+			_fb.i = ((_s << 31) | 0x7f800000) | (_r << 13);
+			return _fb.f;
+		}
+	}
+	_e = (_e + 112) << 23;
+	_r = _r << 13;
+	_fb.i = ((_s << 31) | _e) | _r;
+#endif
 	return _fb.f;
 }
 

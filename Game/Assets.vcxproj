@@ -213,10 +213,7 @@
     <ClInclude Include="Shaders\Generic-VS.glsl">
       <FileType>Document</FileType>
     </ClInclude>
-    <ClInclude Include="Shaders\Sprite-GS.glsl">
-      <FileType>Document</FileType>
-    </ClInclude>
-    <ClInclude Include="Shaders\Terrain-GS.glsl">
+    <ClInclude Include="Shaders\Quad-GS.glsl">
       <FileType>Document</FileType>
     </ClInclude>
   </ItemGroup>

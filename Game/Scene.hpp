@@ -68,6 +68,9 @@ public:
 	void SetParent(Node* _parent);
 
 	void DetachChildren(bool _remove = false);
+	Node* GetParent(void) { return m_parent; }
+	Node* GetChild(void) { return m_child; }
+	Node* GetNext(void) { return m_next; }
 
 	void AddBehavior(Behavior* _b);
 	void RemoveBehavior(Behavior* _b);
@@ -82,6 +85,9 @@ public:
 
 	void Update(const FrameInfo& _frame);
 	void PostUpdate(const FrameInfo& _frame);
+
+	Vec3 LocalToWorld(const Vec3& _v) { return GetWorldTransform().Transform(_v); }
+	Vec3 WorldToLocal(const Vec3& _v) { return GetWorldTransform().Copy().Inverse().Transform(_v); }
 
 	const Mat44& GetWorldTransform(void);
 	void SetWorldTransform(const Mat44& _tm);
@@ -201,7 +207,7 @@ public:
 	Scene(void);
 	~Scene(void);
 
-	void Update(float _dt);
+	void Update(float _seconds);
 
 	void SetActiveCamera(Camera* _camera) { m_activeCamera = _camera; }
 	Camera* GetActiveCamera(void) { return m_activeCamera; }

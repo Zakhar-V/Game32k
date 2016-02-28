@@ -35,10 +35,7 @@
     <ClInclude Include="Shaders\FillGBuffer-PS.glsl">
       <Filter>Assets\Shaders</Filter>
     </ClInclude>
-    <ClInclude Include="Shaders\Sprite-GS.glsl">
-      <Filter>Assets\Shaders</Filter>
-    </ClInclude>
-    <ClInclude Include="Shaders\Terrain-GS.glsl">
+    <ClInclude Include="Shaders\Quad-GS.glsl">
       <Filter>Assets\Shaders</Filter>
     </ClInclude>
   </ItemGroup>

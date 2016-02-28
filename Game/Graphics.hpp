@@ -158,8 +158,12 @@ struct Vertex // generic vertex, 36 bytes
 	};
 
 	Vertex& SetTexCoord(const Vec2& _tc) { texcoord[0] = FloatToHalf(_tc.x), texcoord[1] = FloatToHalf(_tc.y); return *this; };
+	Vertex& SetColor(const Color& _c) { color[0] = _c.r, color[1] = _c.g, color[2] = _c.b, color[3] = _c.a; return *this; }
+	
+	
 	Vertex& SetTexCoord2(const Vec2& _tc) { texcoord2[0] = FloatToHalf(_tc.x), texcoord2[1] = FloatToHalf(_tc.y); return *this; };
-
+	Vertex& SetSize(const Vec2& _s) { size[0] = _s.x, size[1] = _s.y; return *this; }
+	Vertex& SetRotation(float _r) { rotation = _r; return *this; }
 	// ...
 };
 

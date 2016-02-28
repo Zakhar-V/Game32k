@@ -107,6 +107,8 @@ void Renderer::Draw(Scene* _scene)
 	_wm.SetScale({ 100, 0.1f, 100 });
 	m_instanceBuffer->Write(&_wm, 0, sizeof(_wm));
 	m_testCube->Draw();
+
+	m_instanceBuffer->Write(&MAT44_IDENTITY, 0, sizeof(MAT44_IDENTITY));
 }
 
 //----------------------------------------------------------------------------//

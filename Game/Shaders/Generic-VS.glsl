@@ -4,7 +4,7 @@ void main()
 	OutInstanceID = gl_InstanceID;
 
 	OutPos = InPos;
-#if PARTICLES
+#if PARTICLES || TERRAIN
 	OutWorldPos = InPos;
 #else
 	OutWorldPos = WorldMat[gl_InstanceID] * InPos;
@@ -13,10 +13,10 @@ void main()
 	OutColor = InColor;
 	OutTexCoord = InTexCoord;
 
-#if SPRITE
+#if SPRITE || TERRAIN
 	OutSize = InSize;
 	OutRot = InRot;
-	OutTexCoord2 = InTexCoord2 - InTexCoord;
+	OutTexCoord2 = (InTexCoord2 - InTexCoord);
 #else
 
 #endif
@@ -25,4 +25,5 @@ void main()
 
 #endif
 	gl_Position =  ViewProjMat * OutWorldPos;
-}
+	OutLogZ = gl_Position.w*Depth.z + 1;
+}  

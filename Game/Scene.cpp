@@ -35,7 +35,7 @@ Node::Node(void) :
 	m_lastUpdateFrame(0),
 	m_lastViewFrame(0),
 	m_updatePolicy(UP_Auto),
-	m_sleepingThreshold(0.1f), // 100 ms = ~6 frames on 60 fps
+	m_sleepingThreshold(0.2f), // 200 ms = ~12 frames on 60 fps
 	m_activeTime(0)
 {
 }
@@ -385,7 +385,7 @@ void Node::_UpdateTransform(void)
 Camera::Camera(void) :
 	m_orthographic(false),
 	m_fov(QUAD_PI), // 45
-	m_near(0.001f),
+	m_near(1.01f),
 	m_far(1000),
 	m_zoom(1)
 {
@@ -420,10 +420,16 @@ void Camera::GetParams(float _x, float _y, float _w, float _h, UCamera& _params,
 	_params.ViewProjMat = _params.ProjMat * _params.ViewMat;
 
 	Mat44 _proj = _params.ProjMat;
-	_proj.m22 = 0; // no near clip plane
+	//_proj.m22 = 0;
+	//_proj.m32 = -1;
 	_params.InvViewProjMat = (_proj * _params.ViewMat).Inverse();
 
-	// todo: depth params (near, far, C=constant, FC = 1.0/log(far*C + 1))
+	// depth params (near, far, C=constant, FC = 1.0/log(far*C + 1))
+	// the camera depth is: (exp(depth/FC)-1.0)/C
+	_params.Depth.x = m_near;
+	_params.Depth.y = m_far;
+	_params.Depth.z = m_near;
+	_params.Depth.w = 1 / Log(m_far * _params.Depth.z + 1);
 }
 //----------------------------------------------------------------------------//
 
@@ -452,11 +458,11 @@ Scene::~Scene(void)
 	// ...
 }
 //----------------------------------------------------------------------------//
-void Scene::Update(float _dt)
+void Scene::Update(float _seconds)
 {
 	FrameInfo _frame;
 	_frame.id = ++m_frame;
-	_frame.time = _dt;
+	_frame.time = _seconds;
 
 	uint _active = m_numActiveNodes;
 	for (Node* i = m_activeNodes; i; i = i->m_nextActive)

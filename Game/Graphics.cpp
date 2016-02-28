@@ -620,11 +620,11 @@ const g_shaderNames[] =
 	{ ST_Vertex, VS_Particles, "Generic-VS.glsl", SPRITE_BIT | PARTICLES_BIT },
 	{ ST_Vertex, VS_Terrain, "Generic-VS.glsl", TERRAIN_BIT },
 
-	{ ST_Geometry, GS_Sprite, "Sprite-GS.glsl", SPRITE_BIT },
-	{ ST_Geometry, GS_Billboard, "Sprite-GS.glsl", SPRITE_BIT | BILLBOARD_BIT },
-	{ ST_Geometry, GS_BillboardY, "Sprite-GS.glsl", SPRITE_BIT | BILLBOARD_Y_BIT },
-	{ ST_Geometry, GS_Particles, "Sprite-GS.glsl", SPRITE_BIT | PARTICLES_BIT },
-	{ ST_Geometry, GS_Terrain,"Terrain-GS.glsl", TERRAIN_BIT },
+	{ ST_Geometry, GS_Sprite, "Quad-GS.glsl", SPRITE_BIT },
+	{ ST_Geometry, GS_Billboard, "Quad-GS.glsl", SPRITE_BIT | BILLBOARD_BIT },
+	{ ST_Geometry, GS_BillboardY, "Quad-GS.glsl", SPRITE_BIT | BILLBOARD_Y_BIT },
+	{ ST_Geometry, GS_Particles, "Quad-GS.glsl", SPRITE_BIT | PARTICLES_BIT },
+	{ ST_Geometry, GS_Terrain, "Quad-GS.glsl", SPRITE_BIT | TERRAIN_BIT },
 
 	{ ST_Fragment, FS_Texture, "FillGBuffer-PS.glsl", TEXTURE_BIT },
 	{ ST_Fragment, FS_NoTexture, "FillGBuffer-PS.glsl", 0 },

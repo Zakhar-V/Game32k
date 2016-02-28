@@ -199,28 +199,25 @@ protected:
 
 };
 
-double Time(void)
+double Time(void) // in seconds
 {
 	LARGE_INTEGER _f, _c;
 	QueryPerformanceFrequency(&_f);
 	QueryPerformanceCounter(&_c);
 	return (double)_c.QuadPart / (double)_f.QuadPart;
 }
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//----------------------------------------------------------------------------//
-//
-//----------------------------------------------------------------------------//
-////////////////////////////////////////////////////////////////////////////////
-
-
-////////////////////////////////////////////////////////////////////////////////
-//----------------------------------------------------------------------------//
-//
-//----------------------------------------------------------------------------//
-////////////////////////////////////////////////////////////////////////////////
+double TimeCounter(void) // in seconds
+{
+	LARGE_INTEGER _c;
+	QueryPerformanceCounter(&_c);
+	return (double)_c.QuadPart;
+}
+double TimeFreq(void) // in seconds
+{
+	LARGE_INTEGER _f;
+	QueryPerformanceFrequency(&_f);
+	return 1 / (double)_f.QuadPart;
+}
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -242,6 +239,106 @@ double Time(void)
 //
 //----------------------------------------------------------------------------//
 ////////////////////////////////////////////////////////////////////////////////
+
+
+////////////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------//
+//
+//----------------------------------------------------------------------------//
+////////////////////////////////////////////////////////////////////////////////
+
+typedef Ptr<class Terrain> TerrainPtr;
+
+class Terrain : public Node
+{
+public:
+	OBJECT("Terrain");
+
+	Terrain(void)
+	{
+	}
+
+	~Terrain(void)
+	{
+	}
+
+	float GetHeight(float _x, float _z)
+	{
+
+	}
+
+	void Create(Image* _heightmap, const Vec3& _scale, uint _numSectors)
+	{
+		ASSERT(_heightmap && _heightmap->Format() == PF_R32F);
+
+		m_heightmap = _heightmap;
+		m_scale = _scale;
+		m_mesh = new RenderMesh();
+		BufferPtr _vb = new Buffer;
+
+		if (!_numSectors)
+			_numSectors = 1;
+		uint _numSectorsSq = _numSectors * _numSectors;
+		_vb->Realloc(_numSectorsSq * sizeof(Vertex));
+		Vertex* _v = (Vertex*)_vb->Map(LM_WriteDiscard, 0, _vb->Size());
+
+		float _texStep = 1.f / (_numSectors);
+		Vec2 _tc(0);
+		Vec2 _step(_scale.x / _numSectors, _scale.x / _numSectors);
+		Vec2 _halfStep = _step * 0.5f;
+		float _py = _scale.z * -0.5f + _halfStep.y;
+		Color _color(0xff, 0xff, 0xff, 0xff);
+		for (uint y = 0; y < _numSectors; ++y)
+		{
+			_tc.x = 0;
+			float _px = _scale.x * -0.5f + _halfStep.x;
+			for (uint x = 0; x < _numSectors; ++x)
+			{
+				_v->position.Set(_px, 0, _py);
+				_v->SetSize(_step);
+				_v->SetColor(_color);
+				_v->SetTexCoord(_tc);
+				_v->SetTexCoord2(_tc + _texStep);
+				_v->SetRotation(_scale.y);
+				++_v;
+				_tc.x += _texStep;
+				_px += _step.x;
+			}
+			_tc.y += _texStep;
+			_py += _step.y;
+		}
+		_vb->Unmap();
+
+		m_mesh->SetVertexBuffer(_vb);
+		m_mesh->SetRange(0, _numSectorsSq);
+		m_mesh->SetType(PT_Points);
+
+		m_texture = new Texture(TT_2D, PF_R32F);
+		m_texture->Realloc(_heightmap->Width(), _heightmap->Height());
+		m_texture->Write(_heightmap->Format(), _heightmap->Data());
+		m_texture->GenerateMipmap();
+	}
+
+	Vec3 m_scale;
+	uint m_numSectors;
+	ImagePtr m_heightmap;
+	RenderMeshPtr m_mesh;
+	TexturePtr m_texture;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------//
+//
+//----------------------------------------------------------------------------//
+////////////////////////////////////////////////////////////////////////////////
+
+struct Settings_t
+{
+	float invCameraH = 1;
+	float invCameraV = 1;
+	float mouseSens = 1.5;
+}
+gSettings;
 
 
 class FirstPersonCameraController : public Behavior
@@ -263,18 +360,16 @@ public:
 	}
 	void Update(const FrameInfo& _frame) override
 	{
-		gDevice->SetCursorMode(CM_Camera);
-
 		Quat _r = m_node->GetLocalRotation();
-		Vec2 _rot = gDevice->GetCameraDelta() * _frame.time * RADIANS;
+		Vec2 _rot = gDevice->GetCameraDelta() * 10 * Vec2(gSettings.invCameraH, gSettings.invCameraV) * gSettings.mouseSens * _frame.time;
 		if (_rot.x || _rot.y)
 		{
-			m_pitch = Clamp<float>(m_pitch - _rot.y, -HALF_PI, HALF_PI);
-			m_yaw -= _rot.x;
+			m_pitch = Clamp<float>(m_pitch + _rot.y, -90, 90);
+			m_yaw += _rot.x;
 
 			Quat _rx, _ry;
-			_rx.FromAxisAngle(VEC3_UNIT_X, m_pitch);
-			_ry.FromAxisAngle(VEC3_UNIT_Y, m_yaw);
+			_rx.FromAxisAngle(VEC3_UNIT_X, m_pitch * RADIANS);
+			_ry.FromAxisAngle(VEC3_UNIT_Y, m_yaw * RADIANS);
 
 			Vec3 _dir = -VEC3_UNIT_Z * _r;
 
@@ -309,10 +404,12 @@ public:
 			_vec.y += 1;
 
 		if ((GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0)
-			_vec *= 5;
+			_vec *= 250;
+
+		Vec3 _dir = _vec * m_node->GetChild()->GetWorldRotation().Copy().Inverse(); // camera direction
 
 		Vec3 _pos = m_node->GetWorldPosition();
-		_pos += _vec * _frame.time;
+		_pos += _dir * _frame.time;
 		m_node->SetWorldPosition(_pos);
 
 		//printf("%f %f %f\n", _pos.x, _pos.y, _pos.z);
@@ -335,7 +432,7 @@ protected:
 //----------------------------------------------------------------------------//
 ////////////////////////////////////////////////////////////////////////////////
 
-NodePtr CreateCamera(Scene* _scene)
+CameraPtr CreateCamera(Scene* _scene)
 {
 	Ptr<Camera> _camera = new Camera;
 	Ptr<FirstPersonCameraController> _controller = new FirstPersonCameraController;
@@ -343,7 +440,7 @@ NodePtr CreateCamera(Scene* _scene)
 	_camera->SetScene(_scene);
 	_scene->SetActiveCamera(_camera);
 
-	return &_camera;
+	return _camera;
 }
 
 void CreatePlayer(Scene* _scene)
@@ -355,15 +452,16 @@ void CreatePlayer(Scene* _scene)
 	_player->SetScene(_scene);
 	//_controller->Activate();
 
-	NodePtr _camera = CreateCamera(_scene);
+	CameraPtr _camera = CreateCamera(_scene);
 	_camera->SetParent(_player);
+	_camera->SetFar(2500);
 }
 
 void CreatScene(Scene* _scene)
 {
 	CreatePlayer(_scene);
 
-	for (uint i = 0; i < 1000000; ++i)
+	for (uint i = 0; i < 20000; ++i)
 	{
 		NodePtr _test = new Node;
 		_test->SetSleepingThreshold(15);
@@ -408,14 +506,44 @@ void main(void)
 	Scene* _scene = new Scene;
 	CreatScene(_scene);
 
+	TerrainPtr _terrain = new Terrain;
+	{
+		ImagePtr _hmap = new Image;
+		//_hmap->CreatePerlin(512, 0.05f);
+		_hmap->CreatePerlin(256, 0.1f);
+		_terrain->Create(_hmap, { 10000, 500, 10000 }, 250);
+	}
+
 	const Color _clearColor(0x7f7f9fff);
-	double _st, _et, _at;
-	float _dt = 0;
+
+	double _st, _et;
+	float _dt = 0, _tt = 0, _pt = 0;
+	float _fps = 0;
+	int _frames = 0;
+
 	bool _quit = false;
+
+	uint _sampler;
+	glGenSamplers(1, &_sampler);
+	glBindSampler(1, _sampler);
+	glSamplerParameteri(_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glSamplerParameteri(_sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glSamplerParameteri(_sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glSamplerParameteri(_sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+	gDevice->SetCursorMode(CM_Camera);
+
+
 	while (!_quit && !gDevice->ShouldClose())
 	{
-		gDevice->PollEvents();
 		_st = Time();
+		gDevice->PollEvents();
+		_et = Time();
+		_pt += (float)(_et - _st);
+		_st = _et;
+		//_pt += (float)((TimeCounter() - _st) * TimeFreq());
+
+		//_st = TimeCounter();
 
 		_quit = GetAsyncKeyState(VK_ESCAPE) != 0;
 
@@ -425,17 +553,39 @@ void main(void)
 		gGraphics->ClearFrameBuffers(FBT_Color | FBT_DepthStencil, _clearColor, 1, 0xff);
 
 		glEnable(GL_DEPTH_TEST);
+		glEnable(GL_DEPTH_CLAMP);
+		//glDepthRange(-1, 1);
 		gRenderer->Draw(_scene);
 
-		wglSwapIntervalEXT(1);
+		gGraphics->SetShader(VS_Sprite);
+		gGraphics->SetShader(GS_Terrain);
+		gGraphics->SetShader(FS_Texture);
+		gGraphics->SetTexture(0, _terrain->m_texture);
+		gGraphics->SetTexture(1, _terrain->m_texture);
+		glBindSampler(1, _sampler);
+
+
+		_terrain->m_mesh->Draw();
+
+
+
+		wglSwapIntervalEXT(0);
 		gGraphics->EndFrame();
+		Sleep(1);
 
 		_et = Time();
-		float _odt = _dt;
-		_dt = (float)(_et - _st);
-		_dt = _dt * 0.5f + _odt * 0.5f;
-		//if (_dt > 1 / 20.f)
-		//	_dt = 1 / 20.f;
+		_tt += (float)(_et - _st);
+		++_frames;
+		if (_tt > 0.2f)
+		{
+			if (_pt < 0.5f)
+				_tt += _pt;
+			_dt = _tt / _frames;
+			_fps = 1 / _dt;
+			_tt = 0;
+			_pt = 0;
+			_frames = 0;
+		}
 	}
 
 	delete _scene;
