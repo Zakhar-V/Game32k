@@ -135,10 +135,16 @@ protected:
 // Vertex
 //----------------------------------------------------------------------------//
 
-struct Vertex // generic vertex, 36 bytes 
+#define USE_HALF_FLOAT_TEXCOORD 1
+
+struct Vertex // generic vertex, 36(40) bytes 
 {
 	Vec3 position; // 0
-	float16_t texcoord[2]; // 1
+#if USE_HALF_FLOAT_TEXCOORD
+	uint16 texcoord[2]; // 1
+#else
+	float texcoord[2]; // 1
+#endif
 	uint8 color[4]; // 2
 
 	union
@@ -153,18 +159,31 @@ struct Vertex // generic vertex, 36 bytes
 
 		struct
 		{
-			float16_t texcoord2[2]; // 7
+#if USE_HALF_FLOAT_TEXCOORD
+			uint16 texcoord2[2]; // 7
+#else
+			float texcoord2[2]; // 7
+#endif
 			float size[2]; // 8
 			float rotation; // 9
 
 		};
 	};
 
+#if USE_HALF_FLOAT_TEXCOORD
 	Vertex& SetTexCoord(const Vec2& _tc) { texcoord[0] = FloatToHalf(_tc.x), texcoord[1] = FloatToHalf(_tc.y); return *this; };
-	Vertex& SetColor(const Color& _c) { color[0] = _c.r, color[1] = _c.g, color[2] = _c.b, color[3] = _c.a; return *this; }
-	
-	
+	Vec2 GetTexCoord(void) const { return Vec2(HalfToFloat(texcoord[0]), HalfToFloat(texcoord[1])); }
 	Vertex& SetTexCoord2(const Vec2& _tc) { texcoord2[0] = FloatToHalf(_tc.x), texcoord2[1] = FloatToHalf(_tc.y); return *this; };
+	Vec2 GetTexCoord2(void) const { return Vec2(HalfToFloat(texcoord2[0]), HalfToFloat(texcoord2[1])); }
+#else
+	Vertex& SetTexCoord(const Vec2& _tc) { texcoord[0] = _tc.x, texcoord[1] = _tc.y; return *this; };
+	Vec2 GetTexCoord(void) const { return *(Vec2*)texcoord; }
+	Vertex& SetTexCoord2(const Vec2& _tc) { texcoord2[0] = _tc.x, texcoord2[1] = _tc.y; return *this; };
+	Vec2 GetTexCoord2(void) const { return *(Vec2*)texcoord2; }
+#endif
+
+	Vertex& SetColor(const Color& _c) { color[0] = _c.r, color[1] = _c.g, color[2] = _c.b, color[3] = _c.a; return *this; }
+
 	Vertex& SetSize(const Vec2& _s) { size[0] = _s.x, size[1] = _s.y; return *this; }
 	Vertex& SetRotation(float _r) { rotation = _r; return *this; }
 	// ...

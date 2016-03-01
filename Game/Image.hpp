@@ -51,6 +51,17 @@ protected:
 // Image
 //----------------------------------------------------------------------------//
 
+enum ImageSampleFlags : uint
+{
+	ISF_Nearest = 0,
+	ISF_Linear = 0x1,
+	ISF_Sparse = 0x2,
+	ISF_Triangle = 0x4,
+
+	ISF_Repeat = 0,
+	ISF_Clamp = 0x8,
+};
+
 class Image : public RefCounted
 {
 public:
@@ -65,7 +76,10 @@ public:
 	uint Bpp(void) { return m_channels * sizeof(float); }
 
 	Vec2 GetCoord(const Vec2& _tc, bool _repeat = true);
-	Color Sample(const Vec2& _tc, bool _smoothed = true, bool _repeat = true);
+	Vec4 Sample(const Vec2& _tc, uint _flags = ISF_Nearest | ISF_Repeat, float _divisor = 1);
+
+	void GetMinMax(Vec4& _mn, Vec4& _mx);
+	void Normalize(const Vec4& _mn, const Vec4 _mx);
 
 	void CreateBitmapFont(FontInfo& _info, const char* _name, uint _fheight, float _fwidth = 0.5f, bool _italic = false);
 	int CreateNoize(uint _size, uint _channels, int _rseed = 0);

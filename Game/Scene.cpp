@@ -32,9 +32,11 @@ Node::Node(void) :
 	m_active(false),
 	m_transformUpdated(true),
 	m_transformChanged(false),
+	m_worldBBoxUpdated(true),
+	m_dbvtUpdated(true),
+	m_dbvtNodeInTree(false),
 	m_lastUpdateFrame(0),
 	m_lastViewFrame(0),
-	m_updatePolicy(UP_Auto),
 	m_sleepingThreshold(0.2f), // 200 ms = ~12 frames on 60 fps
 	m_activeTime(0)
 {
@@ -220,16 +222,16 @@ void Node::PostUpdate(const FrameInfo& _frame)
 	{
 		m_activeTime = 0;
 
-		if (m_active && m_scene && m_updatePolicy != UP_Always && m_behaviorAllowSleep)
+		if (m_active && m_scene && m_sleepingThreshold != 0 && m_behaviorAllowSleep)
 		{
 			m_scene->_RemoveActiveNode(this);
 			m_active = false;
 		}
 	}
-	/*
-	if(m_worldBoundsChanged || m_transformChanged)
-	_UpdateDbvtNode();
-	*/
+	
+	if(!m_dbvtUpdated)
+		_UpdateDbvtNode();
+
 	m_transformChanged = false;
 }
 //----------------------------------------------------------------------------//
@@ -359,6 +361,7 @@ void Node::_InvalidateTransform(void)
 		WakeUp();
 		m_transformUpdated = false;
 		m_transformChanged = true;
+		_InvalidateWorldBBox();
 		for (Node* i = m_child; i; i = i->m_next) // invalidate and activate all children
 			i->_InvalidateTransform();
 	}
@@ -376,6 +379,88 @@ void Node::_UpdateTransform(void)
 	}
 }
 //----------------------------------------------------------------------------//
+void Node::_InvalidateWorldBBox(void)
+{
+	if (m_worldBBoxUpdated)
+	{
+		WakeUp();
+		m_worldBBoxUpdated = false;
+		if (m_dbvtNode)
+			m_dbvtUpdated = false;
+	}
+}
+//----------------------------------------------------------------------------//
+void Node::_CreateDbvtNode(void)
+{
+	if (!m_dbvtNode)
+	{
+		WakeUp();
+		m_dbvtNode = new DbvtNode;
+		m_dbvtNode->object = this;
+		_GetWorldBBox(m_dbvtNode->box);
+		m_dbvtNodeInTree = false;
+		m_dbvtUpdated = false;
+	}
+}
+//----------------------------------------------------------------------------//
+void Node::_DeleteDbvtNode(void)
+{
+	if (m_dbvtNode)
+	{
+		WakeUp();
+		if (m_scene && m_dbvtNodeInTree)
+			m_scene->GetDbvt()->Remove(m_dbvtNode);
+		delete m_dbvtNode;
+		m_dbvtNode = nullptr;
+		m_dbvtNodeInTree = false;
+		m_dbvtUpdated = true;
+	}
+}
+//----------------------------------------------------------------------------//
+void Node::_InvalidateDbvtNode(void)
+{
+	if (m_dbvtUpdated && m_dbvtNode)
+	{
+		WakeUp();
+		m_dbvtUpdated = false;
+	}
+}
+//----------------------------------------------------------------------------//
+void Node::_UpdateDbvtNode(void)
+{
+	ASSERT(m_dbvtUpdated == false);
+
+	if (m_dbvtNode)
+	{
+		if (!m_worldBBoxUpdated)
+		{
+			_GetWorldBBox(m_dbvtNode->box);
+			m_worldBBoxUpdated = true;
+		}
+		if (m_scene)
+		{
+			if (m_dbvtNode->box.IsFinite())
+			{
+				if (m_dbvtNodeInTree)
+				{
+					m_scene->GetDbvt()->Update(m_dbvtNode);
+				}
+				else
+				{
+					m_scene->GetDbvt()->Insert(m_dbvtNode);
+					m_dbvtNodeInTree = true;
+				}
+			}
+			else if (m_dbvtNodeInTree)
+			{
+				m_scene->GetDbvt()->Remove(m_dbvtNode);
+				m_dbvtNodeInTree = false;
+			}
+		}
+	}
+	m_dbvtUpdated = true;
+}
+//----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
 // Camera
@@ -385,7 +470,7 @@ void Node::_UpdateTransform(void)
 Camera::Camera(void) :
 	m_orthographic(false),
 	m_fov(QUAD_PI), // 45
-	m_near(1.01f),
+	m_near(1.0f),
 	m_far(1000),
 	m_zoom(1)
 {
@@ -434,6 +519,69 @@ void Camera::GetParams(float _x, float _y, float _w, float _h, UCamera& _params,
 //----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
+// Terrain
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+Terrain::Terrain(void) :
+	m_scale(VEC3_ONE),
+	m_numSectors(1)
+{
+}
+//----------------------------------------------------------------------------//
+Terrain::~Terrain(void)
+{
+}
+//----------------------------------------------------------------------------//
+float Terrain::GetHeight(float _x, float _z)
+{
+	ASSERT(m_heightmap != nullptr);
+
+	Vec3 _local = WorldToLocal({ _x, 0, _z });
+	Vec3 _point = _local / m_scale;
+	_point.x += 0.5f;
+	_point.z += 0.5f;
+	return m_scale.y * m_heightmap->Sample({_point.x, _point.z}, ISF_Clamp | ISF_Sparse | ISF_Linear | ISF_Triangle, (float)m_numSectors).x;
+}
+//----------------------------------------------------------------------------//
+void Terrain::Create(Image* _heightmap, float _yScale, float _xzScale, uint _numSectors)
+{
+	ASSERT(_heightmap != nullptr);
+	ASSERT(_numSectors > 0);
+
+	if (!_numSectors)
+		_numSectors = 1;
+	m_heightmap = _heightmap;
+	m_scale.Set(_xzScale, _yScale, _xzScale);
+	m_numSectors = _numSectors;
+	m_mesh = new RenderMesh();
+	m_geom = new Geometry();
+	m_geom->CreateGridXZ(_numSectors, m_scale.x / _numSectors);
+	Vertex* _v = m_geom->Vertices().Ptr();
+	for (uint i = 0; i < m_geom->GetVertexCount(); ++i)
+		_v[i].position.y = m_scale.y * (_heightmap->Sample(_v[i].GetTexCoord(), ISF_Clamp | ISF_Linear).x);
+	m_geom->Upload();
+	m_localBBox.Reset().AddVertices(_v, m_geom->GetVertexCount(), sizeof(Vertex));
+	m_mesh->SetVertexBuffer(m_geom->GetVertexBuffer());
+	m_mesh->SetIndexBuffer(m_geom->GetIndexBuffer());
+	m_mesh->SetRange(0, m_geom->GetIndexCount());
+	m_mesh->SetType(PT_Triangles);
+
+	m_texture = new Texture(TT_2D, PF_RGB8, false);
+	m_texture->Realloc(_heightmap->Width(), _heightmap->Height());
+	m_texture->Write(_heightmap->Format(), _heightmap->Data());
+	m_texture->GenerateMipmap();
+
+	_CreateDbvtNode();
+}
+//----------------------------------------------------------------------------//
+void Terrain::_GetWorldBBox(AlignedBox& _bbox)
+{
+	_bbox = m_localBBox * GetWorldTransform();
+}
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
 // Scene
 //----------------------------------------------------------------------------//
 
@@ -456,6 +604,24 @@ Scene::~Scene(void)
 		m_rootNodes->SetScene(nullptr);
 
 	// ...
+}
+//----------------------------------------------------------------------------//
+void Scene::UpdateDbvt(void)
+{
+	for (Node* i = m_activeNodes; i; i = i->m_nextActive)
+	{
+		if (!i->m_dbvtUpdated)
+			i->_UpdateDbvtNode();
+	}
+}
+//----------------------------------------------------------------------------//
+void Scene::UpdateTransform(void)
+{
+	for (Node* i = m_activeNodes; i; i = i->m_nextActive)
+	{
+		if (!i->m_transformUpdated)
+			i->_UpdateTransform();
+	}
 }
 //----------------------------------------------------------------------------//
 void Scene::Update(float _seconds)
@@ -515,9 +681,9 @@ void Scene::_AddNode(Node* _node)
 		_AddRootNode(_node);
 
 	_node->m_id = _NewID(_node);
-
-	//if (_node->m_dbvtNode)
-	//	m_dbvt->AddNode(_node->m_dbvtNode);
+	
+	_node->m_dbvtUpdated = false;
+	_node->_UpdateDbvtNode();
 
 	++m_numNodes;
 }
@@ -531,10 +697,11 @@ void Scene::_RemoveNode(Node* _node)
 
 	_FreeID(_node->m_id);
 
-	// ...
-
-	//if (_node->m_dbvtNode)
-	//	m_dbvt->RemoveNode(_node->m_dbvtNode);
+	if (_node->m_dbvtNode && _node->m_dbvtNodeInTree)
+	{
+		m_dbvt.Remove(_node->m_dbvtNode);
+		_node->m_dbvtNodeInTree = false;
+	}
 
 	--m_numNodes;
 }

@@ -239,7 +239,7 @@ public:
 
 	void Draw(Scene* _scene);
 
-protected:
+//protected:
 
 	/*RenderBuffer* m_primaryRenderBuffer;
 	RenderBuffer* m_primaryDepthStencilBuffer;

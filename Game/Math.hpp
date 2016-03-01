@@ -370,6 +370,9 @@ struct Vec2
 	Vec2& Set(float _s) { x = _s, y = _s; return *this; }
 	Vec2& Set(float _x, float _y) { x = _x, y = _y; return *this; }
 
+	float Dot(const Vec2& _v) const { return x * _v.x + y * _v.y; }
+	float LengthSq(void) const { return Dot(*this); }
+
 	float x, y;
 };
 
@@ -818,17 +821,10 @@ struct Ray
 };
 
 //----------------------------------------------------------------------------//
-// 
-//----------------------------------------------------------------------------//
-
-inline Vec3 TriangleNormal(const Vec3& _v0, const Vec3& _v1, const Vec3& _v2)
-{
-	return (_v1 - _v0).Cross(_v2 - _v0);
-}
-
-//----------------------------------------------------------------------------//
 // Plane
 //----------------------------------------------------------------------------//
+
+inline Vec3 TriangleNormal(const Vec3& _v0, const Vec3& _v1, const Vec3& _v2) { return (_v1 - _v0).Cross(_v2 - _v0); }
 
 struct Plane
 {
@@ -872,6 +868,14 @@ struct Plane
 		float _md = normal.AbsDot(_radius);
 		return (_d < -_md ? _d + _md : (_d > _md ? _d - _md : 0));
 	}
+	float Distance(const Ray& _ray) const
+	{
+		float _denom = -normal.Dot(_ray.dir);
+		if (Abs(_denom) < EPSILON2)
+			return 0;
+		return normal.Dot(_ray.origin) / _denom;
+	}
+	Vec3 Point(const Ray& _ray)	const { return _ray * Distance(_ray); }
 
 	Vec3 Reflect(const Vec3& _dir) const { return _dir - (2.f * normal.Dot(_dir) * normal); }
 
@@ -893,6 +897,28 @@ struct Plane
 	Vec3 normal;
 	float dist;
 };
+
+//----------------------------------------------------------------------------//
+// Collision
+//----------------------------------------------------------------------------//
+
+///\note not tested
+inline bool IntersectsRayTriangle(const Vec3& _t0, const Vec3& _t1, const Vec3& _t2, const Ray& _ray, float* _dist = nullptr)
+{
+	Plane _plane;
+	_plane.FromTriangle(_t0, _t1, _t2).Normalize();
+	float _d = _plane.Distance(_ray);
+	Vec3 _p = _ray * _d;
+	if (TriangleNormal(_t1, _t0, _p).Dot(_plane.normal) >= 0
+		&& TriangleNormal(_t2, _t1, _p).Dot(_plane.normal) >= 0
+		&& TriangleNormal(_t0, _t2, _p).Dot(_plane.normal) >= 0)
+	{
+		if (_dist)
+			*_dist = _d;
+		return true;
+	}
+	return false;
+}
 
 //----------------------------------------------------------------------------//
 // AlignedBox
@@ -973,6 +999,9 @@ struct AlignedBox
 	Vec3 mn, mx;
 };
 
+//const AlignedBox AABB_INFINITE;
+//const AlignedBox AABB_ZERO(0, 0);
+
 //----------------------------------------------------------------------------//
 // OrientedBox
 //----------------------------------------------------------------------------//
@@ -1036,8 +1065,8 @@ struct Frustum
 struct DbvtNode
 {
 	DbvtNode(void) : child0(nullptr), child1(nullptr) { }
-	bool IsLeaf(void) const { return child[0] == 0; }
-	bool IsNode(void) const { return child[0] != 0; }
+	bool IsLeaf(void) const { return child[1] == 0; }
+	bool IsNode(void) const { return child[1] != 0; }
 	bool IsValidLeaf(void) const { return IsLeaf() && object && box.IsFinite(); }
 
 	AlignedBox box;

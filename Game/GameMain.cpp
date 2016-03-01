@@ -247,84 +247,6 @@ double TimeFreq(void) // in seconds
 //----------------------------------------------------------------------------//
 ////////////////////////////////////////////////////////////////////////////////
 
-typedef Ptr<class Terrain> TerrainPtr;
-
-class Terrain : public Node
-{
-public:
-	OBJECT("Terrain");
-
-	Terrain(void)
-	{
-	}
-
-	~Terrain(void)
-	{
-	}
-
-	float GetHeight(float _x, float _z)
-	{
-
-	}
-
-	void Create(Image* _heightmap, const Vec3& _scale, uint _numSectors)
-	{
-		ASSERT(_heightmap && _heightmap->Format() == PF_R32F);
-
-		m_heightmap = _heightmap;
-		m_scale = _scale;
-		m_mesh = new RenderMesh();
-		BufferPtr _vb = new Buffer;
-
-		if (!_numSectors)
-			_numSectors = 1;
-		uint _numSectorsSq = _numSectors * _numSectors;
-		_vb->Realloc(_numSectorsSq * sizeof(Vertex));
-		Vertex* _v = (Vertex*)_vb->Map(LM_WriteDiscard, 0, _vb->Size());
-
-		float _texStep = 1.f / (_numSectors);
-		Vec2 _tc(0);
-		Vec2 _step(_scale.x / _numSectors, _scale.x / _numSectors);
-		Vec2 _halfStep = _step * 0.5f;
-		float _py = _scale.z * -0.5f + _halfStep.y;
-		Color _color(0xff, 0xff, 0xff, 0xff);
-		for (uint y = 0; y < _numSectors; ++y)
-		{
-			_tc.x = 0;
-			float _px = _scale.x * -0.5f + _halfStep.x;
-			for (uint x = 0; x < _numSectors; ++x)
-			{
-				_v->position.Set(_px, 0, _py);
-				_v->SetSize(_step);
-				_v->SetColor(_color);
-				_v->SetTexCoord(_tc);
-				_v->SetTexCoord2(_tc + _texStep);
-				_v->SetRotation(_scale.y);
-				++_v;
-				_tc.x += _texStep;
-				_px += _step.x;
-			}
-			_tc.y += _texStep;
-			_py += _step.y;
-		}
-		_vb->Unmap();
-
-		m_mesh->SetVertexBuffer(_vb);
-		m_mesh->SetRange(0, _numSectorsSq);
-		m_mesh->SetType(PT_Points);
-
-		m_texture = new Texture(TT_2D, PF_R32F);
-		m_texture->Realloc(_heightmap->Width(), _heightmap->Height());
-		m_texture->Write(_heightmap->Format(), _heightmap->Data());
-		m_texture->GenerateMipmap();
-	}
-
-	Vec3 m_scale;
-	uint m_numSectors;
-	ImagePtr m_heightmap;
-	RenderMeshPtr m_mesh;
-	TexturePtr m_texture;
-};
 
 ////////////////////////////////////////////////////////////////////////////////
 //----------------------------------------------------------------------------//
@@ -380,6 +302,10 @@ public:
 protected:
 };
 
+
+Terrain* _terrain;
+Vec3* _cubePos;
+
 class PlayerController : public Behavior
 {
 public:
@@ -403,18 +329,25 @@ public:
 		if ((GetAsyncKeyState('E') & 0x8000) != 0)
 			_vec.y += 1;
 
+		_vec *= 25000.f / 3600.f; // 25 km/h
 		if ((GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0)
-			_vec *= 250;
+			_vec *= 10;
+		if ((GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0)
+			_vec *= 10;
 
 		Vec3 _dir = _vec * m_node->GetChild()->GetWorldRotation().Copy().Inverse(); // camera direction
 
 		Vec3 _pos = m_node->GetWorldPosition();
 		_pos += _dir * _frame.time;
+		//_pos.y = Max<float>(_pos.y, _terrain->GetHeight(_pos.x, _pos.z) + 2);
+		_pos.y = _terrain->GetHeight(_pos.x, _pos.z) + 1.7f;
 		m_node->SetWorldPosition(_pos);
+		*_cubePos = _pos + Vec3(0, 0, -50) * m_node->GetChild()->GetWorldRotation().Copy().Inverse();
+		_cubePos->y = _terrain->GetHeight(_cubePos->x, _cubePos->z);
 
 		//printf("%f %f %f\n", _pos.x, _pos.y, _pos.z);
 	}
-
+																						 
 protected:
 };
 
@@ -466,7 +399,7 @@ void CreatScene(Scene* _scene)
 		NodePtr _test = new Node;
 		_test->SetSleepingThreshold(15);
 		_test->SetScene(_scene);
-	}
+	} 
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -488,30 +421,36 @@ void main(void)
 	{
 		LOG("Generate resources ...");
 	}
-		/*
+		
 	{
 
 		PRINT_SIZEOF(Node);
 		LOG("1KK nodes(%d) = %d mb", (sizeof(Node)), ((sizeof(Node)) * 1000000) / 1024 / 1024);
-		LOG("1KK nodes+dbvt(%d) = %d mb", (sizeof(Node) + sizeof(DbvTreeNode)), ((sizeof(Node) + sizeof(DbvTreeNode)) * 1000000) / 1024 / 1024);
-#ifdef DEBUG
+		LOG("1KK nodes+dbvt(%d) = %d mb", (sizeof(Node) + sizeof(DbvtNode)), ((sizeof(Node) + sizeof(DbvtNode)) * 1000000) / 1024 / 1024);
+/*#ifdef DEBUG
 		system("pause");
 #endif
-		ExitProcess(0);
-	} */
+		ExitProcess(0);	*/
+	} 
 
 	new Device;
 	new Graphics;
 	new Renderer;
 	Scene* _scene = new Scene;
+
+	Vec3 _cubePosOnStack = 0;
+	_cubePos = &_cubePosOnStack;
+
 	CreatScene(_scene);
 
-	TerrainPtr _terrain = new Terrain;
+	_terrain = new Terrain;
+	Ptr<Terrain> _terrainPtr = _terrain;
 	{
 		ImagePtr _hmap = new Image;
-		//_hmap->CreatePerlin(512, 0.05f);
-		_hmap->CreatePerlin(256, 0.1f);
-		_terrain->Create(_hmap, { 10000, 500, 10000 }, 250);
+		_hmap->CreatePerlin(512, 0.05f);
+		//_hmap->CreatePerlin(256, 0.1f);
+		_terrain->Create(_hmap, 550, 7500, 254);
+		//_terrain->SetScene(_scene);
 	}
 
 	const Color _clearColor(0x7f7f9fff);
@@ -526,12 +465,38 @@ void main(void)
 	uint _sampler;
 	glGenSamplers(1, &_sampler);
 	glBindSampler(1, _sampler);
-	glSamplerParameteri(_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glSamplerParameteri(_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glSamplerParameteri(_sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glSamplerParameteri(_sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glSamplerParameteri(_sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
 	gDevice->SetCursorMode(CM_Camera);
+
+	RenderMeshPtr _cube;
+	// temp
+	{
+		AlignedBox _box({ -0.15f, 10, -0.15f }, {0.15f, -10, 0.15f});
+
+		BufferPtr _tempVB;
+		BufferPtr _tempIB;
+
+		_tempVB = new Buffer;
+		_tempVB->Realloc(sizeof(Vertex) * 8);
+
+		Vertex* _v = (Vertex*)_tempVB->Map(LM_WriteDiscard, 0, _tempVB->Size());
+		_box.GetAllCorners(_v, sizeof(Vertex));
+		_tempVB->Unmap();
+
+		_tempIB = new Buffer;
+		_tempIB->Realloc(sizeof(BOX_TRIANLGE_INDICES), BOX_TRIANLGE_INDICES);
+
+		_cube = new RenderMesh;
+		_cube->SetType(PT_Triangles);
+		_cube->SetVertexBuffer(_tempVB);
+		_cube->SetIndexBuffer(_tempIB);
+		_cube->SetRange(0, 36);
+	}
+
 
 
 	while (!_quit && !gDevice->ShouldClose())
@@ -557,16 +522,49 @@ void main(void)
 		//glDepthRange(-1, 1);
 		gRenderer->Draw(_scene);
 
-		gGraphics->SetShader(VS_Sprite);
-		gGraphics->SetShader(GS_Terrain);
+		gGraphics->SetShader(VS_Terrain);
+		gGraphics->SetShader(ST_Geometry, nullptr);
 		gGraphics->SetShader(FS_Texture);
 		gGraphics->SetTexture(0, _terrain->m_texture);
 		gGraphics->SetTexture(1, _terrain->m_texture);
 		glBindSampler(1, _sampler);
 
-
 		_terrain->m_mesh->Draw();
 
+
+
+		gGraphics->SetShader(FS_NoTexture);
+
+		/*glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		glDisable(GL_CULL_FACE);
+		//glPolygonOffset(-0.75f, -4);
+		//glEnable(GL_POLYGON_OFFSET_FILL);
+		//glEnable(GL_POLYGON_OFFSET_LINE);
+		//glEnable(GL_POLYGON_OFFSET_POINT);
+		//glDisable(GL_DEPTH_TEST);
+		glDepthMask(0);
+		//glDepthFunc(GL_EQUAL);
+		_terrain->m_mesh->Draw();
+		glDepthMask(1);
+		glEnable(GL_CULL_FACE);
+		glCullFace(GL_BACK);
+		//glDepthFunc(GL_LEQUAL);
+		//glDisable(GL_POLYGON_OFFSET_FILL);
+		//glDisable(GL_POLYGON_OFFSET_LINE);
+		//glDisable(GL_POLYGON_OFFSET_POINT);
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		  */
+
+		{
+			glEnable(GL_DEPTH_TEST);
+			Mat44 _cubeMat;
+			_cubeMat.CreateTranslation(*_cubePos);
+			gRenderer->m_instanceBuffer->Write(&_cubeMat, 0, sizeof(_cubeMat));
+			gGraphics->SetShader(VS_StaticModel);
+			gGraphics->SetShader(ST_Geometry, nullptr);
+
+			_cube->Draw();
+		}
 
 
 		wglSwapIntervalEXT(0);

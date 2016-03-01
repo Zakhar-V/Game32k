@@ -2,18 +2,16 @@
 void main()
 {
 	OutInstanceID = gl_InstanceID;
-
 	OutPos = InPos;
-#if PARTICLES || TERRAIN
 	OutWorldPos = InPos;
-#else
-	OutWorldPos = WorldMat[gl_InstanceID] * InPos;
+#if !PARTICLES
+	OutWorldPos = WorldMat[gl_InstanceID] * OutWorldPos;
 #endif
 
 	OutColor = InColor;
 	OutTexCoord = InTexCoord;
 
-#if SPRITE || TERRAIN
+#if SPRITE
 	OutSize = InSize;
 	OutRot = InRot;
 	OutTexCoord2 = (InTexCoord2 - InTexCoord);

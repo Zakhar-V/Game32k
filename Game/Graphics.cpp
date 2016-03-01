@@ -233,13 +233,21 @@ struct GLVertexAttrib
 const GLVertexAttribs[] = 
 {
 	{ GL_FLOAT, 3, false, false, offsetof(Vertex, position) },
+#if USE_HALF_FLOAT_TEXCOORD
 	{ GL_HALF_FLOAT, 2, false, false, offsetof(Vertex, texcoord) },
+#else
+	{ GL_FLOAT, 2, false, false, offsetof(Vertex, texcoord) },
+#endif
 	{ GL_UNSIGNED_BYTE, 4, false, true, offsetof(Vertex, color) },
 	{ GL_UNSIGNED_BYTE, 4, false, true, offsetof(Vertex, normal) },
 	{ GL_UNSIGNED_BYTE, 4, false, true, offsetof(Vertex, tangent) },
 	{ GL_UNSIGNED_BYTE, 4, false, true, offsetof(Vertex, weights) },
 	{ GL_UNSIGNED_BYTE, 4, true, false, offsetof(Vertex, indices) },
+#if USE_HALF_FLOAT_TEXCOORD
 	{ GL_HALF_FLOAT, 2, false, false, offsetof(Vertex, texcoord2) },
+#else
+	{ GL_FLOAT, 2, false, false, offsetof(Vertex, texcoord2) },
+#endif
 	{ GL_FLOAT, 2, false, false, offsetof(Vertex, size) },
 	{ GL_FLOAT, 1, false, false, offsetof(Vertex, rotation) },
 };

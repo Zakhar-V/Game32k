@@ -67,44 +67,100 @@ Vec2 Image::GetCoord(const Vec2& _tc, bool _repeat)
 	Vec2 _coord;
 	if (_repeat)
 	{
-		_coord.x = Wrap(_tc.x, 0.0f, 1.0f) * m_invSize.x;
-		_coord.y = Wrap(_tc.y, 0.0f, 1.0f) * m_invSize.y;
+		_coord.x = Wrap(_tc.x * m_width, 0.0f, (float)m_width-1);
+		_coord.y = Wrap(_tc.y * m_height, 0.0f, (float)m_height - 1);
 	}
 	else
 	{
-		_coord.x = Clamp(_tc.x, 0.0f, 1.0f) * m_invSize.x;
-		_coord.y = Clamp(_tc.y, 0.0f, 1.0f) * m_invSize.y;
+		_coord.x = Clamp<float>(_tc.x * m_width, 0.0f, (float)m_width - 1);
+		_coord.y = Clamp<float>(_tc.y * m_height, 0.0f, (float)m_height - 1);
 	}
 
-	ASSERT((uint)_coord.x < m_width);
-	ASSERT((uint)_coord.y < m_height);
+	ASSERT((uint)_coord.x <= m_width);
+	ASSERT((uint)_coord.y <= m_height);
 
 	return _coord;
 }
 //----------------------------------------------------------------------------//
-Color Image::Sample(const Vec2& _tc, bool _smoothed, bool _repeat)
+Vec4 Image::Sample(const Vec2& _tc, uint _flags, float _divisor)
 {
 	Vec4 _r = VEC4_ZERO;
-	if (_smoothed) // linear
+	uint _w = m_width * m_channels;
+	bool _repeat = (_flags & ISF_Clamp) == 0;
+
+	if (_flags & ISF_Sparse)
+	{
+		if (_divisor == 0)
+			_divisor = 1;
+		Vec2 _sectorSize = Vec2((float)m_width, (float)m_height) / (float)_divisor;
+		Vec2 _sectorInvSize = 1 / _sectorSize;
+		Vec2 _coord = GetCoord(_tc, _repeat); // 0..1 --> 0..size
+		Vec2i _sectorIdx = _coord * _sectorInvSize;
+		Vec2 _sectorLtCoord = Vec2(_sectorIdx) * _sectorSize;
+		Vec2 _sectorRbCoord = _sectorLtCoord + _sectorSize;
+		Vec2 _coeff = (_coord - _sectorLtCoord) * _sectorInvSize;
+		_sectorLtCoord *= m_invSize; // 0..size --> 0..1
+		_sectorRbCoord *= m_invSize; // 0..size --> 0..1
+
+		_flags &= ~ISF_Sparse;
+		Vec4 _lt = Sample(_sectorLtCoord, _flags);
+		Vec4 _lb = Sample({ _sectorLtCoord.x, _sectorRbCoord.y }, _flags);
+		Vec4 _rb = Sample(_sectorRbCoord, _flags);
+		Vec4 _rt = Sample({ _sectorRbCoord.x, _sectorLtCoord.y }, _flags);
+
+		for (uint i = 0; i < m_channels; ++i)
+		{
+			_r[i] = Mix(Mix(_lt[i], _rt[i], _coeff.x), Mix(_lb[i], _rb[i], _coeff.x), _coeff.y);
+		}
+	}	
+	else if (_flags & ISF_Linear)
 	{
 		Vec2 _coord = GetCoord(_tc, _repeat); // 0..1 --> 0..size
 		Vec2i _lt = _coord;
-		Vec2i _rb = _lt + 1;
+		Vec2i _rb = GetCoord(_tc + m_invSize, _repeat);
 		Vec2 _coeff = _coord - _lt;
+		uint _ti = _lt.y * _w;
+		uint _bi = _rb.y * _w;
+		uint _lti = _lt.x + _ti;
+		uint _rti = _rb.x + _ti	;
+		uint _lbi = _lt.x + _bi;
+		uint _rbi = _rb.x + _bi;
 		for (uint c = 0; c < m_channels; ++c)
 		{
-			float _t = Mix(m_data[_lt.x + _lt.y * m_width + c], m_data[_rb.x + _lt.y * m_width + c], _coeff.x);
-			float _b = Mix(m_data[_lt.x + _rb.y * m_width + c], m_data[_rb.x + _rb.y * m_width + c], _coeff.x);
-			_r[c] = Mix(_t, _b, _coeff.y);
+			_r[c] = Mix(Mix(m_data[_lti + c], m_data[_rti + c], _coeff.x), Mix(m_data[_lbi + c], m_data[_rbi + c], _coeff.x), _coeff.y);
 		}
 	}
 	else // nearest
 	{
 		Vec2i _coord = GetCoord(_tc, _repeat);
 		for (uint c = 0; c < m_channels; ++c)
-			_r[c] = m_data[_coord.x + _coord.y * m_width + c];
+			_r[c] = m_data[_coord.x + _coord.y * _w + c];
 	}
 	return _r;
+}
+//----------------------------------------------------------------------------//
+void Image::GetMinMax(Vec4& _mn, Vec4& _mx)
+{
+	_mn = +999999.9f;
+	_mx = -999999.9f;
+	
+	const float* _pixel = m_data;
+	const float* _end = m_data + m_width * m_height * m_channels;
+	while (_pixel < _end)
+	{
+		for (uint i = 0; i < m_channels; ++i)
+		{
+			_mn[i] = Min(_pixel[i], _mn[i]);
+			_mx[i] = Max(_pixel[i], _mx[i]);
+		}
+		_pixel += m_channels;
+	}
+	printf("min(%f) max(%f)\n", _mn.x, _mx.x);
+}
+//----------------------------------------------------------------------------//
+void Normalize(const Vec4& _mn, const Vec4 _mx)
+{
+
 }
 //----------------------------------------------------------------------------//
 void Image::CreateBitmapFont(FontInfo& _info, const char* _name, uint _fheight, float _fwidth, bool _italic)

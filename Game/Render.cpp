@@ -96,7 +96,7 @@ void Renderer::Draw(Scene* _scene)
 
 	gGraphics->SetShader(VS_StaticModel);
 	gGraphics->SetShader(ST_Geometry, nullptr);
-	gGraphics->SetShader(FS_NoTexture);
+	gGraphics->SetShader(FS_Texture);
 
 	if(_frustum.Intersects(AlignedBox(-0.5f, 0.5f) * _wm))
 		m_testCube->Draw();

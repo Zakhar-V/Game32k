@@ -2,6 +2,9 @@
 
 #include "Math.hpp"
 #include "Object.hpp"
+#include "Graphics.hpp"
+#include "Image.hpp"
+#include "Geometry.hpp"
 
 //----------------------------------------------------------------------------//
 // Defs
@@ -19,12 +22,6 @@ struct FrameInfo
 {
 	float time; // in seconds
 	uint16 id;
-};
-
-enum UpdatePolicy : uint8
-{
-	UP_Auto, // update if necessary; deactivate after some time 
-	UP_Always, // update each frame; never not deactivate
 };
 
 //----------------------------------------------------------------------------//
@@ -80,8 +77,7 @@ public:
 
 	void WakeUp(void);
 	void SetSleepingThreshold(float _seconds) { m_sleepingThreshold = _seconds; }
-	void SetUpdatePolicy(UpdatePolicy _policy) { m_updatePolicy = _policy; }
-	UpdatePolicy GetUpdatePolicy(void) { return m_updatePolicy; }
+	float GetSleepingThreshold(float _seconds) { return m_sleepingThreshold; }
 
 	void Update(const FrameInfo& _frame);
 	void PostUpdate(const FrameInfo& _frame);
@@ -121,6 +117,13 @@ protected:
 	void _InvalidateTransform(void);
 	void _UpdateTransform(void);
 
+	void _InvalidateWorldBBox(void);
+	void _CreateDbvtNode(void);
+	void _DeleteDbvtNode(void);
+	void _InvalidateDbvtNode(void);
+	void _UpdateDbvtNode(void);
+	virtual void _GetWorldBBox(AlignedBox& _bbox) { _bbox.Reset(); }
+
 	String m_name;
 	int m_id;
 	uint16 m_layerMask;
@@ -149,13 +152,17 @@ protected:
 
 	bool m_active : 1;
 	bool m_behaviorAllowSleep : 1;
+
 	bool m_transformUpdated : 1;
 	bool m_transformChanged : 1;
+	
+	bool m_worldBBoxUpdated : 1;
+	bool m_dbvtUpdated : 1;
+	bool m_dbvtNodeInTree : 1;
+
 	bool m_inheritPosition : 1;
 	bool m_inheritRotation : 1;
 	bool m_inheritScale : 1;
-
-	UpdatePolicy m_updatePolicy;
 
 	uint16 m_lastUpdateFrame;
 	uint16 m_lastViewFrame;
@@ -198,6 +205,45 @@ protected:
 };
 
 //----------------------------------------------------------------------------//
+// Terrain
+//----------------------------------------------------------------------------//
+
+typedef Ptr<class Terrain> TerrainPtr;
+
+class Terrain : public Node
+{
+public:
+	OBJECT("Terrain");
+
+	Terrain(void);
+	~Terrain(void);
+
+	float GetHeight(float _x, float _z);
+
+	void Create(Image* _heightmap, float _yScale, float _xzScale, uint _numSectors);
+
+
+	void _GetWorldBBox(AlignedBox& _bbox) override;
+
+	Vec3 m_scale;
+	uint m_numSectors;
+	ImagePtr m_heightmap;
+	RenderMeshPtr m_mesh;
+	TexturePtr m_texture;
+	AlignedBox m_localBBox;
+	GeometryPtr m_geom;
+};
+
+//----------------------------------------------------------------------------//
+// 
+//----------------------------------------------------------------------------//
+
+struct NodeEnumeratorBase : public Dbvt::Callback
+{
+	Array<Node*> objects;
+};
+
+//----------------------------------------------------------------------------//
 // Scene
 //----------------------------------------------------------------------------//
 
@@ -206,6 +252,11 @@ class Scene	: public NonCopyable
 public:
 	Scene(void);
 	~Scene(void);
+
+	Dbvt* GetDbvt(void) { return &m_dbvt; }
+	void UpdateDbvt(void);
+
+	void UpdateTransform(void);
 
 	void Update(float _seconds);
 
@@ -233,6 +284,8 @@ protected:
 
 	Array<Node*> m_nodes;
 	Array<uint> m_freeIds;
+
+	Dbvt m_dbvt;
 
 	CameraPtr m_activeCamera;
 

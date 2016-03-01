@@ -105,7 +105,8 @@ protected:
 	static uint StaticClassID(void) { static const uint _id = StrHash(StaticClassName()); return _id; } \
 	const char* ClassName(void) const override { return StaticClassName(); } \
 	uint ClassID(void) const override { return StaticClassID(); } \
-	bool IsClass(uint _id) const override { return _id == StaticClassID() || __super::IsClass(_id); }
+	bool IsClass(uint _id) const override { return _id == StaticClassID() || __super::IsClass(_id); } \
+	template <class T> bool IsClass(void) { return IsClass(T::StaticClassID()); }
 
 class Object : public RefCounted
 {
@@ -117,6 +118,7 @@ public:
 	virtual uint ClassID(void) const { return StaticClassID(); }
 	virtual bool IsClass(uint _id) const { return _id == StaticClassID(); }
 	bool IsClass(const char* _name) { return IsClass(StrHash(_name)); }
+	template <class T> bool IsClass(void) { return IsClass(T::StaticClassID()); }
 
 	~Object(void)
 	{
