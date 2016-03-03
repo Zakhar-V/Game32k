@@ -866,7 +866,8 @@ struct Plane
 	{
 		float _d = normal.Dot(_center) + dist;
 		float _md = normal.AbsDot(_radius);
-		return (_d < -_md ? _d + _md : (_d > _md ? _d - _md : 0));
+		return (Abs(_md) < Abs(_d)) ? _d : 0;
+		//return (_d < -_md ? _d + _md : (_d > _md ? _d - _md : 0));
 	}
 	float Distance(const Ray& _ray) const
 	{
@@ -994,7 +995,7 @@ struct AlignedBox
 
 	bool Contains(const Vec3& _point) const { return _point >= mn && _point <= mx; }
 	bool Contains(const AlignedBox& _box) const { return _box.mx <= mx && _box.mn >= mn; }
-	bool Intersects(const AlignedBox& _box) const { return _box.mx >= mn && _box.mn <= mx; }
+	bool Intersects(const AlignedBox& _box) const { return !(_box.mx < mn || _box.mn > mx); }
 
 	Vec3 mn, mx;
 };
@@ -1065,6 +1066,7 @@ struct Frustum
 struct DbvtNode
 {
 	DbvtNode(void) : child0(nullptr), child1(nullptr) { }
+
 	bool IsLeaf(void) const { return child[1] == 0; }
 	bool IsNode(void) const { return child[1] != 0; }
 	bool IsValidLeaf(void) const { return IsLeaf() && object && box.IsFinite(); }
@@ -1136,6 +1138,48 @@ protected:
 
 	Node* m_root;
 	Node* m_free; // last deleted node
+};
+
+//----------------------------------------------------------------------------//
+// Dbvt utils
+//----------------------------------------------------------------------------//
+
+struct DbvtContainer
+{
+	virtual void AddObject(void* _object, const AlignedBox& _bbox, bool _withTest) { }
+
+	bool stop = false; // if true, callback will be stopped
+};
+
+struct DbvtCallbackContainer : DbvtCallback
+{
+	//DbvtCallbackContainer(DbvtContainer* _container = nullptr) : container(_container) { }
+
+	void AddLeaf(DbvtNode* _leaf, TestResult _testResult) override
+	{
+		ASSERT(container != nullptr);
+		ASSERT(_leaf != nullptr);
+		container->AddObject(_leaf->object, _leaf->box, _testResult == TR_WithTest);
+	}
+
+	DbvtContainer* container = nullptr;
+};
+
+struct DbvtFrustumCallback : DbvtCallbackContainer
+{
+
+	TestResult TestNode(DbvtNode* _node) override
+	{ 
+		if (container->stop)
+			return TR_Stop;
+
+		bool _contains;
+		if (volume.Intersects(_node->box, &_contains))
+			return _contains ? TR_WithoutTest : TR_WithTest;
+		return TR_Skip;
+	}
+
+	Frustum volume;
 };
 
 //----------------------------------------------------------------------------//

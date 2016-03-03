@@ -37,6 +37,9 @@
     <ClCompile Include="Graphics.cpp">
       <Filter>Engine\System</Filter>
     </ClCompile>
+    <ClCompile Include="Level.cpp">
+      <Filter>Engine\Scene</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Game">
@@ -109,6 +112,9 @@
     </ClInclude>
     <ClInclude Include="Graphics.hpp">
       <Filter>Engine\System</Filter>
+    </ClInclude>
+    <ClInclude Include="Level.hpp">
+      <Filter>Engine\Scene</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

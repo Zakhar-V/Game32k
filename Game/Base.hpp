@@ -3,6 +3,9 @@
 #ifdef _MSC_VER
 //#	pragma warning(disable : 4996) // The POSIX name
 #endif
+#if !defined(_DEBUG) || 0 // msvcrt 140 linker errors
+#define _NO_CRT_STDIO_INLINE
+#endif
 
 #include <stdint.h>
 #include <stdio.h>
@@ -13,6 +16,19 @@
 //----------------------------------------------------------------------------//
 // Settings
 //----------------------------------------------------------------------------//
+			 
+#if __cplusplus	== 199711
+#	define CPP 11
+#elif __cplusplus	== 199714
+#	define CPP 14
+#else
+#error unknown cpp version
+#endif
+
+
+#if CPP < 14
+#define constexpr
+#endif
 
 #ifndef _DEBUG
 //#	define _DEBUG
@@ -95,21 +111,24 @@ void operator delete[](void* _p) { if (_p) free(_p); }
 
 #endif // USE_CRT
 
+#if CPP >= 14 && !defined(_DEBUG)
+// do use standard libraries
+/*inline void __cdecl operator delete(void* _p, size_t)
+{ 
+	operator delete(_p);
+}*/
+#endif
+
 //----------------------------------------------------------------------------//
 // Hash
 //----------------------------------------------------------------------------//
 
-uint Hash(const void* _data, uint _size, uint _hash = 0)
+inline uint Hash(const void* _data, uint _size, uint _hash = 0)
 {
 	for (uint i = 0; i < _size; ++i)
 		_hash = ((const uint8*)_data)[i] + (_hash << 6) + (_hash << 16) - _hash;
 	return _hash;
 }
-
-/*constexpr uint ConstHash(const char* _str, uint _hash = 0)
-{
-return *_str ? ConstHash(_str + 1, *_str + (_hash << 6) + (_hash << 16) - _hash) : _hash;
-} */
 
 //----------------------------------------------------------------------------//
 // Rvalue
@@ -412,8 +431,8 @@ template <class T> void Unlink(T*& _head, T* _this, LinkedListNode<T>& _node)
 // StringUtils
 //----------------------------------------------------------------------------//
 
-inline char CharLower(char _ch) { return ((_ch >= 'A' && _ch <= 'Z') || (_ch >= 'a' && _ch <= 'z') || ((uint8)_ch >= 0xc0)) ? (_ch | 0x20) : _ch; }
-inline char CharUpper(char _ch) { return ((_ch >= 'A' && _ch <= 'Z') || (_ch >= 'a' && _ch <= 'z') || ((uint8)_ch >= 0xc0)) ? (_ch & ~0x20) : _ch; }
+inline constexpr char CharLower(char _ch) { return ((_ch >= 'A' && _ch <= 'Z') || (_ch >= 'a' && _ch <= 'z') || ((uint8)_ch >= 0xc0)) ? (_ch | 0x20) : _ch; }
+inline constexpr char CharUpper(char _ch) { return ((_ch >= 'A' && _ch <= 'Z') || (_ch >= 'a' && _ch <= 'z') || ((uint8)_ch >= 0xc0)) ? (_ch & ~0x20) : _ch; }
 
 uint StrHash(const char* _str, uint _hash = 0)
 {
@@ -426,6 +445,20 @@ uint StrHash(const char* _str, uint _hash = 0)
 }
 
 //int StrCompare(const char* _a, const char* _b)
+
+/*#if CPP < 14 
+inline uint ConstStrHash(const char* _str, uint _hash = 0)
+{
+	return (uint)_str; // return address
+}
+#else */
+
+#if CPP >= 14
+constexpr uint ConstStrHash(const char* _str, uint _hash = 0)
+{
+	return *_str ? ConstStrHash(_str + 1, CharLower(*_str) + (_hash << 6) + (_hash << 16) - _hash) : _hash;
+}
+#endif
 
 //----------------------------------------------------------------------------//
 // String

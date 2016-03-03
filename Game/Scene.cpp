@@ -13,6 +13,7 @@ Node::Node(void) :
 	m_id(0),
 	m_layerMask(0xffff),
 	m_tags(0),
+	m_typeMask(NT_Node),
 	m_localPosition(VEC3_ZERO),
 	m_localRotation(QUAT_IDENTITY),
 	m_localScale(VEC3_ONE),
@@ -46,6 +47,7 @@ Node::~Node(void)
 {
 	DetachChildren(true);
 	RemoveAllBehaviors();
+	m_dbvtNode = new DbvtNode;
 	delete m_dbvtNode;
 }
 //----------------------------------------------------------------------------//
@@ -474,11 +476,11 @@ Camera::Camera(void) :
 	m_far(1000),
 	m_zoom(1)
 {
+	m_typeMask |= NT_Camera;
 }
 //----------------------------------------------------------------------------//
 Camera::~Camera(void)
 {
-
 }
 //----------------------------------------------------------------------------//
 void Camera::GetParams(float _x, float _y, float _w, float _h, UCamera& _params, Frustum& _frustum)
@@ -519,14 +521,152 @@ void Camera::GetParams(float _x, float _y, float _w, float _h, UCamera& _params,
 //----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
+// Light
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+Light::Light(void)
+{
+	m_typeMask |= NT_Light;
+}
+//----------------------------------------------------------------------------//
+Light::~Light(void)
+{
+}
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+// PointLight
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+PointLight::PointLight(void)
+{
+	m_typeMask |= NT_PointLight;
+}
+//----------------------------------------------------------------------------//
+PointLight::~PointLight(void)
+{
+}
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+// SpotLight
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+SpotLight::SpotLight(void)
+{
+	m_typeMask |= NT_SpotLight;
+}
+//----------------------------------------------------------------------------//
+SpotLight::~SpotLight(void)
+{
+}
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+// DirectionalLight
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+DirectionalLight::DirectionalLight(void) :
+	m_prevLight(nullptr),
+	m_nextLight(nullptr)
+{
+	m_typeMask |= NT_DirectionalLight;
+}
+//----------------------------------------------------------------------------//
+DirectionalLight::~DirectionalLight(void)
+{
+}
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+// RenderNode
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+RenderNode::RenderNode(void)
+{
+	m_typeMask |= NT_RenderNode;
+}
+//----------------------------------------------------------------------------//
+RenderNode::~RenderNode(void)
+{
+}
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+// Model
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+Model::Model(void)
+{
+	m_typeMask |= NT_Model;
+}
+//----------------------------------------------------------------------------//
+Model::~Model(void)
+{
+}
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+// StaticModel
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+StaticModel::StaticModel(void)
+{
+	m_typeMask |= NT_StaticModel;
+}
+//----------------------------------------------------------------------------//
+StaticModel::~StaticModel(void)
+{
+}
+//----------------------------------------------------------------------------//
+void StaticModel::_GetWorldBBox(AlignedBox& _bbox)
+{
+	/*if (m_mesh)
+		_bbox = m_mesh->GetBBox() * GetWorldTransform();
+	else
+		_bbox.Reset();*/
+}
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+// SkinnedModel
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+SkinnedModel::SkinnedModel(void)
+{
+	m_typeMask |= NT_SkinnedModel;
+}
+//----------------------------------------------------------------------------//
+SkinnedModel::~SkinnedModel(void)
+{
+}
+//----------------------------------------------------------------------------//
+void SkinnedModel::_GetWorldBBox(AlignedBox& _bbox)
+{
+	// get from bones
+}
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
 // Terrain
 //----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
 Terrain::Terrain(void) :
 	m_scale(VEC3_ONE),
-	m_numSectors(1)
+	m_numSectors(1),
+	m_prevTerrain(nullptr),
+	m_nextTerrain(nullptr)
 {
+	m_typeMask |= NT_Terrain;
 }
 //----------------------------------------------------------------------------//
 Terrain::~Terrain(void)
@@ -554,18 +694,14 @@ void Terrain::Create(Image* _heightmap, float _yScale, float _xzScale, uint _num
 	m_heightmap = _heightmap;
 	m_scale.Set(_xzScale, _yScale, _xzScale);
 	m_numSectors = _numSectors;
-	m_mesh = new RenderMesh();
-	m_geom = new Geometry();
-	m_geom->CreateGridXZ(_numSectors, m_scale.x / _numSectors);
-	Vertex* _v = m_geom->Vertices().Ptr();
-	for (uint i = 0; i < m_geom->GetVertexCount(); ++i)
+
+	Geometry _geom;
+	_geom.CreateGridXZ(_numSectors, m_scale.x / _numSectors);
+	Vertex* _v = _geom.Vertices().Ptr();
+	for (uint i = 0; i < _geom.GetVertexCount(); ++i)
 		_v[i].position.y = m_scale.y * (_heightmap->Sample(_v[i].GetTexCoord(), ISF_Clamp | ISF_Linear).x);
-	m_geom->Upload();
-	m_localBBox.Reset().AddVertices(_v, m_geom->GetVertexCount(), sizeof(Vertex));
-	m_mesh->SetVertexBuffer(m_geom->GetVertexBuffer());
-	m_mesh->SetIndexBuffer(m_geom->GetIndexBuffer());
-	m_mesh->SetRange(0, m_geom->GetIndexCount());
-	m_mesh->SetType(PT_Triangles);
+	m_mesh = _geom.CreateVertexArray();
+	m_localBBox = _geom.ComputeBBox();
 
 	m_texture = new Texture(TT_2D, PF_RGB8, false);
 	m_texture->Realloc(_heightmap->Width(), _heightmap->Height());
@@ -575,9 +711,37 @@ void Terrain::Create(Image* _heightmap, float _yScale, float _xzScale, uint _num
 	_CreateDbvtNode();
 }
 //----------------------------------------------------------------------------//
+void Terrain::GetRenderItems(Array<RenderItem>& _items)
+{
+	RenderItem _item;
+	_item.node = this;
+	_item.data = m_mesh;
+	_item.material = nullptr; // todo
+	_item.start = 0;
+	_item.count = m_mesh->GetIndexCount();
+	_items.Push(_item);
+}
+//----------------------------------------------------------------------------//
 void Terrain::_GetWorldBBox(AlignedBox& _bbox)
 {
 	_bbox = m_localBBox * GetWorldTransform();
+}
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+// Vegetation
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+Vegetation::Vegetation(void) :
+	m_prevVegetation(nullptr),
+	m_nextVegetation(nullptr)
+{
+	m_typeMask |= NT_Vegetation;
+}
+//----------------------------------------------------------------------------//
+Vegetation::~Vegetation(void)
+{
 }
 //----------------------------------------------------------------------------//
 
@@ -592,7 +756,10 @@ Scene::Scene(void) :
 	m_activeNodes(nullptr),
 	m_numNodes(0),
 	m_numActiveNodes(0),
-	m_numRootNodes(0)
+	m_numRootNodes(0),
+	m_directionalLights(nullptr),
+	m_terrain(nullptr),
+	m_vegetation(nullptr)
 {
 }
 //----------------------------------------------------------------------------//
@@ -681,7 +848,14 @@ void Scene::_AddNode(Node* _node)
 		_AddRootNode(_node);
 
 	_node->m_id = _NewID(_node);
-	
+
+	if (_node->GetTypeMask() & NT_DirectionalLight)
+		Link(m_directionalLights, static_cast<DirectionalLight*>(_node), static_cast<DirectionalLight*>(_node)->m_prevLight);
+	else if (_node->GetTypeMask() & NT_Terrain)
+		Link(m_terrain, static_cast<Terrain*>(_node), static_cast<Terrain*>(_node)->m_prevTerrain);
+	else if (_node->GetTypeMask() & NT_Vegetation)
+		Link(m_vegetation, static_cast<Vegetation*>(_node), static_cast<Vegetation*>(_node)->m_prevVegetation);
+
 	_node->m_dbvtUpdated = false;
 	_node->_UpdateDbvtNode();
 
@@ -702,6 +876,13 @@ void Scene::_RemoveNode(Node* _node)
 		m_dbvt.Remove(_node->m_dbvtNode);
 		_node->m_dbvtNodeInTree = false;
 	}
+
+	if (_node->GetTypeMask() & NT_DirectionalLight)
+		Link(m_directionalLights, static_cast<DirectionalLight*>(_node), static_cast<DirectionalLight*>(_node)->m_prevLight);
+	else if (_node->GetTypeMask() & NT_Terrain)
+		Unlink(m_terrain, static_cast<Terrain*>(_node), static_cast<Terrain*>(_node)->m_prevTerrain);
+	else if (_node->GetTypeMask() & NT_Vegetation)
+		Unlink(m_vegetation, static_cast<Vegetation*>(_node), static_cast<Vegetation*>(_node)->m_prevVegetation);
 
 	--m_numNodes;
 }

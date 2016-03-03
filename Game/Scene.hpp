@@ -5,6 +5,7 @@
 #include "Graphics.hpp"
 #include "Image.hpp"
 #include "Geometry.hpp"
+#include "Render.hpp"
 
 //----------------------------------------------------------------------------//
 // Defs
@@ -53,6 +54,33 @@ protected:
 // Node
 //----------------------------------------------------------------------------//
 
+enum NodeType : uint
+{
+	NT_Node = 0x1,
+	NT_Camera = 0x2,
+
+
+	
+	NT_Light = 0x4,
+	NT_PointLight = 0x8,
+	NT_SpotLight = 0x10,
+	NT_DirectionalLight = 0x20,
+
+	NT_RenderNode = 0x80,
+
+	NT_Model = 0x100,
+	NT_StaticModel = 0x200,
+	NT_SkinnedModel = 0x400,
+
+	NT_BillboardSet = 0x800,
+	NT_ParticleEmitter = 0x1000,
+	NT_Terrain = 0x2000,
+	NT_SkyDome = 0x4000, 
+	NT_Vegetation = 0x8000,
+	NT_WaterPlane = 0x10000,
+
+};
+
 class Node : public Object
 {
 public:
@@ -60,6 +88,8 @@ public:
 
 	Node(void);
 	~Node(void);
+
+	uint GetTypeMask(void) { return m_typeMask; }
 
 	void SetScene(Scene* _scene);
 	void SetParent(Node* _parent);
@@ -78,6 +108,8 @@ public:
 	void WakeUp(void);
 	void SetSleepingThreshold(float _seconds) { m_sleepingThreshold = _seconds; }
 	float GetSleepingThreshold(float _seconds) { return m_sleepingThreshold; }
+
+	bool IsEnabled(void) { return true; } // TODO
 
 	void Update(const FrameInfo& _frame);
 	void PostUpdate(const FrameInfo& _frame);
@@ -128,6 +160,7 @@ protected:
 	int m_id;
 	uint16 m_layerMask;
 	uint16 m_tags;
+	uint m_typeMask; // NodeType
 
 	Vec3 m_localPosition;
 	Quat m_localRotation;
@@ -205,12 +238,210 @@ protected:
 };
 
 //----------------------------------------------------------------------------//
+// Light
+//----------------------------------------------------------------------------//
+
+typedef Ptr<class Light> LightPtr;
+
+class Light : public Node
+{
+public:
+	OBJECT("Light");
+
+	Light(void);
+	~Light(void);
+
+protected:
+};
+
+//----------------------------------------------------------------------------//
+// PointLight
+//----------------------------------------------------------------------------//
+
+class PointLight : public Light
+{
+public:
+	OBJECT("PointLight");
+
+	PointLight(void);
+	~PointLight(void);
+
+protected:
+};
+
+//----------------------------------------------------------------------------//
+// SpotLight
+//----------------------------------------------------------------------------//
+
+class SpotLight : public Light
+{
+public:
+	OBJECT("SpotLight");
+
+	SpotLight(void);
+	~SpotLight(void);
+
+protected:
+};
+
+//----------------------------------------------------------------------------//
+// DirectionalLight
+//----------------------------------------------------------------------------//
+
+class DirectionalLight : public Light
+{
+public:
+	OBJECT("DirectionalLight");
+
+	DirectionalLight(void);
+	~DirectionalLight(void);
+
+	DirectionalLight* GetNextLight(void) { return m_nextLight; }
+
+protected:
+	friend class Scene;
+
+	DirectionalLight* m_prevLight;
+	DirectionalLight* m_nextLight;
+};
+
+//----------------------------------------------------------------------------//
+// DecalSet
+//----------------------------------------------------------------------------//
+
+class DecalSet : public NonCopyable
+{
+public:
+
+protected:
+
+	Array<Vertex> m_decals;
+};
+
+//----------------------------------------------------------------------------//
+// RenderNode
+//----------------------------------------------------------------------------//
+
+typedef Ptr<class RenderNode> RenderNodePtr;
+
+class RenderNode : public Node
+{
+public:
+	OBJECT("RenderNode");
+
+	RenderNode(void);
+	~RenderNode(void);
+
+	virtual void GetRenderItems(Array<RenderItem>& _items) { }
+};
+
+//----------------------------------------------------------------------------//
+// Model
+//----------------------------------------------------------------------------//
+
+typedef Ptr<class Model> ModelPtr;
+
+class Model : public RenderNode
+{
+public:
+	OBJECT("Model");
+
+	Model(void);
+	~Model(void);
+
+	void SetMesh(Mesh* _mesh) { }
+
+protected:
+
+	//m_mesh
+};
+
+//----------------------------------------------------------------------------//
+// StaticModel
+//----------------------------------------------------------------------------//
+
+typedef Ptr<class StaticModel> StaticModelPtr;
+
+class StaticModel : public Model
+{
+public:
+	OBJECT("StaticModel");
+
+	StaticModel(void);
+	~StaticModel(void);
+
+protected:
+
+	void _GetWorldBBox(AlignedBox& _bbox) override;
+};
+
+//----------------------------------------------------------------------------//
+// SkinnedModel
+//----------------------------------------------------------------------------//
+
+typedef Ptr<class SkinnedModel> SkinnedModelPtr;
+
+class SkinnedModel : public Model
+{
+public:
+	OBJECT("SkinnedModel");
+
+	SkinnedModel(void);
+	~SkinnedModel(void);
+
+protected:
+
+	void _GetWorldBBox(AlignedBox& _bbox) override;
+
+	//m_bones;
+};
+
+//----------------------------------------------------------------------------//
+// BillboardSet
+//----------------------------------------------------------------------------//
+
+typedef Ptr<class BillboardSet> BillboardSetPtr;
+
+class BillboardSet : public RenderNode
+{
+public:
+	OBJECT("BillboardSet");
+
+};
+
+//----------------------------------------------------------------------------//
+// ParticleEmitter
+//----------------------------------------------------------------------------//
+
+typedef Ptr<class ParticleEmitter> ParticleEmitterPtr;
+
+class ParticleEmitter : public BillboardSet
+{
+public:
+	OBJECT("ParticleEmitter");
+
+};
+
+//----------------------------------------------------------------------------//
+// SkyDome
+//----------------------------------------------------------------------------//
+
+typedef Ptr<class SkyDome> SkyDomePtr;
+
+class SkyDome : public RenderNode
+{
+public:
+	OBJECT("SkyDome");
+
+};
+
+//----------------------------------------------------------------------------//
 // Terrain
 //----------------------------------------------------------------------------//
 
 typedef Ptr<class Terrain> TerrainPtr;
 
-class Terrain : public Node
+class Terrain : public RenderNode
 {
 public:
 	OBJECT("Terrain");
@@ -218,29 +449,63 @@ public:
 	Terrain(void);
 	~Terrain(void);
 
+	Terrain* GetNextTerrain(void) { return m_nextTerrain; }
+
 	float GetHeight(float _x, float _z);
 
 	void Create(Image* _heightmap, float _yScale, float _xzScale, uint _numSectors);
 
+	void GetRenderItems(Array<RenderItem>& _items) override;
 
 	void _GetWorldBBox(AlignedBox& _bbox) override;
+
+	friend class Scene;
 
 	Vec3 m_scale;
 	uint m_numSectors;
 	ImagePtr m_heightmap;
-	RenderMeshPtr m_mesh;
+	VertexArrayPtr m_mesh;
 	TexturePtr m_texture;
 	AlignedBox m_localBBox;
-	GeometryPtr m_geom;
+
+	Terrain* m_prevTerrain;
+	Terrain* m_nextTerrain;
 };
 
 //----------------------------------------------------------------------------//
-// 
+// Vegetation
 //----------------------------------------------------------------------------//
 
-struct NodeEnumeratorBase : public Dbvt::Callback
+typedef Ptr<class Vegetation> VegetationPtr;
+
+class Vegetation : public RenderNode
 {
-	Array<Node*> objects;
+public:
+	OBJECT("Vegetation");
+
+	Vegetation(void);
+	~Vegetation(void);
+
+
+	//void place(float dencity)
+
+	Vegetation* m_prevVegetation;
+	Vegetation* m_nextVegetation;
+};
+
+//----------------------------------------------------------------------------//
+// WaterPlane
+//----------------------------------------------------------------------------//
+
+typedef Ptr<class WaterPlane> WaterPlanePtr;
+
+class WaterPlane : public RenderNode
+{
+public:
+	OBJECT("WaterPlane");
+
+
+	//void place(float dencity)
 };
 
 //----------------------------------------------------------------------------//
@@ -275,19 +540,28 @@ protected:
 	uint _NewID(Node* _node);
 	void _FreeID(uint _id);
 
+
+	Dbvt m_dbvt;
+
 	uint16 m_frame;
+
 	Node* m_rootNodes;
 	Node* m_activeNodes;
 	uint m_numNodes;
 	uint m_numActiveNodes;
 	uint m_numRootNodes;
-
 	Array<Node*> m_nodes;
 	Array<uint> m_freeIds;
 
-	Dbvt m_dbvt;
-
 	CameraPtr m_activeCamera;
+
+	DirectionalLight* m_directionalLights;
+	Terrain* m_terrain;
+	Vegetation* m_vegetation;
+
+	//SkyDome* m_sky;
+	//Wheater
+	//float m_waterHeight
 
 };
 

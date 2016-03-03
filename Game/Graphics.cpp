@@ -183,10 +183,13 @@ void Buffer::Realloc(uint _newSize, const void* _data)
 	}
 }
 //----------------------------------------------------------------------------//
-uint8* Buffer::Map(LockMode _mode, uint _offset, uint _size)
+uint8* Buffer::Map(LockMode _mode, uint _offset, int _size)
 {
 	GL_DEBUG_POINT();
-	ASSERT(_offset + _size <= m_size);
+	ASSERT(_offset <= m_size);
+	if (_size < 0)
+		_size = m_size - _offset;
+	ASSERT((uint)(_offset + _size) <= m_size);
 
 	return (uint8*)glMapNamedBufferRangeEXT(m_handle, _offset, _size, _mode);
 }
@@ -253,67 +256,34 @@ const GLVertexAttribs[] =
 };
 
 //----------------------------------------------------------------------------//
-// RenderMesh
+// VertexArray
 //----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
-RenderMesh::RenderMesh(void) :
-	m_type(PT_Points),
-	m_baseVertex(0),
-	m_start(0),
-	m_count(0)
+VertexArray::VertexArray(PrimitiveType _type, bool _indexed, BufferUsage _usage) :
+	m_type(_type)
+{
+	m_vertexBuffer = new Buffer(_usage);
+	if (_indexed)
+		m_indexBuffer = new Buffer(_usage);
+}
+//----------------------------------------------------------------------------//
+VertexArray::~VertexArray(void)
 {
 }
 //----------------------------------------------------------------------------//
-RenderMesh::~RenderMesh(void)
+void VertexArray::Bind(void)
 {
+	gGraphics->SetVertexBuffer(m_vertexBuffer);
+	gGraphics->SetIndexBuffer(m_indexBuffer);
 }
 //----------------------------------------------------------------------------//
-void RenderMesh::SetVertexBuffer(Buffer* _buffer, uint _baseVertex)
+void VertexArray::Draw(uint _start, uint _count, uint _numInstances)
 {
-	m_vertices = _buffer;
-	m_baseVertex = _baseVertex;
-}
-//----------------------------------------------------------------------------//
-void RenderMesh::SetIndexBuffer(Buffer* _buffer)
-{
-	m_indices = _buffer;
-}
-//----------------------------------------------------------------------------//
-void RenderMesh::SetType(PrimitiveType _type)
-{
-	m_type = _type;
-}
-//----------------------------------------------------------------------------//
-void RenderMesh::SetRange(uint _start, uint _count)
-{
-	m_start = _start;
-	m_count = _count;
-}
-//----------------------------------------------------------------------------//
-void RenderMesh::Draw(uint _numInstances)
-{
-	if (m_vertices)
-	{
-		gGraphics->SetVertexBuffer(m_vertices);
-		if (m_indices)
-		{
-			gGraphics->SetIndexBuffer(m_indices);
-			gGraphics->DrawIndexed(m_type, m_baseVertex, m_start, m_count, _numInstances);
-		}
-		else
-		{
-			gGraphics->Draw(m_type, m_baseVertex + m_start, m_count, _numInstances);
-		}
-	}
-}
-//----------------------------------------------------------------------------//
-int RenderMesh::Compare(const RenderMesh* _rhs) const
-{
-	ASSERT(_rhs != nullptr);
-	if (_rhs->m_vertices == m_vertices)
-		return (int)(m_indices - _rhs->m_indices);
-	return (int)(m_vertices - _rhs->m_vertices);
+	if (m_indexBuffer)
+		gGraphics->DrawIndexed(m_type, 0, _start, _count, _numInstances);
+	else
+		gGraphics->Draw(m_type, _start, _count, _numInstances);
 }
 //----------------------------------------------------------------------------//
 

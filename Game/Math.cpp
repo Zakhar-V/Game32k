@@ -536,9 +536,17 @@ bool Frustum::Intersects(const Vec3& _center, float _radius) const
 {
 	for (uint i = 0; i < 6; ++i)
 	{
+		float _d = planes[i].Distance(_center, _radius);
+		//printf("%f ", _d);
+		if (_d < 0)
+		{
+			//printf("false\n");
+			return false;
+		}
 		if (planes[i].Distance(_center, _radius) < 0)
 			return false;
 	}
+	//printf("true\n");
 	return true;
 }
 //----------------------------------------------------------------------------//
@@ -597,14 +605,18 @@ bool Frustum::Intersects(const Frustum& _frustum, bool* _contains) const
 //----------------------------------------------------------------------------//
 void Frustum::GetPlanes(Plane* _planes, const Mat44& _m)
 {
-	float _m30 = _m[3][0];
-	float _m31 = _m[3][1];
-	float _m32 = _m[3][2];
-	float _m33 = _m[3][3];
+	/*_planes[FP_Left].Set(_m[3][0] + _m[0][0], _m[3][1] + _m[0][1], _m[3][2] + _m[0][2], _m[3][3] + _m[0][3]).Normalize();
+	_planes[FP_Right].Set(_m[3][0] - _m[0][0], _m[3][1] - _m[0][1], _m[3][2] - _m[0][2], _m[3][3] - _m[0][3]).Normalize();
+	_planes[FP_Bottom].Set(_m[3][0] + _m[1][0], _m[3][1] + _m[1][1], _m[3][2] + _m[1][2], _m[3][3] + _m[1][3]).Normalize();
+	_planes[FP_Top].Set(_m[3][0] - _m[1][0], _m[3][1] - _m[1][1], _m[3][2] - _m[1][2], _m[3][3] - _m[1][3]).Normalize();
+	_planes[FP_Near].Set(_m[3][0] + _m[2][0], _m[3][1] + _m[2][1], _m[3][2] + _m[2][2], _m[3][3] + _m[2][3]).Normalize();
+	_planes[FP_Far].Set(_m[3][0] - _m[2][0], _m[3][1] - _m[2][1], _m[3][2] - _m[2][2], _m[3][3] - _m[2][3]).Normalize();
+	*/	
+
 	for (uint i = 0, j = 0; i < 3; ++i, j += 2)
 	{
-		_planes[j].Set(_m30 - _m[i][0], _m31 - _m[i][1], _m32 - _m[i][2], _m33 - _m[i][3]).Normalize();
-		_planes[j].Set(_m30 + _m[i][0], _m31 + _m[i][1], _m32 + _m[i][2], _m33 + _m[i][3]).Normalize();
+		_planes[j].Set(_m[3][0] + _m[i][0], _m[3][1] + _m[i][1], _m[3][2] + _m[i][2], _m[3][3] + _m[i][3]).Normalize();
+		_planes[j+1].Set(_m[3][0] - _m[i][0], _m[3][1] - _m[i][1], _m[3][2] - _m[i][2], _m[3][3] - _m[i][3]).Normalize();
 	}
 }
 //----------------------------------------------------------------------------//
@@ -657,9 +669,9 @@ void Dbvt::Enum(Callback* _cb, bool _withTest)
 	Node* _stackBase[32];
 	Node** _stack = _stackBase;
 	*_stack++ = m_root;
-	do
+	if(m_root) do
 	{
-		Node* _node = *_stack--;
+		Node* _node = *--_stack;
 		Callback::TestResult _result = _withTest ? _cb->TestNode(_node) : Callback::TR_WithoutTest;
 		if (_result == Callback::TR_Stop)
 			break;
@@ -681,7 +693,7 @@ void Dbvt::Enum(Callback* _cb, bool _withTest)
 			*_stack2++ = _node;
 			do
 			{
-				_node = *_stack2--;
+				_node = *--_stack2;
 				if (_node->IsNode())
 				{
 					*_stack2++ = _node->child0;

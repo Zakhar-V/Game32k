@@ -33,7 +33,7 @@
 
 
 // constants
-#define MAX_INSTANCES 1000 // 1000 * sizeof(mat4) = 47kb (max = 64kb)
+#define MAX_INSTANCES 512
 #define MAX_BONES 64
 
 
@@ -68,6 +68,10 @@ UBUFFER(1, Camera)
 UBUFFER(2, InstanceMat)
 {
 	ROWMAJOR mat4 WorldMat[MAX_INSTANCES];
+};
+UBUFFER(5, InstanceData)
+{
+	ROWMAJOR mat4 InstanceData[MAX_INSTANCES];
 };
 
 UBUFFER(3, SkinMat)

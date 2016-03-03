@@ -8,7 +8,6 @@
 
 //----------------------------------------------------------------------------//
 Geometry::Geometry(BufferUsage _usage) :
-	m_usage(_usage),
 	m_type(PT_Points)
 {
 }
@@ -23,22 +22,11 @@ void Geometry::Clear(void)
 	m_indices.Clear();
 }
 //----------------------------------------------------------------------------//
-void Geometry::Begin(PrimitiveType _type)
-{
-	Clear();
-	m_type = _type;
-}
-//----------------------------------------------------------------------------//
-void Geometry::End(void)
-{
-	Upload();
-}
-//----------------------------------------------------------------------------//
 void Geometry::Merge(const Vertex* _vertices, uint _numVertices, const index_t* _indices, uint _numIndices)
 {
 	ASSERT(_vertices || !_numVertices);
 
-	uint16 _baseVertex = (uint16)m_vertices.Size();
+	index_t _baseVertex = (index_t)m_vertices.Size();
 	m_vertices.Push(_vertices, _numVertices);
 
 	if (_numIndices)
@@ -50,12 +38,17 @@ void Geometry::Merge(const Vertex* _vertices, uint _numVertices, const index_t* 
 	}
 }
 //----------------------------------------------------------------------------//
+AlignedBox Geometry::ComputeBBox(void)
+{
+	return AlignedBox().AddVertices(m_vertices.Ptr(), m_vertices.Size(), sizeof(Vertex));
+}
+//----------------------------------------------------------------------------//
 void Geometry::CreateGridXZ(uint _numSectors, float _sectorSize)
 {
 	ASSERT((_numSectors + 1) * (_numSectors + 1) < (index_t)-1); // 254 for uint16_t
 
 	Clear();
-	//m_type = PT_Triangles;
+	m_type = PT_Triangles;
 
 	uint _numVertices = _numSectors + 1;
 	uint _numQuads = _numSectors - 1;
@@ -104,33 +97,14 @@ void Geometry::CreateGridXZ(uint _numSectors, float _sectorSize)
 	}
 }
 //----------------------------------------------------------------------------//
-void Geometry::Upload(void)
+VertexArrayPtr Geometry::CreateVertexArray(BufferUsage _usage)
 {
+	VertexArrayPtr _va = new VertexArray(m_type, m_indices.Size() != 0, _usage);
 	if (m_vertices.Size())
-	{
-		if (!m_vertexBuffer)
-			m_vertexBuffer = new Buffer(m_usage);
-
-		uint _size = m_vertices.Size() * sizeof(Vertex);
-
-		if (m_vertexBuffer->Size() < _size)
-			m_vertexBuffer->Realloc(_size, m_vertices.Ptr());
-		else
-			m_vertexBuffer->Write(m_vertices.Ptr(), 0, _size);
-	}
-
+		_va->GetVertexBuffer()->Realloc(m_vertices.Size() * sizeof(Vertex), m_vertices.Ptr());
 	if (m_indices.Size())
-	{
-		if (!m_indexBuffer)
-			m_indexBuffer = new Buffer(m_usage);
-
-		uint _size = m_indices.Size() * sizeof(index_t);
-
-		if (m_indexBuffer->Size() < _size)
-			m_indexBuffer->Realloc(_size, m_indices.Ptr());
-		else
-			m_indexBuffer->Write(m_indices.Ptr(), 0, _size);
-	}
+		_va->GetIndexBuffer()->Realloc(m_indices.Size() * sizeof(index_t), m_indices.Ptr());
+	return _va;
 }
 //----------------------------------------------------------------------------//
 

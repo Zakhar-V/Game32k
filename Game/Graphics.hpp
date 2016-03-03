@@ -119,7 +119,7 @@ public:
 	uint Size(void) { return m_size; }
 	uint Handle(void) { return m_handle; }
 	void Realloc(uint _newSize, const void* _data = nullptr);
-	uint8* Map(LockMode _mode, uint _offset, uint _size);
+	uint8* Map(LockMode _mode, uint _offset = 0, int _size = -1);
 	void Unmap(void);
 	void Write(const void* _src, uint _offset, uint _size);
 	void Copy(Buffer* _src, uint _srcOffset, uint _dstOffset, uint _size);
@@ -127,8 +127,8 @@ public:
 protected:
 
 	BufferUsage m_usage;
-	uint m_size = 0;
-	uint m_handle = 0;
+	uint m_size;
+	uint m_handle;
 };
 
 //----------------------------------------------------------------------------//
@@ -190,37 +190,35 @@ struct Vertex // generic vertex, 36(40) bytes
 };
 
 //----------------------------------------------------------------------------//
-// RenderMesh
+// VertexArray
 //----------------------------------------------------------------------------//
 
-typedef Ptr<class RenderMesh> RenderMeshPtr;
+typedef Ptr<class VertexArray> VertexArrayPtr;
 
-class RenderMesh : public RefCounted
+class VertexArray : public RefCounted
 {
 public:
-	RenderMesh(void);
-	~RenderMesh(void);
 
-	void SetVertexBuffer(Buffer* _buffer, uint _baseVertex = 0);
-	Buffer* GetVertexBuffer(void) { return m_vertices; }
-	uint GetBaseVertex(void) { return m_baseVertex; }
-	void SetIndexBuffer(Buffer* _buffer);
-	Buffer* GetIndexBuffer(void) { return m_indices; }
-	void SetType(PrimitiveType _type);
+	VertexArray(PrimitiveType _type, bool _indexed, BufferUsage _usage = BU_Static);
+	~VertexArray(void);
+
 	PrimitiveType GetType(void) { return m_type; }
-	void SetRange(uint _start, uint _count);
-	uint GetStart(void) { return m_start; }
-	uint GetCount(void) { return m_count; }
-	void Draw(uint _numInstances = 1);
-	int Compare(const RenderMesh* _rhs) const;
+
+	Buffer* GetVertexBuffer(void) { return m_vertexBuffer; }
+	uint GetVertexCount(void) { return m_vertexBuffer->Size() / sizeof(Vertex); }
+
+	Buffer* GetIndexBuffer(void) { return m_indexBuffer; }
+	uint GetIndexCount(void) { return m_indexBuffer ? (m_indexBuffer->Size() / sizeof(index_t)) : 0; }
+
+	void Bind(void);
+	void Draw(uint _start, uint _count, uint _numInstances = 1);
+	
 
 protected:
+
 	PrimitiveType m_type;
-	uint m_baseVertex;
-	uint m_start;
-	uint m_count;
-	BufferPtr m_vertices;
-	BufferPtr m_indices;
+	BufferPtr m_vertexBuffer;
+	BufferPtr m_indexBuffer;
 };
 
 //----------------------------------------------------------------------------//

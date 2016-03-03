@@ -15,10 +15,44 @@
 #include "Scene.cpp"
 #include "Physics.cpp"
 #include "Render.cpp"
+#include "Level.cpp"
 
 //----------------------------------------------------------------------------//
 //
 //----------------------------------------------------------------------------//
+
+////////////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------//
+// 
+//----------------------------------------------------------------------------//
+////////////////////////////////////////////////////////////////////////////////
+
+class GameMap
+{
+
+};
+
+class SpawnPoint : public Entity
+{
+
+};
+
+class Zone : public Entity
+{
+
+};
+
+class Character : public Entity
+{
+	
+};
+
+class Player : public Entity
+{
+
+};
+
+
 
 ////////////////////////////////////////////////////////////////////////////////
 //----------------------------------------------------------------------------//
@@ -339,8 +373,8 @@ public:
 
 		Vec3 _pos = m_node->GetWorldPosition();
 		_pos += _dir * _frame.time;
-		//_pos.y = Max<float>(_pos.y, _terrain->GetHeight(_pos.x, _pos.z) + 2);
-		_pos.y = _terrain->GetHeight(_pos.x, _pos.z) + 1.7f;
+		_pos.y = Max<float>(_pos.y, _terrain->GetHeight(_pos.x, _pos.z) + 2);
+		//_pos.y = _terrain->GetHeight(_pos.x, _pos.z) + 1.7f;
 		m_node->SetWorldPosition(_pos);
 		*_cubePos = _pos + Vec3(0, 0, -50) * m_node->GetChild()->GetWorldRotation().Copy().Inverse();
 		_cubePos->y = _terrain->GetHeight(_cubePos->x, _cubePos->z);
@@ -393,13 +427,24 @@ void CreatePlayer(Scene* _scene)
 void CreatScene(Scene* _scene)
 {
 	CreatePlayer(_scene);
+	/*{
+		Array<Node*> _nodes;
+		for (uint i = 0; i < 200000; ++i)
+		{
+			NodePtr _test = new Node;
+			_test->SetSleepingThreshold(15);
+			_test->SetScene(_scene);
+			_nodes.Push(_test);
+		}
 
-	for (uint i = 0; i < 20000; ++i)
-	{
-		NodePtr _test = new Node;
-		_test->SetSleepingThreshold(15);
-		_test->SetScene(_scene);
-	} 
+		//MessageBox(0, "", "", 0);
+
+		for (uint i = 0; i < _nodes.Size(); ++i)
+		{
+			_nodes[i]->SetScene(nullptr);
+		}
+	}*/
+	//MessageBox(0, "", "", 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -409,6 +454,20 @@ void CreatScene(Scene* _scene)
 ////////////////////////////////////////////////////////////////////////////////
 
 #pragma comment(lib, "opengl32.lib")
+
+/*int __cdecl __stdio_common_vfprintf(
+	_In_                                    unsigned __int64 _Options,
+	_Inout_                                 FILE*            _Stream,
+	_In_z_ _Printf_format_string_params_(2) char const*      _Format,
+	_In_opt_                                _locale_t        _Locale,
+	va_list          _ArgList
+	)
+{
+	//vfprintf()
+} */
+
+#ifndef _DEBUG
+#endif
 
 void main(void)
 {
@@ -423,14 +482,13 @@ void main(void)
 	}
 		
 	{
-
 		PRINT_SIZEOF(Node);
 		LOG("1KK nodes(%d) = %d mb", (sizeof(Node)), ((sizeof(Node)) * 1000000) / 1024 / 1024);
 		LOG("1KK nodes+dbvt(%d) = %d mb", (sizeof(Node) + sizeof(DbvtNode)), ((sizeof(Node) + sizeof(DbvtNode)) * 1000000) / 1024 / 1024);
 /*#ifdef DEBUG
 		system("pause");
 #endif
-		ExitProcess(0);	*/
+		ExitProcess(0);*/
 	} 
 
 	new Device;
@@ -450,7 +508,8 @@ void main(void)
 		_hmap->CreatePerlin(512, 0.05f);
 		//_hmap->CreatePerlin(256, 0.1f);
 		_terrain->Create(_hmap, 550, 7500, 254);
-		//_terrain->SetScene(_scene);
+		//_terrain->Create(_hmap, 5, 75, 254);
+		_terrain->SetScene(_scene);
 	}
 
 	const Color _clearColor(0x7f7f9fff);
@@ -472,7 +531,7 @@ void main(void)
 
 	gDevice->SetCursorMode(CM_Camera);
 
-	RenderMeshPtr _cube;
+	/*RenderMeshPtr _cube;
 	// temp
 	{
 		AlignedBox _box({ -0.15f, 10, -0.15f }, {0.15f, -10, 0.15f});
@@ -495,7 +554,7 @@ void main(void)
 		_cube->SetVertexBuffer(_tempVB);
 		_cube->SetIndexBuffer(_tempIB);
 		_cube->SetRange(0, 36);
-	}
+	}	*/
 
 
 
@@ -529,7 +588,7 @@ void main(void)
 		gGraphics->SetTexture(1, _terrain->m_texture);
 		glBindSampler(1, _sampler);
 
-		_terrain->m_mesh->Draw();
+		//_terrain->m_mesh->Draw();
 
 
 
@@ -563,7 +622,7 @@ void main(void)
 			gGraphics->SetShader(VS_StaticModel);
 			gGraphics->SetShader(ST_Geometry, nullptr);
 
-			_cube->Draw();
+			//_cube->Draw();
 		}
 
 

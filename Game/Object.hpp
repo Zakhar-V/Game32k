@@ -100,9 +100,15 @@ protected:
 // Object
 //----------------------------------------------------------------------------//
 
+#if CPP < 14
+#define STATIC_CLASS_ID() static uint StaticClassID(void) { static const uint _id = StrHash(StaticClassName()); return _id; }
+#else
+#define STATIC_CLASS_ID() static uint StaticClassID(void) { return ConstStrHash(StaticClassName()); }
+#endif
+
 #define OBJECT(Name) \
-	static const char* StaticClassName(void) { return Name; } \
-	static uint StaticClassID(void) { static const uint _id = StrHash(StaticClassName()); return _id; } \
+	static constexpr const char* StaticClassName(void) { return Name; } \
+	STATIC_CLASS_ID() \
 	const char* ClassName(void) const override { return StaticClassName(); } \
 	uint ClassID(void) const override { return StaticClassID(); } \
 	bool IsClass(uint _id) const override { return _id == StaticClassID() || __super::IsClass(_id); } \
@@ -112,8 +118,8 @@ class Object : public RefCounted
 {
 public:
 
-	static const char* StaticClassName(void) { return "Object"; }
-	static uint StaticClassID(void) { static const uint _id = StrHash(StaticClassName()); return _id; }
+	static constexpr const char* StaticClassName(void) { return "Object"; }
+	STATIC_CLASS_ID();
 	virtual const char* ClassName(void) const { return StaticClassName(); }
 	virtual uint ClassID(void) const { return StaticClassID(); }
 	virtual bool IsClass(uint _id) const { return _id == StaticClassID(); }
