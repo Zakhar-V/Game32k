@@ -248,6 +248,8 @@ inline uint32_t FirstPow2(uint32_t _val)
 inline bool IsPow2(uint32_t _val) { return (_val & (_val - 1)) == 0; }
 inline uint8 FloatToByte(float _x) { return (uint8)(_x * FLOAT2BYTE); }
 inline float ByteToFloat(uint8 _x) { return _x * BYTE2FLOAT; }
+inline uint8 FloatToSByte(float _x) { return (uint8)((_x * 0.5f) * FLOAT2BYTE); }
+inline float SByteToFloat(uint8 _x) { return (_x) * BYTE2FLOAT * 2 - 1; }
 
 typedef uint16_t float16_t;
 inline uint16_t FloatToHalf(float _value)
@@ -493,9 +495,11 @@ struct Vec3
 	float AbsSum(void) const { return Abs(x) + Abs(y) + Abs(z); }
 
 	bool operator < (const Vec3& _rhs) const { return x < _rhs.x && y < _rhs.y && z < _rhs.z; }
+	bool operator <= (const Vec3& _rhs) const { return x <= _rhs.x && y <= _rhs.y && z <= _rhs.z; }
 	bool operator > (const Vec3& _rhs) const { return x > _rhs.x && y > _rhs.y && z > _rhs.z; }
-	bool operator <= (const Vec3& _rhs) const { return !(*this > _rhs); }
-	bool operator >= (const Vec3& _rhs) const { return !(*this < _rhs); }
+	bool operator >= (const Vec3& _rhs) const { return x >= _rhs.x && y >= _rhs.y && z >= _rhs.z; }
+	//bool operator <= (const Vec3& _rhs) const { return !(*this > _rhs); }
+	//bool operator >= (const Vec3& _rhs) const { return !(*this < _rhs); }
 
 	float x, y, z;
 };
@@ -994,7 +998,12 @@ struct AlignedBox
 	bool operator != (const AlignedBox& _rhs) const { return !(*this == _rhs); }
 
 	bool Contains(const Vec3& _point) const { return _point >= mn && _point <= mx; }
-	bool Contains(const AlignedBox& _box) const { return _box.mx <= mx && _box.mn >= mn; }
+	//bool Contains(const AlignedBox& _box) const { return _box.mn >= mn && _box.mx <= mx; }
+	bool Contains(const AlignedBox& _box) const
+	{ 
+		//return _box.mn.x >= mn.x && _box.mn.y >= mn.y && _box.mn.z >= mn.z && _box.mx.x <= mx.x && _box.mx.y <= mx.y && _box.mx.z <= mx.z;
+		return _box.mn >= mn && _box.mx <= mx;
+	}
 	bool Intersects(const AlignedBox& _box) const { return !(_box.mx < mn || _box.mn > mx); }
 
 	Vec3 mn, mx;
@@ -1084,6 +1093,15 @@ struct DbvtNode
 		void* object;
 		int value;
 	};
+
+#ifdef _DEBUG
+	AlignedBox _GetChildBounds(void)
+	{
+		if (IsLeaf())
+			return box;
+		return child0->_GetChildBounds() + child1->_GetChildBounds();
+	}
+#endif
 };
 
 //----------------------------------------------------------------------------//
@@ -1128,6 +1146,7 @@ public:
 	void Enum(Callback* _cb, bool _withTest = true);
 
 	// TODO: enum directional
+
 
 protected:
 

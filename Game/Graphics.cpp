@@ -242,7 +242,11 @@ const GLVertexAttribs[] =
 	{ GL_FLOAT, 2, false, false, offsetof(Vertex, texcoord) },
 #endif
 	{ GL_UNSIGNED_BYTE, 4, false, true, offsetof(Vertex, color) },
-	{ GL_UNSIGNED_BYTE, 4, false, true, offsetof(Vertex, normal) },
+#if USE_BYTE_NORMALS
+	{ GL_BYTE, 4, false, true, offsetof(Vertex, normal) },
+#else
+	{ GL_FLOAT, 3, false, false, offsetof(Vertex, normal) },
+#endif
 	{ GL_UNSIGNED_BYTE, 4, false, true, offsetof(Vertex, tangent) },
 	{ GL_UNSIGNED_BYTE, 4, false, true, offsetof(Vertex, weights) },
 	{ GL_UNSIGNED_BYTE, 4, true, false, offsetof(Vertex, indices) },
@@ -604,8 +608,8 @@ const g_shaderNames[] =
 	{ ST_Geometry, GS_Particles, "Quad-GS.glsl", SPRITE_BIT | PARTICLES_BIT },
 	{ ST_Geometry, GS_Terrain, "Quad-GS.glsl", SPRITE_BIT | TERRAIN_BIT },
 
-	{ ST_Fragment, FS_Texture, "FillGBuffer-PS.glsl", TEXTURE_BIT },
-	{ ST_Fragment, FS_NoTexture, "FillGBuffer-PS.glsl", 0 },
+	{ ST_Fragment, FS_Texture, "Generic-PS.glsl", TEXTURE_BIT },
+	{ ST_Fragment, FS_NoTexture, "Generic-PS.glsl", 0 },
 
 };
 //----------------------------------------------------------------------------//

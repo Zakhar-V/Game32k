@@ -136,6 +136,8 @@ protected:
 //----------------------------------------------------------------------------//
 
 #define USE_HALF_FLOAT_TEXCOORD 1
+#define USE_BYTE_NORMALS 1
+
 
 struct Vertex // generic vertex, 36(40) bytes 
 {
@@ -151,7 +153,11 @@ struct Vertex // generic vertex, 36(40) bytes
 	{
 		struct
 		{
+#if USE_BYTE_NORMALS
 			uint8 normal[4]; // 3
+#else
+			float normal[3]; // 3
+#endif
 			uint8 tangent[4]; // 4
 			uint8 weights[4]; // 5
 			uint8 indices[4]; // 6
@@ -186,6 +192,14 @@ struct Vertex // generic vertex, 36(40) bytes
 
 	Vertex& SetSize(const Vec2& _s) { size[0] = _s.x, size[1] = _s.y; return *this; }
 	Vertex& SetRotation(float _r) { rotation = _r; return *this; }
+
+#if USE_BYTE_NORMALS
+	Vec3 GetNormal(void) const { return Vec3(SByteToFloat(normal[0]), SByteToFloat(normal[1]), SByteToFloat(normal[2])); }
+	Vertex& SetNormal(const Vec3& _n) { normal[0] = FloatToSByte(_n[0]), normal[1] = FloatToSByte(_n[1]), normal[2] = FloatToSByte(_n[2]); return *this; }
+#else
+	Vec3 GetNormal(void) const { return *(const Vec3*)normal; }
+	Vertex& SetNormal(const Vec3& _n) { normal[0] = _n[0], normal[1] = _n[1], normal[2] = _n[2]; return *this; }
+#endif
 	// ...
 };
 

@@ -4,8 +4,8 @@ void main()
 	gl_FragDepth = log(InLogZ)*Depth.w;
 
 #if TEXTURE
-	OutColor = texture(ColorMap, InTexCoord).rrra * 0.7 + vec4(InTexCoord, InLogZ, 1) * 0.3;
-	//OutColor = vec4(InTexCoord, InLogZ, 1);
+	//OutColor = texture(ColorMap, InTexCoord).rrra * 0.7 + vec4(InTexCoord, InLogZ, 1) * 0.3;
+	OutColor = InColor;
 #else
 	//OutColor = InColor;
 
@@ -13,7 +13,9 @@ void main()
 	gl_FragDepth = log(InLogZ)*(Depth.w - 5e-4);
 	//OutColor = vec4(InWorldPos * 2);
 	//OutColor = vec4(InWorldPos.y, InWorldPos.y, gl_FragDepth, 1);
-	OutColor = vec4(gl_FragDepth, gl_FragDepth, 0, 1);
+	//OutColor = vec4(gl_FragDepth, gl_FragDepth, 0, 1);
+	//OutColor = vec4(InTexCoord, InLogZ, 1);
+	OutColor = vec4(InNormal, 1);
 #endif
 
 	//gl_FragDepth = InLogZ;

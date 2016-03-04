@@ -349,11 +349,13 @@ public:
 	Model(void);
 	~Model(void);
 
-	void SetMesh(Mesh* _mesh) { }
+	void SetMesh(Mesh* _mesh);
+	Mesh* GetMesh(void) { return m_mesh; }
+	void GetRenderItems(Array<RenderItem>& _items) override;
 
 protected:
 
-	//m_mesh
+	MeshPtr m_mesh;
 };
 
 //----------------------------------------------------------------------------//

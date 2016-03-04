@@ -11,6 +11,8 @@ void main()
 	OutColor = InColor;
 	OutTexCoord = InTexCoord;
 
+	OutNormal = normalize(InNormal*NormMat);
+
 #if SPRITE
 	OutSize = InSize;
 	OutRot = InRot;

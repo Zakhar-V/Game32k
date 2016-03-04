@@ -24,6 +24,9 @@
     <None Include="..\Build\CreateBuiltinData.bat">
       <Filter>Assets\Build</Filter>
     </None>
+    <None Include="Shaders\Postprocess.glsl">
+      <Filter>Assets\Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Shaders\Common.h">
@@ -32,10 +35,10 @@
     <ClInclude Include="Shaders\Generic-VS.glsl">
       <Filter>Assets\Shaders</Filter>
     </ClInclude>
-    <ClInclude Include="Shaders\FillGBuffer-PS.glsl">
+    <ClInclude Include="Shaders\Quad-GS.glsl">
       <Filter>Assets\Shaders</Filter>
     </ClInclude>
-    <ClInclude Include="Shaders\Quad-GS.glsl">
+    <ClInclude Include="Shaders\Generic-PS.glsl">
       <Filter>Assets\Shaders</Filter>
     </ClInclude>
   </ItemGroup>

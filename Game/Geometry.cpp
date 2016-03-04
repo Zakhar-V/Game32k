@@ -38,9 +38,86 @@ void Geometry::Merge(const Vertex* _vertices, uint _numVertices, const index_t* 
 	}
 }
 //----------------------------------------------------------------------------//
+void Geometry::ComputeNormals(void)
+{
+	if (m_type != PT_Triangles)
+		return;
+
+	Vec3 _n;
+	Array<Vec3> _normals;
+	_normals.Resize(m_vertices.Size(), VEC3_ZERO);
+
+	if (m_indices.Size())
+	{
+		for (uint i = 0; i + 3 <= m_indices.Size(); i += 3)
+		{
+			index_t _idx0 = m_indices[i + 0];
+			index_t _idx1 = m_indices[i + 1];
+			index_t _idx2 = m_indices[i + 2];
+			_n = TriangleNormal(m_vertices[_idx0].position, m_vertices[_idx1].position, m_vertices[_idx2].position);
+			_normals[_idx0] += _n;
+			_normals[_idx1] += _n;
+			_normals[_idx2] += _n;
+		}
+		for (uint i = 0; i < _normals.Size(); ++i)
+		{
+			m_vertices[i].SetNormal(_normals[i].Normalize());
+		}
+	}
+	else if(m_indices.Size() > 3)
+	{
+		for (uint i = 0; i + 3 <= m_vertices.Size(); i += 3)
+		{
+			_n = TriangleNormal(m_vertices[i + 0].position, m_vertices[i + 1].position, m_vertices[i + 2].position).Normalize();
+			m_vertices[i + 0].SetNormal(_n);
+			m_vertices[i + 1].SetNormal(_n);
+			m_vertices[i + 2].SetNormal(_n);
+		}
+	}
+}
+//----------------------------------------------------------------------------//
 AlignedBox Geometry::ComputeBBox(void)
 {
 	return AlignedBox().AddVertices(m_vertices.Ptr(), m_vertices.Size(), sizeof(Vertex));
+}
+//----------------------------------------------------------------------------//
+void Geometry::CreateCube(const AlignedBox& _box)
+{
+	static const float _tc[4][2] =
+	{
+		{ 0, 0 }, // 0 lt
+		{ 0, 1 }, // 1 lb
+		{ 1, 1 }, // 2 rb
+		{ 1, 0 }, // 3 rt
+	};
+
+	Clear();
+	m_type = PT_Triangles;
+	m_vertices.Reserve(24);
+	m_indices.Reserve(36);
+
+	Vertex _v;
+	Vertex _corners[8];
+	_box.GetAllCorners(_corners, sizeof(Vertex));
+	for (uint i = 0; i < 24; i += 4)
+	{
+		// lt lb rb rt 
+		for (uint j = 0; j < 4; ++j)
+		{
+			_v = _corners[BOX_QUAD_INDICES[i + j]];
+			_v.SetTexCoord({ _tc[j][0], _tc[j][1] });
+			m_vertices.Push(_v);
+		}
+
+		// 012 023
+		m_indices.Push(i + 0).Push(i + 1).Push(i + 2);
+		m_indices.Push(i + 0).Push(i + 2).Push(i + 3);
+	}
+}
+//----------------------------------------------------------------------------//
+void Geometry::CreateSphere(float radius, int _s, int _p)
+{
+	
 }
 //----------------------------------------------------------------------------//
 void Geometry::CreateGridXZ(uint _numSectors, float _sectorSize)

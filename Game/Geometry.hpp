@@ -19,6 +19,9 @@ public:
 
 	Array<Vertex>& Vertices(void) { return m_vertices; }
 	Array<index_t>& Indices(void) { return m_indices; }
+	uint GetVertexCount(void) { return m_vertices.Size(); }
+	uint GetIndexCount(void) { return m_indices.Size(); }
+	PrimitiveType GetPrimitiveType(void) { return m_type; }
 
 	void Clear(void);
 
@@ -26,17 +29,17 @@ public:
 	// Transform
 	// Mirror
 	// MakeAdjacency
-	// ComputeNormals
+	void ComputeNormals(void);
 	// ComputeTangents
 	// Load
 	// Save
 	AlignedBox ComputeBBox(void);
 
+	void CreateCube(const Vec3& _size) { CreateCube(AlignedBox().FromCenterExtends(VEC3_ZERO, _size * 0.5f)); }
+	void CreateCube(const AlignedBox& _box);
+	void CreateSphere(float radius, int _s = 16, int _p = 8);
 	void CreateGridXZ(uint _numSectors, float _sectorSize);
 
-	uint GetVertexCount(void) { return m_vertices.Size(); }
-	uint GetIndexCount(void) { return m_indices.Size(); }
-	PrimitiveType GetPrimitiveType(void) { return m_type; }
 
 	VertexArrayPtr CreateVertexArray(BufferUsage _usage = BU_Static);
 

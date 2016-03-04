@@ -536,17 +536,9 @@ bool Frustum::Intersects(const Vec3& _center, float _radius) const
 {
 	for (uint i = 0; i < 6; ++i)
 	{
-		float _d = planes[i].Distance(_center, _radius);
-		//printf("%f ", _d);
-		if (_d < 0)
-		{
-			//printf("false\n");
-			return false;
-		}
 		if (planes[i].Distance(_center, _radius) < 0)
 			return false;
 	}
-	//printf("true\n");
 	return true;
 }
 //----------------------------------------------------------------------------//
@@ -666,12 +658,22 @@ void Dbvt::Update(Node* _leaf)
 //----------------------------------------------------------------------------//
 void Dbvt::Enum(Callback* _cb, bool _withTest)
 {
-	Node* _stackBase[32];
+	Node* _stackBase[64];
 	Node** _stack = _stackBase;
 	*_stack++ = m_root;
+#if _DEBUG
+	int _maxDepth = 0, _maxDepthWithoutTest = 0, _depth = 1, _numTests = 0;
+#endif
 	if(m_root) do
 	{
 		Node* _node = *--_stack;
+#if _DEBUG
+		--_depth;
+		_maxDepth = Max(_maxDepth, _depth);
+		++_numTests;
+		//ASSERT(_node->box.Contains(_node->_GetChildBounds()));
+#endif
+
 		Callback::TestResult _result = _withTest ? _cb->TestNode(_node) : Callback::TR_WithoutTest;
 		if (_result == Callback::TR_Stop)
 			break;
@@ -683,6 +685,9 @@ void Dbvt::Enum(Callback* _cb, bool _withTest)
 			{
 				*_stack++ = _node->child0;
 				*_stack++ = _node->child1;
+#if _DEBUG
+				_depth += 2;
+#endif
 			}
 			else
 				_cb->AddLeaf(_node, _result);
@@ -691,13 +696,26 @@ void Dbvt::Enum(Callback* _cb, bool _withTest)
 		{
 			Node** _stack2 = _stack;
 			*_stack2++ = _node;
+#if _DEBUG
+			++_depth;
+#endif
 			do
 			{
 				_node = *--_stack2;
+#if _DEBUG
+				--_depth;
+				_maxDepthWithoutTest = Max(_maxDepth, _depth);
+#endif
+
+				//ASSERT(_node->box.Contains(_node->_GetChildBounds()));
+
 				if (_node->IsNode())
 				{
 					*_stack2++ = _node->child0;
 					*_stack2++ = _node->child1;
+#if _DEBUG
+					_depth += 2;
+#endif
 				}
 				else
 					_cb->AddLeaf(_node, _result);
@@ -706,6 +724,11 @@ void Dbvt::Enum(Callback* _cb, bool _withTest)
 		}
 
 	} while (_stack > _stackBase);
+
+#if _DEBUG
+	//printf("max depth = %d/%d, num tests = %d\n", _maxDepth, _maxDepthWithoutTest, _numTests);
+#endif
+
 }
 //----------------------------------------------------------------------------//
 void Dbvt::_Insert(Node* _leaf, Node* _root)
@@ -745,7 +768,7 @@ void Dbvt::_Insert(Node* _leaf, Node* _root)
 			_parent->box = _parent->child0->box + _parent->child1->box;
 			_node = _parent;
 			_parent = _node->parent;
-		}
+		} 
 	}
 	else // it's new root
 	{
@@ -804,15 +827,14 @@ void Dbvt::_Delete(Node* _node)
 //----------------------------------------------------------------------------//
 void Dbvt::_Clear(void)
 {
-	Node* _stackBase[32];
+	Node* _stackBase[64];
 	Node** _stack = _stackBase;
 	*_stack++ = m_root;
-	do
+	if(m_root) do
 	{
 		Node* _top = *_stack--;
 		if (_top->IsNode())
 		{
-			ASSERT(_stack - _stackBase < 30);
 			*_stack++ = _top->child0;
 			*_stack++ = _top->child1;
 			delete _top;

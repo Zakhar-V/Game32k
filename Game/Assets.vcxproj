@@ -207,13 +207,16 @@
   <ItemGroup>
     <None Include="..\Build\CreateBuiltinData.bat" />
     <None Include="Assets.inc" />
-    <ClInclude Include="Shaders\FillGBuffer-PS.glsl">
+    <ClInclude Include="Shaders\Generic-PS.glsl">
       <FileType>Document</FileType>
     </ClInclude>
     <ClInclude Include="Shaders\Generic-VS.glsl">
       <FileType>Document</FileType>
     </ClInclude>
     <ClInclude Include="Shaders\Quad-GS.glsl">
+      <FileType>Document</FileType>
+    </ClInclude>
+    <ClInclude Include="Shaders\Postprocess.glsl">
       <FileType>Document</FileType>
     </ClInclude>
   </ItemGroup>

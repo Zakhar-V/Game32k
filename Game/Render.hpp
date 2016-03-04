@@ -25,10 +25,22 @@ class Material : public RefCounted
 {
 public:
 
+	void SetColor(const Vec4& _color) { m_diffuse = _color; }
+	void SetSpecular(const Vec4& _specular) { m_diffuse = _specular; }
+	void SetEmissive(const Vec4& _emission) { m_emission = _emission; }
+
+	bool IsTransparent(void) { return m_diffuse.a < 1; }
+
+	void SetTexture(Texture* _texture) { m_texture = _texture; }
+	Texture* GetTexture(void) { return m_texture; }
+	//SamplerID GetSampler(void) { return m_sampler; }
+
 protected:
 
-	Texture* m_diffuse;
-	Texture* m_bump;
+	Vec4 m_diffuse;
+	Vec4 m_specular;
+	Vec4 m_emission;
+	TexturePtr m_texture;
 };
 
 //----------------------------------------------------------------------------//
@@ -50,6 +62,8 @@ struct RenderItem
 
 struct MeshPart
 {
+	MeshPart(uint _start = 0, uint _count = 0, uint _material = 0) :
+		start(_start), count(_count), material(_material) {}
 	uint start = 0;
 	uint count = 0;
 	uint material = 0;
@@ -61,18 +75,47 @@ class Mesh : public RefCounted
 {
 public:
 
-	void SetData(VertexArray* _data) { m_data = _data; }
-	VertexArray* GetData(void) { return m_data; }
+	Mesh(void) { }
+	~Mesh(void) { }
+
+	void CreateFromGeometry(Geometry* _geom)
+	{
+		ASSERT(_geom != nullptr);
+		SetGeometry(_geom);
+		SetPartCount(1);
+		uint _count = _geom->GetIndexCount();
+		SetPart(0, 0, _count ? _count: _geom->GetVertexCount());
+	}
+
+	void SetGeometry(Geometry* _geom)
+	{
+		m_geom = _geom;
+		if (m_geom)
+		{
+			m_data = m_geom->CreateVertexArray();
+			m_bbox = m_geom->ComputeBBox();
+		}
+		else
+		{
+			m_data = nullptr;
+			m_bbox.Reset();
+		}
+	}
+
+	VertexArray* GetVertexArray(void) { return m_data; }
+	const AlignedBox& GetBBox(void) { return m_bbox; }
 
 	void SetPartCount(uint _count) { m_parts.Resize(_count); }
 	uint GetPartCount(void) { return m_parts.Size(); }
+	void SetPart(uint _index, const MeshPart& _part) { m_parts[_index] = _part; }
+	void SetPart(uint _index, uint _start, uint _count, uint _material = 0) { SetPart(_index, {_start, _count, _material}); }
 	const MeshPart& GetPart(uint _index) { return m_parts[_index]; }
 
 	void SetMaterialCount(uint _count) { m_materials.Resize(_count); }
 	uint GetMaterialCount(void) { return m_materials.Size(); }
 	Material* GetMaterial(uint _index) { return _index < m_materials.Size() ? m_materials[_index] : nullptr; }
 
-	void GetItem(RenderItem& _item, uint _index)
+	void GetItem(uint _index, RenderItem& _item)
 	{
 		ASSERT(_index < m_parts.Size());
 		const MeshPart& _part = m_parts[_index];
@@ -84,9 +127,11 @@ public:
 
 protected:
 
+	GeometryPtr m_geom;
 	VertexArrayPtr m_data;
 	Array<MeshPart> m_parts;
 	Array<MaterialPtr> m_materials;
+	AlignedBox m_bbox;
 };
 
 //----------------------------------------------------------------------------//
@@ -131,6 +176,10 @@ public:
 	TexturePtr m_primaryDepthStencilTexture;
 	TexturePtr m_auxDepth;
 	TexturePtr m_auxColor;*/
+
+	RenderBuffer* m_colorBuffer;
+	RenderBuffer* m_depthStencilBuffer;
+
 
 	TexturePtr m_gBufferColorTexture;
 	TexturePtr m_gBufferNormalTexture; // 

@@ -27,7 +27,7 @@
 //----------------------------------------------------------------------------//
 ////////////////////////////////////////////////////////////////////////////////
 
-class GameMap
+/*class GameMap
 {
 
 };
@@ -50,7 +50,7 @@ class Character : public Entity
 class Player : public Entity
 {
 
-};
+};	*/
 
 
 
@@ -392,7 +392,6 @@ protected:
 //----------------------------------------------------------------------------//
 ////////////////////////////////////////////////////////////////////////////////
 
-
 ////////////////////////////////////////////////////////////////////////////////
 //----------------------------------------------------------------------------//
 //
@@ -427,6 +426,24 @@ void CreatePlayer(Scene* _scene)
 void CreatScene(Scene* _scene)
 {
 	CreatePlayer(_scene);
+
+	GeometryPtr _geom = new Geometry();
+	_geom->CreateCube(1);
+	_geom->ComputeNormals();
+
+	MeshPtr _mesh = new Mesh;
+	_mesh->CreateFromGeometry(_geom);
+
+	int _rseed = 0;
+	for (uint i = 0; i < 10000; ++i)
+	{
+		StaticModelPtr _model = new StaticModel;
+		_model->SetSleepingThreshold(1);
+		_model->SetMesh(_mesh);
+		_model->SetLocalPosition( Vec3((Rand(_rseed) * 2 - 1) * 5000, 300 + (Rand(_rseed) * 2 - 1) * 1000, (Rand(_rseed) * 2 - 1) * 5000));
+		_model->SetScene(_scene);
+	}
+
 	/*{
 		Array<Node*> _nodes;
 		for (uint i = 0; i < 200000; ++i)
@@ -468,6 +485,53 @@ void CreatScene(Scene* _scene)
 
 #ifndef _DEBUG
 #endif
+
+
+////////////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------//
+//
+//----------------------------------------------------------------------------//
+////////////////////////////////////////////////////////////////////////////////
+
+/*class AIObject
+{
+
+};
+
+class AIState
+{
+public:
+};
+
+
+class Entity : public Node
+{
+public:
+
+protected:
+	
+	
+	float m_health;
+	AIObject* m_ai;
+};
+
+class Character : public Entity
+{
+
+};
+
+class Player : public Character
+{
+
+};	*/
+
+
+////////////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------//
+//
+//----------------------------------------------------------------------------//
+////////////////////////////////////////////////////////////////////////////////
+
 
 void main(void)
 {
@@ -579,7 +643,10 @@ void main(void)
 		glEnable(GL_DEPTH_TEST);
 		glEnable(GL_DEPTH_CLAMP);
 		//glDepthRange(-1, 1);
+
+		glEnable(GL_CULL_FACE);
 		gRenderer->Draw(_scene);
+		glDisable(GL_CULL_FACE);
 
 		gGraphics->SetShader(VS_Terrain);
 		gGraphics->SetShader(ST_Geometry, nullptr);

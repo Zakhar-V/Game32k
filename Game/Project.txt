@@ -264,5 +264,16 @@ Data/hash - маркер актуальности папки Data. (контрольная сумма встроенных ресурс
 		- SkyDome
 		- WaterPlane
 
+*04/03/2016
+	- Dbvt
+		- отладка
+	- Mesh
+	- Geometry
+		- CreateCube
+		- ComputeNormals
+		- ComputeBBox
+	- Renderer
+
+
 
 		

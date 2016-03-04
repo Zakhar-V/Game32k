@@ -19,6 +19,55 @@ void RenderContainer::AddObject(void* _object, const AlignedBox& _bbox, bool _wi
 //----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
+//
+//----------------------------------------------------------------------------//
+
+struct DbvtDebugRenderer
+{
+	Array<Vertex> vertices;
+
+	void AddBox(const AlignedBox& _bbox, const Color& _color)
+	{
+		Vertex _v[8];
+		_bbox.GetAllCorners(_v, sizeof(Vertex));
+		for (uint i = 0; i < 8; ++i)
+		{
+			_v[i].SetColor(_color);
+		}
+		for (uint i = 0; i < 24; ++i)
+		{
+			vertices.Push(_v[BOX_LINE_INDICES[i]]);
+		}
+	}
+
+	void AddBoxes(DbvtNode* _root)
+	{
+		DbvtNode* _stackBase[64];
+		DbvtNode** _stack = _stackBase;
+		*_stack++ = _root;
+		int _depth = 1;
+		if (_root) do
+		{
+			DbvtNode* _node = *--_stack;
+			--_depth;
+			float _color = ((_depth + 1) / 4.f);
+
+			if (_node->IsNode())
+			{
+				*_stack++ = _node->child0;
+				*_stack++ = _node->child1;
+				_depth += 2;
+			}
+			else
+				_color = 1;
+
+			AddBox(_node->box, Vec4(_color, _color, _color, _color));
+
+		} while (_stack > _stackBase);
+	}
+};
+
+//----------------------------------------------------------------------------//
 // Renderer
 //----------------------------------------------------------------------------//
 
@@ -28,6 +77,11 @@ Renderer::Renderer(void)
 	LOG("Create Renderer");
 
 	ASSERT(gGraphics != nullptr); // the render context must be created before it
+
+
+	m_colorBuffer = new RenderBuffer(PF_RGBA8);
+	m_depthStencilBuffer = new RenderBuffer(PF_D24S8);
+
 
 	m_cameraBuffer = new Buffer(BU_Dynamic);
 	m_cameraBuffer->Realloc(sizeof(UCamera));
@@ -133,6 +187,8 @@ void Renderer::Draw(Scene* _scene)
 			}
 		}
 	}
+
+
 	/*for (DirectionalLight* i = _scene->GetDirectionalLight(); i; i = i->GetNextLight())
 	{
 		if (i->IsEnabled())
@@ -155,23 +211,79 @@ void Renderer::Draw(Scene* _scene)
 
 	Mat44 _wm = MAT44_IDENTITY;
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	glEnable(GL_DEPTH_TEST);
 
-	for (RenderItem* i = m_renderItems.Ptr(), *e = m_renderItems.Ptr() + m_renderItems.Size(); i < e; ++i)
+	uint _numDrawCalls = 0;
+
+	for (RenderItem* i = m_renderItems.Ptr(), *e = m_renderItems.Ptr() + m_renderItems.Size(); i < e;)
 	{
+		gGraphics->SetShader(FS_NoTexture);
+
 		if (i->node->GetTypeMask() & NT_Terrain)
 		{
 			gGraphics->SetShader(VS_Terrain);
 			gGraphics->SetShader(ST_Geometry, nullptr);
+
+			m_instanceBuffer->Write(&i->node->GetWorldTransform(), 0, sizeof(MAT44_IDENTITY));
+			i->data->Bind();
+			i->data->Draw(i->start, i->count);
+			++_numDrawCalls;
+
+			++i;
 		}
+		else if (i->node->GetTypeMask() & NT_StaticModel)
+		{
+			gGraphics->SetShader(VS_StaticModel);
+			gGraphics->SetShader(ST_Geometry, nullptr);
 
-		m_instanceBuffer->Write(&i->node->GetWorldTransform(), 0, sizeof(MAT44_IDENTITY));
-		
-		gGraphics->SetShader(FS_NoTexture);
+			VertexArray* _vao = i->data;
+			uint _start = i->start;
+			uint _count = i->count;
+			UInstanceMat _im;
+			uint _numInstances = 0;
+			for (uint j = 0; i < e && j < MAX_INSTANCES; ++j)
+			{
+				if (i->data == _vao && i->start == _start && i->count == _count)
+				{
+					_im.WorldMat[_numInstances++] = i->node->GetWorldTransform();
+					++i;
+				}
+				else
+					break;
+			}
 
-		i->data->Bind();
-		i->data->Draw(i->start, i->count);
+			m_instanceBuffer->Write(&_im, 0, _numInstances * sizeof(MAT44_IDENTITY));
+			_vao->Bind();
+			_vao->Draw(_start, _count, _numInstances);
+			++_numDrawCalls;
+		}
+		else
+			++i;
 	}
+	//printf("\n");
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+	printf("visible objects: %d, draw calls: %d\n", m_renderContainer.objects.Size(), _numDrawCalls);
+
+#if 0
+
+	{
+		DbvtDebugRenderer _dbg;
+		_dbg.AddBoxes(_scene->GetDbvt()->Root());
+
+		Buffer _buffer;
+		_buffer.Realloc(_dbg.vertices.Size() * sizeof(Vertex),_dbg.vertices.Ptr());
+		
+		glDisable(GL_DEPTH_TEST);
+
+		m_instanceBuffer->Write(&MAT44_IDENTITY, 0, sizeof(MAT44_IDENTITY));
+		gGraphics->SetVertexBuffer(&_buffer);
+		gGraphics->SetShader(VS_StaticModel);
+		gGraphics->SetShader(ST_Geometry, nullptr);
+		gGraphics->SetShader(FS_Texture);
+		gGraphics->Draw(PT_Lines, 0, _dbg.vertices.Size());
+	}
+#endif
 
 	// get lights
 
@@ -193,7 +305,7 @@ void Renderer::Draw(Scene* _scene)
 
 
 
-	_wm.SetTranslation({ 0, 0, 0 });
+	/*_wm.SetTranslation({ 0, 0, 0 });
 	//_wm.SetScale({ 5, 1, 1 });
 
 

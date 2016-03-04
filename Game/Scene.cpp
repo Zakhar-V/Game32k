@@ -611,6 +611,29 @@ Model::~Model(void)
 {
 }
 //----------------------------------------------------------------------------//
+void Model::SetMesh(Mesh* _mesh)
+{
+	m_mesh = _mesh;
+	if (m_mesh)
+		_CreateDbvtNode();
+	else
+		_DeleteDbvtNode();
+}
+//----------------------------------------------------------------------------//
+void Model::GetRenderItems(Array<RenderItem>& _items)
+{
+	if (m_mesh)
+	{
+		RenderItem _item;
+		_item.node = this;
+		for (uint i = 0; i < m_mesh->GetPartCount(); ++i)
+		{
+			m_mesh->GetItem(i, _item);
+			_items.Push(_item);
+		}
+	}
+}
+//----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
 // StaticModel
@@ -628,10 +651,10 @@ StaticModel::~StaticModel(void)
 //----------------------------------------------------------------------------//
 void StaticModel::_GetWorldBBox(AlignedBox& _bbox)
 {
-	/*if (m_mesh)
+	if (m_mesh)
 		_bbox = m_mesh->GetBBox() * GetWorldTransform();
 	else
-		_bbox.Reset();*/
+		_bbox.Reset();
 }
 //----------------------------------------------------------------------------//
 
@@ -700,6 +723,7 @@ void Terrain::Create(Image* _heightmap, float _yScale, float _xzScale, uint _num
 	Vertex* _v = _geom.Vertices().Ptr();
 	for (uint i = 0; i < _geom.GetVertexCount(); ++i)
 		_v[i].position.y = m_scale.y * (_heightmap->Sample(_v[i].GetTexCoord(), ISF_Clamp | ISF_Linear).x);
+	_geom.ComputeNormals();
 	m_mesh = _geom.CreateVertexArray();
 	m_localBBox = _geom.ComputeBBox();
 
@@ -810,7 +834,7 @@ void Scene::Update(float _seconds)
 		n->PostUpdate(_frame);
 	}
 
-	//printf("active nodes: %d --> %d (%f)\n", _active, m_numActiveNodes, m_activeNodes->m_activeTime);
+	printf("active nodes: %d --> %d (%f) ", _active, m_numActiveNodes, m_activeNodes->m_activeTime);
 }
 //----------------------------------------------------------------------------//
 void Scene::_AddActiveNode(Node* _node)

@@ -164,6 +164,8 @@ IN(11, vec3, Binormal);
 IN_FLAT(12, int, InstanceID);
 IN(13, float, LogZ);
 OUT(0, vec4, Color);
+OUT(1, vec4, Normal);
+//OUT(2, vec4, Normal);
 #endif
 
 #define UNIT_X vec3(1, 0, 0)
