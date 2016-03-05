@@ -58,8 +58,8 @@ GL_FUNCDEF(void, glGenBuffers, GLsizei n, GLuint *buffers);
 // 2.0
 GL_FUNCDEF(void, glBlendEquationSeparate, GLenum modeRGB, GLenum modeAlpha);
 GL_FUNCDEF(void, glDrawBuffers, GLsizei n, const GLenum *bufs);
-//GL_FUNCDEF(void, glStencilOpSeparate, GLenum face, GLenum sfail, GLenum dpfail, GLenum dppass);
-//GL_FUNCDEF(void, glStencilFuncSeparate, GLenum face, GLenum func, GLint ref, GLuint mask);
+GL_FUNCDEF(void, glStencilOpSeparate, GLenum face, GLenum sfail, GLenum dpfail, GLenum dppass);
+GL_FUNCDEF(void, glStencilFuncSeparate, GLenum face, GLenum func, GLint ref, GLuint mask);
 //GL_FUNCDEF(void, glStencilMaskSeparate, GLenum face, GLuint mask);
 //GL_FUNCDEF(void, glAttachShader, GLuint program, GLuint shader);
 //GL_FUNCDEF(void, glBindAttribLocation, GLuint program, GLuint index, const GLchar *name);
@@ -927,6 +927,9 @@ void LoadOpenGL(void)
 	// 2.0
 	GL_FUNCLOAD(glBlendEquationSeparate);
 	GL_FUNCLOAD(glDrawBuffers);
+	GL_FUNCLOAD(glStencilOpSeparate);
+	GL_FUNCLOAD(glStencilFuncSeparate);
+	//GL_FUNCLOAD(glStencilMaskSeparate);
 	//GL_FUNCLOAD(glBindAttribLocation);
 	//GL_FUNCLOAD(glDeleteProgram);
 	//GL_FUNCLOAD(glDisableVertexAttribArray);

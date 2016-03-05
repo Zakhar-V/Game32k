@@ -41,9 +41,8 @@ public:
 protected:
 	friend class Node;
 
-	void _SetNode(Node* _node) { m_node = _node; }
-
-	void _SetScene(Scene* _scene) { }
+	virtual void _SetNode(Node* _node) { m_node = _node; }
+	virtual void _SetScene(Scene* _scene) { }
 
 	Node* m_node = nullptr;
 	Behavior* m_prev = nullptr;
@@ -78,6 +77,8 @@ enum NodeType : uint
 	NT_SkyDome = 0x4000, 
 	NT_Vegetation = 0x8000,
 	NT_WaterPlane = 0x10000,
+
+	NT_Entity = 0x80000,
 
 };
 

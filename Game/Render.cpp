@@ -79,6 +79,10 @@ Renderer::Renderer(void)
 	ASSERT(gGraphics != nullptr); // the render context must be created before it
 
 
+	m_depthStencilEnabled = gGraphics->AddDepthStencilState({ true });
+	m_depthStencilDisabled = gGraphics->AddDepthStencilState({ false });
+
+
 	m_colorBuffer = new RenderBuffer(PF_RGBA8);
 	m_depthStencilBuffer = new RenderBuffer(PF_D24S8);
 
@@ -86,9 +90,11 @@ Renderer::Renderer(void)
 	m_cameraBuffer = new Buffer(BU_Dynamic);
 	m_cameraBuffer->Realloc(sizeof(UCamera));
 	m_instanceBuffer = new Buffer(BU_Dynamic);
-	m_instanceBuffer->Realloc(sizeof(UInstanceMat));
+	m_instanceBuffer->Realloc(sizeof(UInstancing));
+	m_materialBuffer = new Buffer(BU_Dynamic);
+	m_materialBuffer->Realloc(sizeof(UMaterial));
 	m_skinBuffer = new Buffer(BU_Dynamic);
-	m_skinBuffer->Realloc(sizeof(USkinMat));
+	m_skinBuffer->Realloc(sizeof(USkinning));
 
 
 
@@ -151,8 +157,9 @@ void Renderer::Draw(Scene* _scene)
 
 
 	gGraphics->SetUniformBuffer(U_Camera, m_cameraBuffer);
-	gGraphics->SetUniformBuffer(U_InstanceMat, m_instanceBuffer);
-	gGraphics->SetUniformBuffer(U_SkinMat, m_skinBuffer);
+	gGraphics->SetUniformBuffer(U_Instancing, m_instanceBuffer);
+	gGraphics->SetUniformBuffer(U_Material, m_materialBuffer);
+	gGraphics->SetUniformBuffer(U_Skinning, m_skinBuffer);
 
 
 	// get visible objects
@@ -211,7 +218,9 @@ void Renderer::Draw(Scene* _scene)
 
 	Mat44 _wm = MAT44_IDENTITY;
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	glEnable(GL_DEPTH_TEST);
+	//glEnable(GL_DEPTH_TEST);
+
+	gGraphics->SetDepthStencilState(m_depthStencilEnabled);
 
 	uint _numDrawCalls = 0;
 
@@ -239,20 +248,30 @@ void Renderer::Draw(Scene* _scene)
 			VertexArray* _vao = i->data;
 			uint _start = i->start;
 			uint _count = i->count;
-			UInstanceMat _im;
+			Material* _material = i->material;
 			uint _numInstances = 0;
-			for (uint j = 0; i < e && j < MAX_INSTANCES; ++j)
+			while (i < e && _numInstances < MAX_INSTANCES)
 			{
-				if (i->data == _vao && i->start == _start && i->count == _count)
+				if (i->data == _vao && i->start == _start && i->count == _count && i->material == _material)
 				{
-					_im.WorldMat[_numInstances++] = i->node->GetWorldTransform();
+					m_instanceStorage.WorldMat[_numInstances] = i->node->GetWorldTransform();
+					if (i->material)
+					{
+						m_materialStorage.Material[_numInstances] = i->material->GetParams();
+					}
+					else
+					{
+						// todo: use default material
+					}
+					++_numInstances;
 					++i;
 				}
 				else
 					break;
 			}
 
-			m_instanceBuffer->Write(&_im, 0, _numInstances * sizeof(MAT44_IDENTITY));
+			m_instanceBuffer->Write(&m_instanceStorage, 0, _numInstances * sizeof(MAT44_IDENTITY));
+			m_materialBuffer->Write(&m_materialStorage, 0, _numInstances * sizeof(MAT44_IDENTITY));
 			_vao->Bind();
 			_vao->Draw(_start, _count, _numInstances);
 			++_numDrawCalls;
@@ -263,7 +282,7 @@ void Renderer::Draw(Scene* _scene)
 	//printf("\n");
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-	printf("visible objects: %d, draw calls: %d\n", m_renderContainer.objects.Size(), _numDrawCalls);
+	//printf("visible objects: %d, draw calls: %d\n", m_renderContainer.objects.Size(), _numDrawCalls);
 
 #if 0
 

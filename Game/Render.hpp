@@ -28,18 +28,26 @@ public:
 	void SetColor(const Vec4& _color) { m_diffuse = _color; }
 	void SetSpecular(const Vec4& _specular) { m_diffuse = _specular; }
 	void SetEmissive(const Vec4& _emission) { m_emission = _emission; }
+	void SetIntensity(const Vec4& _intensity) { m_intensity = _intensity; }
 
 	bool IsTransparent(void) { return m_diffuse.a < 1; }
+
+	void SetShader(ShaderID _shader) { m_shader = _shader; }
+	ShaderID GetShader(void) { return m_shader; }
 
 	void SetTexture(Texture* _texture) { m_texture = _texture; }
 	Texture* GetTexture(void) { return m_texture; }
 	//SamplerID GetSampler(void) { return m_sampler; }
+
+	const Mat44& GetParams(void) { return *(const Mat44*)&m_diffuse; }
 
 protected:
 
 	Vec4 m_diffuse;
 	Vec4 m_specular;
 	Vec4 m_emission;
+	Vec4 m_intensity;
+	ShaderID m_shader;
 	TexturePtr m_texture;
 };
 
@@ -177,6 +185,9 @@ public:
 	TexturePtr m_auxDepth;
 	TexturePtr m_auxColor;*/
 
+	DepthStencilStateID m_depthStencilEnabled;
+	DepthStencilStateID m_depthStencilDisabled;
+
 	RenderBuffer* m_colorBuffer;
 	RenderBuffer* m_depthStencilBuffer;
 
@@ -194,7 +205,12 @@ public:
 
 	BufferPtr m_cameraBuffer;
 	BufferPtr m_instanceBuffer;
+	BufferPtr m_materialBuffer;
 	BufferPtr m_skinBuffer;
+
+	UMaterial m_materialStorage;
+	UInstancing m_instanceStorage;
+	USkinning m_skinStorage;
 
 	RenderContainer m_renderContainer;
 	Array<RenderItem> m_renderItems;

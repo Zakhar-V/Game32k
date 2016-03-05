@@ -21,8 +21,11 @@
 #define _DEBUG_DRAW
 #endif
 
-#define MAX_SHADER_OBJECTS 64
+#define MAX_SHADER_OBJECTS 32
 #define MAX_SAMPLER_OBJECTS 16
+#define MAX_DEPTHSTENCIL_STATE_OBJECTS 16
+#define MAX_RASTERIZER_STATE_OBJECTS 16
+#define MAX_BLEND_STATE_OBJECTS 16
 
 #define MAX_TEXTURE_UNITS 15 // 16 - reserved
 #define MAX_RENDER_TARGETS 4
@@ -68,9 +71,71 @@ enum CompareFunc : uint16
 	CF_Always = GL_ALWAYS,
 };
 
-class DepthStencilState
+enum StencilOp : uint16
 {
+	SO_Keep = GL_KEEP,
+	SO_Zero = GL_ZERO,
+	SO_Replace = GL_REPLACE,
+	SO_IncrWrap = GL_INCR_WRAP,
+	SO_DecrWrap = GL_DECR_WRAP,
+	SO_Incr = GL_INCR,
+	SO_Decr = GL_DECR,
+	SO_Invert = GL_INVERT,
+};
 
+struct StencilFunc
+{
+	StencilFunc(StencilOp _stencilFail = SO_Keep, StencilOp _depthFail = SO_Keep, StencilOp _pass = SO_Keep, CompareFunc _func = CF_Always) :
+		stencilFail(_stencilFail), depthFail(_depthFail), pass(_pass), func(_func) { }
+
+	StencilOp stencilFail;
+	StencilOp depthFail;
+	StencilOp pass;
+	CompareFunc func;
+};
+
+typedef uint DepthStencilStateID;
+
+class DepthStencilState	: public NonCopyable
+{
+public:
+
+	struct Desc
+	{
+		Desc(bool _depthTest = false, 
+			bool _depthWrite = true, 
+			CompareFunc _depthFunc = CF_Less,
+			bool _stencilTest = false,
+			uint8 _stencilRead = 0xff, 
+			uint8 _stencilWrite = 0xff,
+			const StencilFunc& _stencilFront = StencilFunc(),
+			const StencilFunc& _stencilBack = StencilFunc()) :
+			depthTest(_depthTest), depthWrite(_depthWrite), depthFunc(_depthFunc), 
+			stencilTest(_stencilTest), stencilRead(_stencilRead), stencilWrite(_stencilWrite), stencilFront(_stencilFront), stencilBack(_stencilBack) {}
+
+		bool depthTest;
+		bool depthWrite;
+		CompareFunc depthFunc;
+		bool stencilTest;
+		uint8 stencilRead;
+		uint8 stencilWrite;
+		StencilFunc stencilFront;
+		StencilFunc stencilBack;
+	};
+
+	const Desc& GetDesc(void) { return m_desc; }
+
+protected:
+	friend class Graphics;
+
+	DepthStencilState(void);
+	~DepthStencilState(void);
+
+	void _Init(uint _hash, const Desc& _desc);
+	void _Bind(uint _ref);
+
+	uint m_hash;
+	Desc m_desc;
 };
 
 //----------------------------------------------------------------------------//
@@ -338,7 +403,58 @@ protected:
 
 enum TextureWrap : uint16
 {
+	TW_Repeat,
+	TW_Clamp,
+};
 
+enum TextureFilter : uint16
+{
+	TF_Nearest,
+	TF_Linear,
+	TF_Bilinear,
+	TF_Trilinear,
+};
+
+enum TextureAnisotropy : uint16
+{
+	TA_Max = 0,
+	TA_X1 = 1,
+	TA_X2 = 2,
+	TA_X4 = 4,
+	TA_X8 = 8,
+	TA_X16 = 16,
+};
+
+typedef uint SamplerID;
+
+struct Sampler : public NonCopyable
+{
+public:
+
+	struct Desc
+	{
+		Desc(TextureWrap _wrap = TW_Repeat, TextureFilter _filter = TF_Linear, TextureAnisotropy _anisotropy = TA_Max, CompareFunc _func = CF_Never) :
+			wrap(_wrap), filter(_filter), anisotropy(_anisotropy), depthFunc(_func) { }
+
+		TextureWrap wrap;
+		TextureFilter filter;
+		TextureAnisotropy anisotropy;
+		CompareFunc depthFunc;
+	};
+
+	const Desc& GetDesc(void) { return m_desc; }
+
+protected:
+	friend class Graphics;
+
+	Sampler(void);
+	~Sampler(void);
+
+	void _Init(uint _hash, const Desc& _desc);
+
+	uint m_hash;
+	Desc m_desc;
+	uint m_handle;
 };
 
 //----------------------------------------------------------------------------//
@@ -403,6 +519,12 @@ public:
 	void BeginFrame(void);
 	void EndFrame(void);
 
+	DepthStencilStateID AddDepthStencilState(const DepthStencilState::Desc& _desc);
+	void SetDepthStencilState(DepthStencilStateID _state, uint _stencilRef = 0);
+
+	SamplerID AddSampler(const Sampler::Desc& _desc);
+	void SetSampler(uint _slot, SamplerID _sampler);
+
 	void EnableRenderTargets(bool _enabled = true);
 	bool IsRenderTargetsEnabled(void) { return m_drawToFramebuffer; }
 	void ResetRenderTargets(void);
@@ -439,7 +561,20 @@ protected:
 	HDC m_dc;
 	HGLRC m_rc;
 
-	// shaders
+	// depthstencil
+
+	DepthStencilState m_depthStencilState[MAX_DEPTHSTENCIL_STATE_OBJECTS];
+	uint m_numDepthStencilState;
+	DepthStencilStateID m_currentDepthStencilState;
+	uint m_currentStencilRef;
+
+	// sampler
+
+	Sampler m_samplers[MAX_SAMPLER_OBJECTS];
+	uint m_numSamplers;
+	SamplerID m_currentSamplers[MAX_SAMPLER_OBJECTS];
+
+	// shader
 
 	Shader m_shaders[MAX_SHADER_OBJECTS];
 	uint m_numShaders;
@@ -467,10 +602,9 @@ protected:
 	FramebufferAttachment m_renderTargets[MAX_RENDER_TARGETS];
 	FramebufferAttachment m_depthStencilTarget;
 
-	// textures
+	// texture
 
-	Texture* m_textures[MAX_TEXTURE_UNITS];
-	class Sampler* m_samplers[MAX_TEXTURE_UNITS];
+	Texture* m_currentTextures[MAX_TEXTURE_UNITS];
 };
 
 //----------------------------------------------------------------------------//

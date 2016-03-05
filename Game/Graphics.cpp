@@ -150,6 +150,62 @@ void __stdcall _DebugProc(uint _source, uint _type, uint _id, uint _severity, in
 #endif // _DEBUG_OUTPUT
 
 //----------------------------------------------------------------------------//
+// Utils
+//----------------------------------------------------------------------------//
+
+void glEnableEx(uint _state, bool _enabled)
+{
+	if (_enabled)
+		glEnable(_state);
+	else
+		glDisable(_state);
+}
+
+//----------------------------------------------------------------------------//
+// DepthStencilState
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+DepthStencilState::DepthStencilState(void) :
+	m_hash(0)
+{
+}
+//----------------------------------------------------------------------------//
+DepthStencilState::~DepthStencilState(void)
+{
+}
+//----------------------------------------------------------------------------//
+void DepthStencilState::_Init(uint _hash, const Desc& _desc)
+{
+	m_hash = _hash;
+	m_desc = _desc;
+}
+//----------------------------------------------------------------------------//
+void DepthStencilState::_Bind(uint _ref)
+{
+	GL_DEBUG_POINT();
+
+	glEnableEx(GL_DEPTH_TEST, m_desc.depthTest);
+	glDepthFunc(m_desc.depthFunc);
+	glDepthMask(m_desc.depthWrite);
+
+	if (m_desc.stencilTest)
+	{
+		glEnable(GL_STENCIL_TEST);
+		glStencilMask(m_desc.stencilWrite);
+		glStencilFuncSeparate(GL_FRONT, m_desc.stencilFront.func, _ref, m_desc.stencilRead);
+		glStencilFuncSeparate(GL_BACK, m_desc.stencilBack.func, _ref, m_desc.stencilRead);
+		glStencilOpSeparate(GL_FRONT, m_desc.stencilFront.stencilFail, m_desc.stencilFront.depthFail, m_desc.stencilFront.pass);
+		glStencilOpSeparate(GL_BACK, m_desc.stencilBack.stencilFail, m_desc.stencilBack.depthFail, m_desc.stencilBack.pass);
+	}
+	else
+	{
+		glDisable(GL_STENCIL_TEST);
+	}
+}
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
 // Buffer
 //----------------------------------------------------------------------------//
 
@@ -570,6 +626,65 @@ void RenderBuffer::_BindRenderTargetTexture(uint _framebuffer, uint _attachment,
 //----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
+// Sampler
+//----------------------------------------------------------------------------//
+
+const uint16 GLTextureWrap[] =
+{
+	GL_REPEAT, // TW_Repeat
+	GL_CLAMP_TO_EDGE, // TW_Clamp
+};
+const uint16 GLTextureMinFilter[] =
+{
+	GL_NEAREST, // TF_Nearest
+	GL_LINEAR, // TF_Linear
+	GL_NEAREST_MIPMAP_NEAREST, // TF_Bilinear
+	GL_LINEAR_MIPMAP_LINEAR, // TF_Trilinear
+};
+const uint16 GLTextureMagFilter[] =
+{
+	GL_NEAREST, // TF_Nearest
+	GL_LINEAR, // TF_Linear
+	GL_LINEAR, // TF_Bilinear
+	GL_LINEAR, // TF_Trilinear
+};
+
+//----------------------------------------------------------------------------//
+Sampler::Sampler(void) :
+	m_hash(0),
+	m_handle(0)
+{
+}
+//----------------------------------------------------------------------------//
+Sampler::~Sampler(void)
+{
+	// glDeleteSamplers(1, &m_handle);
+}
+//----------------------------------------------------------------------------//
+void Sampler::_Init(uint _hash, const Desc& _desc)
+{
+	GL_DEBUG_POINT();
+	ASSERT(m_handle == 0); // init once
+
+	m_hash = _hash;
+	m_desc = _desc;
+
+	glGenSamplers(1, &m_handle);
+	glBindSampler(MAX_TEXTURE_UNITS, m_handle);
+	glSamplerParameteri(m_handle, GL_TEXTURE_MIN_FILTER, GLTextureMinFilter[m_desc.filter]);
+	glSamplerParameteri(m_handle, GL_TEXTURE_MAG_FILTER, GLTextureMagFilter[m_desc.filter]);
+	glSamplerParameteri(m_handle, GL_TEXTURE_WRAP_S, GLTextureWrap[m_desc.wrap]);
+	glSamplerParameteri(m_handle, GL_TEXTURE_WRAP_T, GLTextureWrap[m_desc.wrap]);
+	glSamplerParameteri(m_handle, GL_TEXTURE_MAX_ANISOTROPY_EXT, m_desc.anisotropy == TA_Max ? TA_X16 : m_desc.anisotropy);
+	if (m_desc.depthFunc != CF_Never)
+	{
+		glSamplerParameteri(m_handle, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+		glSamplerParameteri(m_handle, GL_TEXTURE_COMPARE_FUNC, m_desc.depthFunc);
+	}
+}
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
 // Shader
 //----------------------------------------------------------------------------//
 
@@ -622,7 +737,7 @@ Shader::Shader(void) :
 //----------------------------------------------------------------------------//
 Shader::~Shader(void)
 {
-	GL_DEBUG_POINT();
+	//GL_DEBUG_POINT();
 
 	//if (m_handle)
 	//	glDeleteProgram(m_handle);
@@ -631,7 +746,7 @@ Shader::~Shader(void)
 void Shader::_Init(ShaderType _type, const char* _common, const char* _src, uint16 _flags)
 {
 	GL_DEBUG_POINT();
-	ASSERT(m_handle == 0);
+	ASSERT(m_handle == 0); // init once
 	ASSERT(_common != nullptr);
 	ASSERT(_src != nullptr);
 
@@ -776,7 +891,22 @@ Graphics::Graphics(void)
 	}
 #endif
 
-	//shaders
+	// depthstencil
+	{
+		m_numDepthStencilState = 0;
+		m_currentDepthStencilState = 0;
+		m_currentStencilRef = 0;
+		AddDepthStencilState(DepthStencilState::Desc());
+	}
+
+	// sampler
+	{
+		m_numSamplers = 0;
+		memset(m_currentSamplers, 0, sizeof(m_currentSamplers));
+		AddSampler(Sampler::Desc()); // add default sampler
+	}
+
+	// shader
 	{
 		GL_DEBUG_POINT();
 
@@ -824,10 +954,9 @@ Graphics::Graphics(void)
 		memset(&m_depthStencilTarget, 0, sizeof(m_depthStencilTarget));
 	}
 
-	// textures
+	// texture
 	{
-		memset(m_textures, 0, sizeof(m_textures));
-		memset(m_samplers, 0, sizeof(m_samplers));
+		memset(m_currentTextures, 0, sizeof(m_currentTextures));
 	}
 
 	_ResetState();
@@ -840,6 +969,7 @@ Graphics::~Graphics(void)
 	// delete vao
 	// delete framebuffers
 	// delete shaders
+	// delete samplers
 	// delete context
 }
 //----------------------------------------------------------------------------//
@@ -860,6 +990,68 @@ void Graphics::EndFrame(void)
 #ifdef _DEBUG_OUTPUT
 	g_DebugOutputEnabled = _dbg;
 #endif
+}
+//----------------------------------------------------------------------------//
+DepthStencilStateID Graphics::AddDepthStencilState(const DepthStencilState::Desc& _desc)
+{
+	GL_DEBUG_POINT();
+
+	uint _hash = Hash(&_desc, sizeof(_desc));
+	for (uint i = 0; i < m_numDepthStencilState; ++i)
+	{
+		if (m_depthStencilState[i].m_hash == _hash)
+			return i;
+	}
+
+	ASSERT(m_numDepthStencilState < MAX_DEPTHSTENCIL_STATE_OBJECTS);
+
+	DepthStencilStateID _id = m_numDepthStencilState++;
+	m_depthStencilState[_id]._Init(_hash, _desc);
+	return _id;
+}
+//----------------------------------------------------------------------------//
+void Graphics::SetDepthStencilState(DepthStencilStateID _state, uint _stencilRef)
+{
+	GL_DEBUG_POINT();
+	ASSERT(_state < m_numDepthStencilState);
+
+	if (m_currentDepthStencilState != _state || m_currentStencilRef != _stencilRef)
+	{
+		m_currentDepthStencilState = _state;
+		m_currentStencilRef = _stencilRef;
+		m_depthStencilState[_state]._Bind(_stencilRef);
+	}
+}
+//----------------------------------------------------------------------------//
+SamplerID Graphics::AddSampler(const Sampler::Desc& _desc)
+{
+	GL_DEBUG_POINT();
+
+	uint _hash = Hash(&_desc, sizeof(_desc));
+	for (uint i = 0; i < m_numSamplers; ++i)
+	{
+		if (m_samplers[i].m_hash == _hash)
+			return i;
+	}
+
+	ASSERT(m_numSamplers < MAX_SAMPLER_OBJECTS);
+	
+	SamplerID _id = m_numSamplers++;
+	m_samplers[_id]._Init(_hash, _desc);
+	return _id;
+}
+//----------------------------------------------------------------------------//
+void Graphics::SetSampler(uint _slot, SamplerID _sampler)
+{
+	GL_DEBUG_POINT();
+	ASSERT(_slot < MAX_SAMPLER_OBJECTS);
+	ASSERT(_sampler < m_numSamplers);
+
+	if (m_currentSamplers[_slot] != _sampler)
+	{
+		m_currentSamplers[_slot] = _sampler;
+		glBindSampler(_slot, m_samplers[_sampler].m_handle);
+	}
 }
 //----------------------------------------------------------------------------//
 void Graphics::EnableRenderTargets(bool _enabled)
@@ -951,13 +1143,13 @@ void Graphics::SetTexture(uint _slot, Texture* _texture)
 	GL_DEBUG_POINT();
 	ASSERT(_slot < MAX_TEXTURE_UNITS);
 
-	if (m_textures[_slot] != _texture)
+	if (m_currentTextures[_slot] != _texture)
 	{
 		uint _target = GL_TEXTURE_2D, _handle = 0;
 		if (_texture)
 			_target = GLTextureType[_texture->Type()], _handle = _texture->Handle();
 		glBindMultiTextureEXT(GL_TEXTURE0 + _slot, _target, _handle);
-		m_textures[_slot] = _texture;
+		m_currentTextures[_slot] = _texture;
 	}
 }
 //----------------------------------------------------------------------------//
@@ -1097,6 +1289,12 @@ void Graphics::DrawIndexed(PrimitiveType _type, uint _baseVertex, uint _start, u
 void Graphics::_ResetState(void)
 {
 	GL_DEBUG_POINT();
+
+	// depthstencil
+	m_currentDepthStencilState = 0;
+	m_depthStencilState[0]._Bind(0);
+
+	// sampler
 
 	// shaders
 	memset(m_currentShader, 0, sizeof(m_currentShader));

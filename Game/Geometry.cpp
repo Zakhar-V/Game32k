@@ -38,6 +38,17 @@ void Geometry::Merge(const Vertex* _vertices, uint _numVertices, const index_t* 
 	}
 }
 //----------------------------------------------------------------------------//
+void Geometry::Transform(const Mat44& _m)
+{
+	Mat44 _nm = _m.Copy().Transpose();
+	for (uint i = 0; i < m_vertices.Size(); ++i)
+	{
+		Vertex& _v = m_vertices[i];
+		_v.position = _m.Transform(_v.position);
+		_v.SetNormal(_nm.TransformVector(_v.GetNormal()).Normalize());
+	}
+}
+//----------------------------------------------------------------------------//
 void Geometry::ComputeNormals(void)
 {
 	if (m_type != PT_Triangles)
@@ -81,7 +92,7 @@ AlignedBox Geometry::ComputeBBox(void)
 	return AlignedBox().AddVertices(m_vertices.Ptr(), m_vertices.Size(), sizeof(Vertex));
 }
 //----------------------------------------------------------------------------//
-void Geometry::CreateCube(const AlignedBox& _box)
+void Geometry::CreateCube(const AlignedBox& _box, bool _smoothed)
 {
 	static const float _tc[4][2] =
 	{
@@ -93,31 +104,83 @@ void Geometry::CreateCube(const AlignedBox& _box)
 
 	Clear();
 	m_type = PT_Triangles;
-	m_vertices.Reserve(24);
-	m_indices.Reserve(36);
 
 	Vertex _v;
 	Vertex _corners[8];
 	_box.GetAllCorners(_corners, sizeof(Vertex));
-	for (uint i = 0; i < 24; i += 4)
-	{
-		// lt lb rb rt 
-		for (uint j = 0; j < 4; ++j)
-		{
-			_v = _corners[BOX_QUAD_INDICES[i + j]];
-			_v.SetTexCoord({ _tc[j][0], _tc[j][1] });
-			m_vertices.Push(_v);
-		}
 
-		// 012 023
-		m_indices.Push(i + 0).Push(i + 1).Push(i + 2);
-		m_indices.Push(i + 0).Push(i + 2).Push(i + 3);
+	if (_smoothed)
+	{
+		// todo: texcoord
+		m_vertices.Push(_corners, 8);
+		m_indices.Push(BOX_TRIANLGE_INDICES, 36);
+	}
+	else
+	{
+		m_vertices.Reserve(24);
+		m_indices.Reserve(36);
+		for (uint i = 0; i < 24; i += 4)
+		{
+			// lt lb rb rt 
+			for (uint j = 0; j < 4; ++j)
+			{
+				_v = _corners[BOX_QUAD_INDICES[i + j]];
+				_v.SetTexCoord({ _tc[j][0], _tc[j][1] });
+				m_vertices.Push(_v);
+			}
+
+			// 012 023
+			m_indices.Push(i + 0).Push(i + 1).Push(i + 2);
+			m_indices.Push(i + 0).Push(i + 2).Push(i + 3);
+		}
 	}
 }
 //----------------------------------------------------------------------------//
-void Geometry::CreateSphere(float radius, int _s, int _p)
+void Geometry::CreateSphere(float _radius, int _segments, int _rings)
 {
-	
+	//http://www.ogre3d.org/tikiwiki/ManualSphereMeshes
+	Clear();
+	m_type = PT_Triangles;
+
+	m_vertices.Resize((_segments + 1) * (_rings + 1));
+	m_indices.Resize((_segments + 1) * _rings * 6);
+
+	Vertex* _v = m_vertices.Ptr();
+	index_t* _i = m_indices.Ptr();
+
+	float _xz, _x, _y, _z;
+	float _invS = 1.0f / _segments;
+	float _invR = 1.0f / _rings;
+	float _rAngle = PI * _invR;
+	float _sAngle = 2 * PI * _invS;
+	index_t _idx = 0;
+	Vec3 _n;
+
+	for (int _ring = 0; _ring <= _rings; _ring++)
+	{
+		SinCos(_ring * _rAngle, _xz, _y);
+		for (int _seg = 0; _seg <= _segments; _seg++)
+		{
+			SinCos(_seg * _sAngle, _x, _z);
+
+			_n.Set(_x * _xz, _y, _z * _xz);
+			_v->position.Set(_n * _radius);
+			_v->SetNormal(_n);
+			_v->SetTexCoord({ _seg * _invS, _ring * _invR });
+			++_v;
+
+			if (_ring != _rings)
+			{
+				*_i++ = _idx + _segments + 1;
+				*_i++ = _idx;
+				*_i++ = _idx + _segments;
+				*_i++ = _idx + _segments + 1;
+				*_i++ = _idx + 1;
+				*_i++ = _idx;
+				_idx++;
+			}
+		}
+	}
 }
 //----------------------------------------------------------------------------//
 void Geometry::CreateGridXZ(uint _numSectors, float _sectorSize)

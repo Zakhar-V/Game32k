@@ -249,7 +249,7 @@ inline bool IsPow2(uint32_t _val) { return (_val & (_val - 1)) == 0; }
 inline uint8 FloatToByte(float _x) { return (uint8)(_x * FLOAT2BYTE); }
 inline float ByteToFloat(uint8 _x) { return _x * BYTE2FLOAT; }
 inline uint8 FloatToSByte(float _x) { return (uint8)((_x * 0.5f) * FLOAT2BYTE); }
-inline float SByteToFloat(uint8 _x) { return (_x) * BYTE2FLOAT * 2 - 1; }
+inline float SByteToFloat(uint8 _x) { return int8(_x) * BYTE2FLOAT; }
 
 typedef uint16_t float16_t;
 inline uint16_t FloatToHalf(float _value)

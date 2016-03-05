@@ -834,7 +834,7 @@ void Scene::Update(float _seconds)
 		n->PostUpdate(_frame);
 	}
 
-	printf("active nodes: %d --> %d (%f) ", _active, m_numActiveNodes, m_activeNodes->m_activeTime);
+	//printf("active nodes: %d --> %d (%f) ", _active, m_numActiveNodes, m_activeNodes->m_activeTime);
 }
 //----------------------------------------------------------------------------//
 void Scene::_AddActiveNode(Node* _node)

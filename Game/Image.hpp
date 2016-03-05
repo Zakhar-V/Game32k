@@ -79,7 +79,6 @@ public:
 	Vec4 Sample(const Vec2& _tc, uint _flags = ISF_Nearest | ISF_Repeat, float _divisor = 1);
 
 	void GetMinMax(Vec4& _mn, Vec4& _mx);
-	void Normalize(const Vec4& _mn, const Vec4 _mx);
 
 	void CreateBitmapFont(FontInfo& _info, const char* _name, uint _fheight, float _fwidth = 0.5f, bool _italic = false);
 	int CreateNoize(uint _size, uint _channels, int _rseed = 0);

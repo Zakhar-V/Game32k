@@ -317,7 +317,7 @@ public:
 	void Update(const FrameInfo& _frame) override
 	{
 		Quat _r = m_node->GetLocalRotation();
-		Vec2 _rot = gDevice->GetCameraDelta() * 10 * Vec2(gSettings.invCameraH, gSettings.invCameraV) * gSettings.mouseSens * _frame.time;
+		Vec2 _rot = gDevice->GetCameraDelta() * Vec2(gSettings.invCameraH, gSettings.invCameraV) * gSettings.mouseSens * _frame.time;
 		if (_rot.x || _rot.y)
 		{
 			m_pitch = Clamp<float>(m_pitch + _rot.y, -90, 90);
@@ -427,21 +427,69 @@ void CreatScene(Scene* _scene)
 {
 	CreatePlayer(_scene);
 
+	Mat44 _tm;
 	GeometryPtr _geom = new Geometry();
-	_geom->CreateCube(1);
-	_geom->ComputeNormals();
+	_geom->CreateSphere(1, 16, 8);
+	_tm.CreateScale({ 1, 1.8f, 1 });
+	_geom->Transform(_tm);
+	//_geom->ComputeNormals();
 
-	MeshPtr _mesh = new Mesh;
-	_mesh->CreateFromGeometry(_geom);
+	MeshPtr _bodyMesh = new Mesh;
+	_bodyMesh->CreateFromGeometry(_geom);
+
+	_geom->CreateCube(0.75f);
+	_geom->ComputeNormals();
+	MeshPtr _eyeMesh = new Mesh;
+	_eyeMesh->CreateFromGeometry(_geom);
+	//_tm.CreateScale({ 1, 2, 1 });
+	//_geom->Transform(_tm);
+
+	
+	_geom->CreateCube({ 3.0f, 0.75f, 0.5f }, true);
+	_geom->ComputeNormals();
+	MeshPtr _shoulderMesh = new Mesh;
+	_shoulderMesh->CreateFromGeometry(_geom);
+
+	_geom->CreateCube({ 1.0f, 1.9f, 0.75f }, true);
+	_geom->ComputeNormals();
+	MeshPtr _engineMesh = new Mesh;
+	_engineMesh->CreateFromGeometry(_geom);
+
 
 	int _rseed = 0;
-	for (uint i = 0; i < 10000; ++i)
+	for (uint i = 0; i < 1000; ++i)
 	{
-		StaticModelPtr _model = new StaticModel;
-		_model->SetSleepingThreshold(1);
-		_model->SetMesh(_mesh);
-		_model->SetLocalPosition( Vec3((Rand(_rseed) * 2 - 1) * 5000, 300 + (Rand(_rseed) * 2 - 1) * 1000, (Rand(_rseed) * 2 - 1) * 5000));
-		_model->SetScene(_scene);
+		StaticModelPtr _body = new StaticModel;
+		_body->SetSleepingThreshold(1);
+		_body->SetMesh(_bodyMesh);
+		_body->SetLocalPosition( Vec3((Rand(_rseed) * 2 - 1) * 500, 300 + (Rand(_rseed) * 2 - 1) * 100, (Rand(_rseed) * 2 - 1) * 500));
+
+
+		StaticModelPtr _eye = new StaticModel;
+		_eye->SetMesh(_eyeMesh);
+		_eye->SetParent(_body);
+		_eye->SetLocalPosition({ 0, 0.6f, 0.8f });
+
+		StaticModelPtr _shoulder = new StaticModel;
+		_shoulder->SetMesh(_shoulderMesh);
+		_shoulder->SetParent(_body);
+		_shoulder->SetLocalPosition({ 0, 0.6f, 0 });
+
+
+		StaticModelPtr _engineL = new StaticModel;
+		_engineL->SetMesh(_engineMesh);
+		_engineL->SetParent(_body);
+		_engineL->SetLocalPosition({ -1.65f, 0.3f, 0 });
+
+
+		StaticModelPtr _engineR = new StaticModel;
+		_engineR->SetMesh(_engineMesh);
+		_engineR->SetParent(_body);
+		_engineR->SetLocalPosition({ +1.65f, 0.3f, 0 });
+
+
+
+		_body->SetScene(_scene);
 	}
 
 	/*{
@@ -493,7 +541,7 @@ void CreatScene(Scene* _scene)
 //----------------------------------------------------------------------------//
 ////////////////////////////////////////////////////////////////////////////////
 
-/*class AIObject
+class AIObject
 {
 
 };
@@ -507,6 +555,15 @@ public:
 class Entity : public Node
 {
 public:
+
+	virtual void OnHit(Entity* _entity, const Vec3& _point, const Vec3& _normal, const Vec3& _force)
+	{
+
+	}
+
+	virtual void Update(const FrameInfo& _frame)
+	{
+	}
 
 protected:
 	
@@ -522,8 +579,75 @@ class Character : public Entity
 
 class Player : public Character
 {
+public:
 
-};	*/
+protected:
+};
+
+
+
+//----------------------------------------------------------------------------//
+// 
+//----------------------------------------------------------------------------//
+
+class DroneEngine : public Entity
+{
+	ModelPtr m_body;
+	ParticleEmitterPtr m_exhaust;
+	Vec3 m_dir;
+};
+
+class Drone : public Entity
+{
+public:
+
+protected:
+	
+	DroneEngine* m_engineL;
+	DroneEngine* m_engineR;
+	ModelPtr m_body;
+	ModelPtr m_forceField;
+};
+
+//----------------------------------------------------------------------------//
+// EntityUpdater
+//----------------------------------------------------------------------------//
+
+class EntityUpdater : public Behavior
+{
+public:
+	EntityUpdater(void) :
+		m_entity(nullptr)
+	{
+	}
+	~EntityUpdater(void)
+	{
+	}
+
+	void Update(const FrameInfo& _frame) override
+	{
+		if (m_entity)
+			m_entity->Update(_frame);
+	}
+
+protected:
+
+	void _SetNode(Node* _node) override
+	{
+		m_node = _node;
+
+		if (m_node && m_node->IsClass<Entity>())
+			m_entity = static_cast<Entity*>(m_node);
+		else
+			m_entity = nullptr;
+	}
+
+	Entity* m_entity;
+};
+
+//----------------------------------------------------------------------------//
+//
+//----------------------------------------------------------------------------//
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -640,13 +764,15 @@ void main(void)
 		gGraphics->BeginFrame();
 		gGraphics->ClearFrameBuffers(FBT_Color | FBT_DepthStencil, _clearColor, 1, 0xff);
 
-		glEnable(GL_DEPTH_TEST);
+		//glEnable(GL_DEPTH_TEST);
 		glEnable(GL_DEPTH_CLAMP);
 		//glDepthRange(-1, 1);
 
-		glEnable(GL_CULL_FACE);
+		//glEnable(GL_CULL_FACE);
+		//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		gRenderer->Draw(_scene);
-		glDisable(GL_CULL_FACE);
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		//glDisable(GL_CULL_FACE);
 
 		gGraphics->SetShader(VS_Terrain);
 		gGraphics->SetShader(ST_Geometry, nullptr);
@@ -682,7 +808,7 @@ void main(void)
 		  */
 
 		{
-			glEnable(GL_DEPTH_TEST);
+			//glEnable(GL_DEPTH_TEST);
 			Mat44 _cubeMat;
 			_cubeMat.CreateTranslation(*_cubePos);
 			gRenderer->m_instanceBuffer->Write(&_cubeMat, 0, sizeof(_cubeMat));
@@ -693,7 +819,7 @@ void main(void)
 		}
 
 
-		wglSwapIntervalEXT(0);
+		wglSwapIntervalEXT(1);
 		gGraphics->EndFrame();
 		Sleep(1);
 
@@ -702,7 +828,7 @@ void main(void)
 		++_frames;
 		if (_tt > 0.2f)
 		{
-			if (_pt < 0.5f)
+			if (_pt < _tt)
 				_tt += _pt;
 			_dt = _tt / _frames;
 			_fps = 1 / _dt;

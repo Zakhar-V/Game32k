@@ -16,6 +16,7 @@
 
 // PS flags
 #define TEXTURE_BIT 0x1
+#define CEL_SHADE_BIT 0x2
 
 
 #ifdef GLSL
@@ -28,6 +29,7 @@
 #define TERRAIN (FLAGS & TERRAIN_BIT)
 
 #define TEXTURE (FLAGS & TEXTURE_BIT)
+#define CEL_SHADE (FLAGS & CEL_SHADE_BIT)
 
 #endif
 
@@ -65,16 +67,16 @@ UBUFFER(1, Camera)
 	vec4 Depth;	// near, far, C=constant, FC = 1.0/log(far*C + 1)
 };
 
-UBUFFER(2, InstanceMat)
+UBUFFER(2, Instancing)
 {
 	ROWMAJOR mat4 WorldMat[MAX_INSTANCES];
 };
-UBUFFER(5, InstanceData)
+UBUFFER(5, Material)
 {
-	ROWMAJOR mat4 InstanceData[MAX_INSTANCES];
+	ROWMAJOR mat4 Material[MAX_INSTANCES];
 };
 
-UBUFFER(3, SkinMat)
+UBUFFER(3, Skinning)
 {
 	ROWMAJOR mat4 SkinMat[MAX_BONES];
 };

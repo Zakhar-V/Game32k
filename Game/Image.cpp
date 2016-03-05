@@ -158,11 +158,6 @@ void Image::GetMinMax(Vec4& _mn, Vec4& _mx)
 	printf("min(%f) max(%f)\n", _mn.x, _mx.x);
 }
 //----------------------------------------------------------------------------//
-void Normalize(const Vec4& _mn, const Vec4 _mx)
-{
-
-}
-//----------------------------------------------------------------------------//
 void Image::CreateBitmapFont(FontInfo& _info, const char* _name, uint _fheight, float _fwidth, bool _italic)
 {
 	int _tw = int(_fwidth * 1000) / 100;

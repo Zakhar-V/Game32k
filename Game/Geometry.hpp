@@ -26,7 +26,7 @@ public:
 	void Clear(void);
 
 	void Merge(const Vertex* _vertices, uint _numVertices, const index_t* _indices, uint _numIndices);
-	// Transform
+	void Transform(const Mat44& _m);
 	// Mirror
 	// MakeAdjacency
 	void ComputeNormals(void);
@@ -35,9 +35,9 @@ public:
 	// Save
 	AlignedBox ComputeBBox(void);
 
-	void CreateCube(const Vec3& _size) { CreateCube(AlignedBox().FromCenterExtends(VEC3_ZERO, _size * 0.5f)); }
-	void CreateCube(const AlignedBox& _box);
-	void CreateSphere(float radius, int _s = 16, int _p = 8);
+	void CreateCube(const Vec3& _size = 1, bool _smoothed = false) { CreateCube(AlignedBox().FromCenterExtends(VEC3_ZERO, _size * 0.5f), _smoothed); }
+	void CreateCube(const AlignedBox& _box, bool _smoothed = false);
+	void CreateSphere(float _radius = 1, int _segments = 16, int _rings = 8);
 	void CreateGridXZ(uint _numSectors, float _sectorSize);
 
 
