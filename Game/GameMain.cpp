@@ -17,9 +17,426 @@
 #include "Render.cpp"
 #include "Level.cpp"
 
+////////////////////////////////////////////////////////////////////////////////
 //----------------------------------------------------------------------------//
 //
 //----------------------------------------------------------------------------//
+////////////////////////////////////////////////////////////////////////////////
+
+inline double Time(void) // in seconds
+{
+	LARGE_INTEGER _f, _c;
+	QueryPerformanceFrequency(&_f);
+	QueryPerformanceCounter(&_c);
+	return (double)_c.QuadPart / (double)_f.QuadPart;
+}
+
+//----------------------------------------------------------------------------//
+//
+//----------------------------------------------------------------------------//
+
+class Player* gPlayer = nullptr;
+
+//----------------------------------------------------------------------------//
+//
+//----------------------------------------------------------------------------//
+
+class Character : public Entity
+{
+public:
+	OBJECT("Character");
+
+	Character(void) :
+		m_health(100)
+	{
+		m_minHeight = 2;
+	}
+	~Character(void)
+	{
+	}
+
+protected:
+
+	void _LogicUpdate(const FrameInfo& _frame) override
+	{
+	}
+
+	void _PreUpdateImpl(const FrameInfo& _frame) override
+	{
+	}
+
+	void _UpdateImpl(const FrameInfo& _frame) override
+	{
+		Vec3 _pos = GetWorldPosition();
+		//_pos.y = Max<float>(_pos.y, m_scene->GetTerrainHeight(_pos.x, _pos.z) + m_minHeight);
+		_pos.y = m_scene->GetTerrainHeight(_pos.x, _pos.z) + m_minHeight;
+		SetWorldPosition(_pos);
+	}
+
+	void _PostUpdateImpl(const FrameInfo& _frame) override
+	{
+	}
+
+	float m_health;
+	float m_minHeight;
+};
+
+//----------------------------------------------------------------------------//
+//
+//----------------------------------------------------------------------------//
+
+class Drone : public Character
+{
+public:
+	OBJECT("Drone");
+
+	Drone(void)
+	{
+		m_health = 10;
+	}
+	~Drone(void)
+	{
+	}
+
+protected:
+
+	void _LogicUpdate(const FrameInfo& _frame) override
+	{
+		Character::_LogicUpdate(_frame);
+	}
+
+	void _PreUpdateImpl(const FrameInfo& _frame) override
+	{
+		Character::_PreUpdateImpl(_frame);
+	}
+
+	void _UpdateImpl(const FrameInfo& _frame) override
+	{
+		Character::_UpdateImpl(_frame);
+	}
+
+	void _PostUpdateImpl(const FrameInfo& _frame) override
+	{
+		Character::_PostUpdateImpl(_frame);
+	}
+};
+
+//----------------------------------------------------------------------------//
+//
+//----------------------------------------------------------------------------//
+
+struct Settings_t
+{
+	float invCameraH = 1;
+	float invCameraV = 1;
+	float mouseSens = 1.5;
+}
+gSettings;
+
+
+#define G_PLAYER_HEIGHT 1.75f
+#define G_PLAYER_HEIGHT_LOW 0.75f
+#define G_CHARACTER_VELOCITY 20000.f / 3600.f // 20 km/h
+#define G_PLAYER_VELOCITY 22000.f / 3600.f // 22 km/h 
+#define G_PLAYER_SPRINT_VELOCITY_MULTIPLIER 2.5f
+#define G_PLAYER_STEP_VELOCITY_MULTIPLIER 0.5f
+
+
+class FirstPersonCameraController : public Behavior
+{
+public:
+	OBJECT("FirstPersonCameraController");
+
+	float m_yaw = 0;
+	float m_pitch = 0;
+
+	FirstPersonCameraController(void)
+	{
+
+	}
+
+	~FirstPersonCameraController(void)
+	{
+
+	}
+	void Update(const FrameInfo& _frame) override
+	{
+		Quat _r = m_node->GetLocalRotation();
+		Vec2 _rot = gDevice->GetCameraDelta() * Vec2(gSettings.invCameraH, gSettings.invCameraV) * gSettings.mouseSens * _frame.time;
+		if (_rot.x || _rot.y)
+		{
+			m_pitch = Clamp<float>(m_pitch + _rot.y, -90, 90);
+			m_yaw += _rot.x;
+
+			Quat _rx, _ry;
+			_rx.FromAxisAngle(VEC3_UNIT_X, m_pitch * RADIANS);
+			_ry.FromAxisAngle(VEC3_UNIT_Y, m_yaw * RADIANS);
+
+			Vec3 _dir = -VEC3_UNIT_Z * _r;
+
+			m_node->SetLocalRotation(_rx * _ry);
+		}
+	}
+
+protected:
+};
+
+class PlayerMovementController : public Behavior
+{
+public:
+	OBJECT("PlayerMovementController");
+
+	PlayerMovementController(void)
+	{
+	}
+
+	void Update(const FrameInfo& _frame) override
+	{
+		Vec3 _vec = 0;
+		if ((GetAsyncKeyState('W') & 0x8000) != 0)
+			_vec.z -= 1;
+		if ((GetAsyncKeyState('S') & 0x8000) != 0)
+			_vec.z += 1;
+
+		if ((GetAsyncKeyState('A') & 0x8000) != 0)
+			_vec.x -= 1;
+		if ((GetAsyncKeyState('D') & 0x8000) != 0)
+			_vec.x += 1;
+
+		if ((GetAsyncKeyState('Q') & 0x8000) != 0)
+			_vec.y -= 1;
+		if ((GetAsyncKeyState('E') & 0x8000) != 0)
+			_vec.y += 1;
+
+		// TODO
+
+		float _speed = 20000.f / 3600.f; // 20 km/h
+		if ((GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0)
+			_speed *= G_PLAYER_SPRINT_VELOCITY_MULTIPLIER;
+		if ((GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0)
+			_speed *= G_PLAYER_STEP_VELOCITY_MULTIPLIER;
+		_vec *= _speed;
+
+		Vec3 _dir = _vec * m_node->GetWorldRotation().Copy().Inverse();
+		_dir.y = 0; // no flying
+		Vec3 _pos = m_node->GetWorldPosition();
+		_pos += _dir * _frame.time;
+		m_node->SetWorldPosition(_pos);
+	}
+
+protected:
+
+};
+
+class Player : public Character
+{
+public:
+	OBJECT("Player");
+
+	Player(void)
+	{
+		gPlayer = this;
+
+		m_minHeight = G_PLAYER_HEIGHT;
+		m_camera = new Camera;
+		m_camera->SetParent(this);
+		//m_camera->SetLocalPosition({0, 0, 0});
+		m_camera->SetInheritRotation(false);
+		m_camera->AddBehavior(new FirstPersonCameraController);
+		AddBehavior(new PlayerMovementController);
+	}
+
+	~Player(void)
+	{
+	}
+
+protected:
+
+	void _SetSceneImpl(Scene* _scene) override
+	{
+		m_scene = _scene;
+		if (m_scene)
+			m_scene->SetActiveCamera(m_camera);
+	}
+
+	void _LogicUpdate(const FrameInfo& _frame) override
+	{
+		Character::_LogicUpdate(_frame);
+
+		if ((GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0)
+			m_minHeight = G_PLAYER_HEIGHT_LOW;
+		else
+			m_minHeight = G_PLAYER_HEIGHT;
+	}
+
+	void _PreUpdateImpl(const FrameInfo& _frame) override
+	{
+		Character::_PreUpdateImpl(_frame);
+	}
+
+	void _UpdateImpl(const FrameInfo& _frame) override
+	{
+		Character::_UpdateImpl(_frame);
+
+		Vec3 _dir = m_camera->GetWorldDirection();
+		_dir.y = 0; // no flying
+		SetWorldDirection(_dir);
+	}
+
+	void _PostUpdateImpl(const FrameInfo& _frame) override
+	{ 
+		Character::_PostUpdateImpl(_frame);
+
+	}
+
+	CameraPtr m_camera;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------//
+//
+//----------------------------------------------------------------------------//
+////////////////////////////////////////////////////////////////////////////////
+
+//----------------------------------------------------------------------------//
+// Game
+//----------------------------------------------------------------------------//
+
+#define gGame Game::Get()
+
+class Game : public Singleton<Game>
+{
+public:
+
+protected:
+};
+
+//----------------------------------------------------------------------------//
+// App
+//----------------------------------------------------------------------------//
+
+#define gApp Game::Get()
+
+class App : public Singleton<App>
+{
+
+};
+
+////////////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------//
+//
+//----------------------------------------------------------------------------//
+////////////////////////////////////////////////////////////////////////////////
+
+//----------------------------------------------------------------------------//
+//
+//----------------------------------------------------------------------------//
+
+void main()
+{
+	LOG("Startup ...");
+	LOG("Build %s", __DATE__);
+	CreateDirectory("Data", nullptr);
+	SetCurrentDirectory("Data");
+	bool _bdOutOfDate = ExtractBuiltinData();
+	/*if (_bdOutOfDate)
+	{
+		LOG("Generate resources ...");
+	}*/
+
+	new Device;
+	new Graphics;
+	new Renderer;
+	Scene* _scene = new Scene;
+
+	{
+		ImagePtr _hmap = new Image;
+		_hmap->CreatePerlin(512, 0.05f);
+		//_hmap->CreatePerlin(256, 0.1f);
+		TerrainPtr _terrain = new Terrain;
+		_terrain->Create(_hmap, 550, 7500, 254);
+		//_terrain->Create(_hmap, 5, 75, 254);
+		_terrain->SetScene(_scene);
+	}
+
+	{
+		Ptr<Player> _player = new Player;
+		_player->SetScene(_scene);
+	}
+
+
+	const Color _clearColor(0x7f7f9fff);
+
+	double _st, _et;
+	float _dt = 0, _tt = 0, _pt = 0;
+	float _fps = 0;
+	int _frames = 0;
+
+	bool _quit = false;
+
+	gDevice->SetCursorMode(CM_Camera);
+
+	while (!_quit && !gDevice->ShouldClose())
+	{
+		_st = Time();
+		gDevice->PollEvents();
+		_et = Time();
+		_pt += (float)(_et - _st);
+		_st = _et;
+
+		_quit = GetAsyncKeyState(VK_ESCAPE) != 0;
+
+		_scene->Update(_dt);
+
+		gGraphics->BeginFrame();
+		gGraphics->ClearFrameBuffers(FBT_Color | FBT_DepthStencil, _clearColor, 1, 0xff);
+
+		//glEnable(GL_DEPTH_TEST);
+		glEnable(GL_DEPTH_CLAMP);
+		//glDepthRange(-1, 1);
+
+		//glEnable(GL_CULL_FACE);
+		//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		gRenderer->Draw(_scene);
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		//glDisable(GL_CULL_FACE);
+
+
+
+		gGraphics->SetShader(FS_NoTexture);
+
+
+		wglSwapIntervalEXT(1);
+		gGraphics->EndFrame();
+		Sleep(1);
+
+		_et = Time();
+		_tt += (float)(_et - _st);
+		++_frames;
+		if (_tt > 0.2f)
+		{
+			if (_pt < _tt)
+				_tt += _pt;
+			_dt = _tt / _frames;
+			_fps = 1 / _dt;
+			_tt = 0;
+			_pt = 0;
+			_frames = 0;
+		}
+	}
+
+	delete _scene;
+	delete gRenderer;
+	delete gGraphics;
+	delete gDevice;
+
+#ifdef DEBUG
+	system("pause");
+#endif
+	ExitProcess(0);
+}
+
+#if 0
 
 ////////////////////////////////////////////////////////////////////////////////
 //----------------------------------------------------------------------------//
@@ -541,6 +958,50 @@ void CreatScene(Scene* _scene)
 //----------------------------------------------------------------------------//
 ////////////////////////////////////////////////////////////////////////////////
 
+
+class Entity : public Behavior
+{
+public:
+
+	/*void Update(const FrameInfo& _frame) override
+	{
+
+	}*/
+
+protected:
+	
+};
+
+
+class Character : public Entity
+{
+};
+
+class Drone : public Character
+{
+
+};
+
+class Player : public Character
+{
+
+};
+
+////////////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------//
+//
+//----------------------------------------------------------------------------//
+////////////////////////////////////////////////////////////////////////////////
+
+/*class Drone	: public Behavior
+{
+public:
+
+protected:
+
+
+};
+
 class AIObject
 {
 
@@ -571,6 +1032,7 @@ protected:
 	float m_health;
 	AIObject* m_ai;
 };
+
 
 class Character : public Entity
 {
@@ -643,7 +1105,7 @@ protected:
 	}
 
 	Entity* m_entity;
-};
+};*/
 
 //----------------------------------------------------------------------------//
 //
@@ -1184,3 +1646,4 @@ void main(void)
 }
 #endif
 
+#endif

@@ -10,6 +10,7 @@
 
 //----------------------------------------------------------------------------//
 Node::Node(void) :
+	m_nameHash(0),
 	m_id(0),
 	m_layerMask(0xffff),
 	m_tags(0),
@@ -30,6 +31,7 @@ Node::Node(void) :
 	m_behaviors(nullptr),
 	m_dbvtNode(nullptr),
 	m_physics(nullptr),
+	m_enabled(true),
 	m_active(false),
 	m_transformUpdated(true),
 	m_transformChanged(false),
@@ -101,9 +103,14 @@ void Node::SetParent(Node* _parent)
 	Mat44 _worldTM = GetWorldTransform(); // get current world transform
 
 	if (m_parent)
+	{
 		Unlink(m_parent->m_child, this, m_prev);
+		m_parent->_OnChildRemoved(this);
+	}
 	else if (m_scene)
+	{
 		m_scene->_RemoveRootNode(this);
+	}
 
 	m_parent = _parent;
 
@@ -113,6 +120,8 @@ void Node::SetParent(Node* _parent)
 
 		if (m_parent->m_scene)
 			SetScene(m_parent->m_scene);
+
+		m_parent->_OnChildAdded(this);
 	}
 	else if (m_scene)
 	{
@@ -203,6 +212,8 @@ void Node::Update(const FrameInfo& _frame)
 		m_parent->Update(_frame);
 	}
 
+	_PreUpdateImpl(_frame);
+
 	m_behaviorAllowSleep = true;
 	for (Behavior* i = m_behaviors; i;)
 	{
@@ -220,6 +231,8 @@ void Node::Update(const FrameInfo& _frame)
 //----------------------------------------------------------------------------//
 void Node::PostUpdate(const FrameInfo& _frame)
 {
+	_PostUpdateImpl(_frame);
+
 	if (m_activeTime >= m_sleepingThreshold)
 	{
 		m_activeTime = 0;
@@ -373,9 +386,21 @@ void Node::_UpdateTransform(void)
 {
 	if (!m_transformUpdated)
 	{
-		m_worldTransform.CreateTransform(m_localPosition, m_localRotation, m_localScale);
+		Vec3 _pos = m_localPosition;
+		Quat _rot = m_localRotation;
+		Vec3 _scl = m_localScale;
+
 		if (m_parent)
-			m_worldTransform = m_parent->GetWorldTransform() * m_worldTransform;
+		{
+			if (m_inheritPosition)
+				_pos = m_parent->GetWorldTransform().Transform(_pos);
+			if (m_inheritRotation)
+				_rot = m_parent->GetWorldRotation() * _rot;
+			if (m_inheritScale)
+				_scl *= m_parent->GetWorldScale();
+		}
+
+		m_worldTransform.CreateTransform(_pos, _rot, _scl);
 		m_worldRotation = m_worldTransform.GetRotation();
 		m_transformUpdated = true;
 	}
@@ -461,6 +486,23 @@ void Node::_UpdateDbvtNode(void)
 		}
 	}
 	m_dbvtUpdated = true;
+}
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+// Entity
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+Entity::Entity(void) :
+	m_prevEntity(nullptr),
+	m_nextEntity(nullptr)
+{
+	m_typeMask |= NT_Entity;
+}
+//----------------------------------------------------------------------------//
+Entity::~Entity(void)
+{
 }
 //----------------------------------------------------------------------------//
 
@@ -783,7 +825,8 @@ Scene::Scene(void) :
 	m_numRootNodes(0),
 	m_directionalLights(nullptr),
 	m_terrain(nullptr),
-	m_vegetation(nullptr)
+	m_vegetation(nullptr),
+	m_entities(nullptr)
 {
 }
 //----------------------------------------------------------------------------//
@@ -821,7 +864,14 @@ void Scene::Update(float _seconds)
 	_frame.id = ++m_frame;
 	_frame.time = _seconds;
 
-	uint _active = m_numActiveNodes;
+	for (Entity* i = m_entities; i; )
+	{
+		EntityPtr e = i;
+		i = i->m_nextEntity;
+		if(e->IsActive() && e->IsEnabled())
+			e->_LogicUpdate(_frame);
+	}
+
 	for (Node* i = m_activeNodes; i; i = i->m_nextActive)
 	{
 		i->Update(_frame);
@@ -873,7 +923,9 @@ void Scene::_AddNode(Node* _node)
 
 	_node->m_id = _NewID(_node);
 
-	if (_node->GetTypeMask() & NT_DirectionalLight)
+	if (_node->GetTypeMask() & NT_Entity)
+		Link(m_entities, static_cast<Entity*>(_node), static_cast<Entity*>(_node)->m_prevEntity);
+	else if (_node->GetTypeMask() & NT_DirectionalLight)
 		Link(m_directionalLights, static_cast<DirectionalLight*>(_node), static_cast<DirectionalLight*>(_node)->m_prevLight);
 	else if (_node->GetTypeMask() & NT_Terrain)
 		Link(m_terrain, static_cast<Terrain*>(_node), static_cast<Terrain*>(_node)->m_prevTerrain);
@@ -901,8 +953,10 @@ void Scene::_RemoveNode(Node* _node)
 		_node->m_dbvtNodeInTree = false;
 	}
 
-	if (_node->GetTypeMask() & NT_DirectionalLight)
-		Link(m_directionalLights, static_cast<DirectionalLight*>(_node), static_cast<DirectionalLight*>(_node)->m_prevLight);
+	if (_node->GetTypeMask() & NT_Entity)
+		Unlink(m_entities, static_cast<Entity*>(_node), static_cast<Entity*>(_node)->m_prevEntity);
+	else if (_node->GetTypeMask() & NT_DirectionalLight)
+		Unlink(m_directionalLights, static_cast<DirectionalLight*>(_node), static_cast<DirectionalLight*>(_node)->m_prevLight);
 	else if (_node->GetTypeMask() & NT_Terrain)
 		Unlink(m_terrain, static_cast<Terrain*>(_node), static_cast<Terrain*>(_node)->m_prevTerrain);
 	else if (_node->GetTypeMask() & NT_Vegetation)

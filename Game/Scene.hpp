@@ -92,6 +92,15 @@ public:
 
 	uint GetTypeMask(void) { return m_typeMask; }
 
+	void SetName(const String& _name) { m_name = _name, m_nameHash = StrHash(_name); }
+	const String& GetName(void) { return m_name; }
+	uint GetNameHash(void) { return m_nameHash; }
+
+	//void SetEntity(Entity* _entity) { m_entity = _entity; }
+	//Entity* GetEntity(void) { return (m_parent && (m_parent->m_typeMask & NT_Entity)) ? static_cast<Entity*>(m_parent) : nullptr; }
+	void _SetEntity(Entity* _entity) { m_entity = _entity; }
+	virtual Entity* GetEntity(void) { return m_entity; }
+
 	void SetScene(Scene* _scene);
 	void SetParent(Node* _parent);
 
@@ -109,8 +118,11 @@ public:
 	void WakeUp(void);
 	void SetSleepingThreshold(float _seconds) { m_sleepingThreshold = _seconds; }
 	float GetSleepingThreshold(float _seconds) { return m_sleepingThreshold; }
+	bool IsActive(void) { return m_active; }
 
-	bool IsEnabled(void) { return true; } // TODO
+	bool IsEnabled(void) { return m_enabled; } // TODO: recursive
+	virtual void Enable(void) { WakeUp(); m_enabled = true; } // TODO: recursive
+	virtual void Disable(void) { m_enabled = false; } // TODO: recursive
 
 	void Update(const FrameInfo& _frame);
 	void PostUpdate(const FrameInfo& _frame);
@@ -133,6 +145,9 @@ public:
 	void SetWorldScale(const Vec3& _scale);
 	Vec3 GetWorldScale(void);
 
+	Vec3 GetWorldDirection(void) { return -VEC3_UNIT_Z * GetWorldRotation(); }
+	void SetWorldDirection(const Vec3& _dir) { SetWorldRotation(Quat().FromRotationTo(-VEC3_UNIT_Z, _dir)); }
+
 	void SetInheritPosition(bool _enabled = true);
 	bool GetInheritPosition(void) { return m_inheritPosition; }
 	void SetInheritRotation(bool _enabled = true);
@@ -145,7 +160,11 @@ protected:
 	friend class Scene;
 
 	virtual void _SetSceneImpl(Scene* _scene) { m_scene = _scene; }
-	virtual void _UpdateImpl(const FrameInfo& _frame) { }
+	virtual void _PreUpdateImpl(const FrameInfo& _frame) { } // called before behavior update
+	virtual void _UpdateImpl(const FrameInfo& _frame) { } // called after behavior update
+	virtual void _PostUpdateImpl(const FrameInfo& _frame) { } // called after all updates
+	virtual void _OnChildRemoved(Node* _child) { }
+	virtual void _OnChildAdded(Node* _child) { }
 
 	void _InvalidateTransform(void);
 	void _UpdateTransform(void);
@@ -158,6 +177,7 @@ protected:
 	virtual void _GetWorldBBox(AlignedBox& _bbox) { _bbox.Reset(); }
 
 	String m_name;
+	uint m_nameHash;
 	int m_id;
 	uint16 m_layerMask;
 	uint16 m_tags;
@@ -170,7 +190,7 @@ protected:
 	Quat m_worldRotation;
 
 	Scene* m_scene;
-	Entity* m_entity;
+	Entity* m_entity; // it's needed ?
 	Node* m_parent;
 	Node* m_prev;
 	Node* m_next;
@@ -184,6 +204,7 @@ protected:
 	DbvtNode* m_dbvtNode;
 	PhysicsEntity* m_physics;
 
+	bool m_enabled : 1;
 	bool m_active : 1;
 	bool m_behaviorAllowSleep : 1;
 
@@ -203,6 +224,31 @@ protected:
 
 	float m_sleepingThreshold;
 	float m_activeTime;
+};
+
+//----------------------------------------------------------------------------//
+// Entity
+//----------------------------------------------------------------------------//
+
+typedef Ptr<class Entity> EntityPtr;
+
+class Entity : public Node
+{
+public:
+	OBJECT("Entity");
+
+	Entity(void);
+	~Entity(void);
+
+	Entity* GetEntity(void) { return this; }
+
+protected:
+	friend class Scene;
+
+	virtual void _LogicUpdate(const FrameInfo& _frame) { } // called unordered before all updates
+
+	Entity* m_prevEntity;
+	Entity* m_nextEntity;
 };
 
 //----------------------------------------------------------------------------//
@@ -531,6 +577,11 @@ public:
 	void SetActiveCamera(Camera* _camera) { m_activeCamera = _camera; }
 	Camera* GetActiveCamera(void) { return m_activeCamera; }
 
+	float GetTerrainHeight(float _x, float _z)
+	{
+		return m_terrain ? m_terrain->GetHeight(_x, _z) : 0;
+	}
+
 protected:
 	friend class Node;
 
@@ -561,6 +612,8 @@ protected:
 	DirectionalLight* m_directionalLights;
 	Terrain* m_terrain;
 	Vegetation* m_vegetation;
+
+	Entity* m_entities;
 
 	//SkyDome* m_sky;
 	//Wheater

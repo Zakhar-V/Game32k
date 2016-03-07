@@ -647,6 +647,43 @@ struct Quat
 	Quat& FromRotationMatrix(const float* _r0, const float* _r1, const float* _r2);
 	Quat& FromAxisAngle(const Vec3& _axis, float _angle);
 
+
+	Quat& FromLookRotation(const Vec3& _dir, const Vec3& _up = VEC3_UNIT_Y)
+	{
+		Vec3 _z = _dir.Copy().Normalize();
+		Vec3 _y = _z.Cross(_up).Copy().Normalize().Cross(_z);
+		Vec3 _x = _y.Cross(_z);
+		return FromRotationMatrix(*_x, *_y, *_z);
+	}
+
+	Quat& FromRotationTo(const Vec3& _start, const Vec3& _end)
+	{
+		Vec3 _ns = _start.Copy().Normalize();
+		Vec3 _ne = _end.Copy().Normalize();
+		float d = _ns.Dot(_ne);
+
+		if (d > -1 + EPSILON)
+		{
+			Vec3 _c = _ns.Cross(_ne);
+			float _s = Sqrt((1 + d) * 2);
+			float _invS = 1 / _s;
+			x = _c.x * _invS;
+			y = _c.y * _invS;
+			z = _c.z * _invS;
+			w = 0.5f * _s;
+		}
+		else
+		{
+			Vec3 _axis = VEC3_UNIT_X.Cross(_ns);
+			if (_axis.LengthSq() < EPSILON2)
+				_axis = VEC3_UNIT_Y.Cross(_ns);
+
+			FromAxisAngle(_axis, HALF_PI);
+		}
+		return *this;
+	}
+
+
 	float x, y, z, w;
 };
 
