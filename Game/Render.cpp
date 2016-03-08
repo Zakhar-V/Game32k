@@ -42,28 +42,29 @@ struct DbvtDebugRenderer
 
 	void AddBoxes(DbvtNode* _root)
 	{
-		DbvtNode* _stackBase[64];
-		DbvtNode** _stack = _stackBase;
-		*_stack++ = _root;
-		int _depth = 1;
+		Array<DbvtNode*> _stack;
+		_stack.Push(_root);
+		//DbvtNode* _stackBase[1000];
+		//DbvtNode** _stack = _stackBase;
+		//*_stack++ = _root;
+		//int _depth = 1;
 		if (_root) do
 		{
-			DbvtNode* _node = *--_stack;
-			--_depth;
-			float _color = ((_depth + 1) / 4.f);
+			DbvtNode* _node = _stack.Top();
+			_stack.Pop();
+			float _color = ((_stack.Size() + 1) / 4.f);
 
 			if (_node->IsNode())
 			{
-				*_stack++ = _node->child0;
-				*_stack++ = _node->child1;
-				_depth += 2;
+				_stack.Push(_node->child0);
+				_stack.Push(_node->child1);
 			}
 			else
 				_color = 1;
 
 			AddBox(_node->box, Vec4(_color, _color, _color, _color));
 
-		} while (_stack > _stackBase);
+		} while (_stack.Size() > 0);
 	}
 };
 
@@ -163,6 +164,12 @@ void Renderer::Draw(Scene* _scene)
 
 
 	// get visible objects
+	{
+#if 0
+		int _depth = _scene->GetDbvt()->GetMaxDepth();
+		gDevice->SetTitle("max dbvt depth = %d\n", _depth);
+#endif
+	}
 
 	m_renderContainer.objects.Clear();
 	m_renderContainer.mask = NT_RenderNode | NT_Light;
@@ -228,6 +235,8 @@ void Renderer::Draw(Scene* _scene)
 	{
 		gGraphics->SetShader(FS_NoTexture);
 
+		//LOG("%#p %f %f %f", i->node, i->node->GetWorldPosition().x, i->node->GetWorldPosition().y, i->node->GetWorldPosition().z);
+
 		if (i->node->GetTypeMask() & NT_Terrain)
 		{
 			gGraphics->SetShader(VS_Terrain);
@@ -287,6 +296,7 @@ void Renderer::Draw(Scene* _scene)
 #if 0
 
 	{
+
 		DbvtDebugRenderer _dbg;
 		_dbg.AddBoxes(_scene->GetDbvt()->Root());
 

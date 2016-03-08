@@ -182,7 +182,7 @@ public:
 	Ref& operator = (const T* _p) { p = _p ? _p->GetRef() : nullptr; return *this; }
 	Ref& operator = (const Ptr<T>& _p) { p = _p ? _p->GetRef() : nullptr; return *this; }
 	Ref& operator = (const Ref& _p) { p = _p.p; return *this; }
-	operator T* (void) { return p ? p->GetPtr() : nullptr; }
+	operator T* (void) { return p ? static_cast<T*>(p->GetPtr()) : nullptr; }
 	T* operator & (void) const { return static_cast<T*>(p ? p->GetPtr() : nullptr); }
 	T* operator -> (void) const { ASSERT(p && p->GetPtr()); return static_cast<T*>(p->GetPtr()); }
 	T& operator * (void) const { ASSERT(p && p->GetPtr()); return *static_cast<T*>(p->GetPtr()); }

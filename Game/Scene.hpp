@@ -113,7 +113,7 @@ public:
 	void RemoveBehavior(Behavior* _b);
 	void RemoveAllBehaviors(void);
 	Behavior* GetBehavior(uint _class, uint _index = 0);
-	template <class T> T* GetBehavior(uint _index = 0) { return static_cast<T*>(GetBehavior(_index)); }
+	template <class T> T* GetBehavior(uint _index = 0) { return static_cast<T*>(GetBehavior(T::StaticClassID(), _index)); }
 
 	void WakeUp(void);
 	void SetSleepingThreshold(float _seconds) { m_sleepingThreshold = _seconds; }

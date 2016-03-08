@@ -266,7 +266,7 @@ int Image::CreateNoize(uint _size, uint _channels, int _rseed)
 	float* _dstp = m_data;
 	float* _dste = _dstp + _size * _size * _channels;
 	while (_dstp < _dste)
-		*_dstp++ = Rand(_rseed);
+		*_dstp++ = Rand(&_rseed);
 	return _rseed;
 }
 //----------------------------------------------------------------------------//

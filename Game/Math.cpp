@@ -650,14 +650,41 @@ void Dbvt::Update(Node* _leaf)
 	ASSERT(_leaf != nullptr);
 	ASSERT(_leaf->object != nullptr && _leaf->box.IsFinite());
 
+	//_Remove(_leaf);
+	//_leaf->parent = nullptr;
+	//_Insert(_leaf, m_root);
+
 	Node* _root = _Remove(_leaf);
 	while (_root && !_root->box.Contains(_leaf->box))
 		_root = _root->parent;
 	_Insert(_leaf, _root ? _root : m_root);
 }
 //----------------------------------------------------------------------------//
+uint Dbvt::GetMaxDepth(void)
+{
+	Array<DbvtNode*> _stack;
+	_stack.Push(m_root);
+	uint _depth = 1;
+	if (m_root) do
+	{
+		_depth = Max(_depth, _stack.Size());
+		DbvtNode* _node = _stack.Top();
+		_stack.Pop();
+
+		if (_node->IsNode())
+		{
+			_stack.Push(_node->child0);
+			_stack.Push(_node->child1);
+		}
+
+	} while (_stack.Size() > 0);
+
+	return _depth;
+}
+//----------------------------------------------------------------------------//
 void Dbvt::Enum(Callback* _cb, bool _withTest)
 {
+	ASSERT(GetMaxDepth() < 64);
 	Node* _stackBase[64];
 	Node** _stack = _stackBase;
 	*_stack++ = m_root;
@@ -827,6 +854,7 @@ void Dbvt::_Delete(Node* _node)
 //----------------------------------------------------------------------------//
 void Dbvt::_Clear(void)
 {
+	ASSERT(GetMaxDepth() < 64);
 	Node* _stackBase[64];
 	Node** _stack = _stackBase;
 	*_stack++ = m_root;

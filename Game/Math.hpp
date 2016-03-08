@@ -332,8 +332,10 @@ inline float Cerp(float _a, float _b, float _t)
 // Noise
 //----------------------------------------------------------------------------//
 
-inline uint IRand(int& _rseed) { return (uint)(_rseed = 69069 * _rseed + 1); }
-inline float Rand(int& _rseed) { return IRand(_rseed) * (1.0f / 0xffffffff); }
+inline uint IRand(int* _rseed) { return (uint)(*_rseed = 69069 * *_rseed + 1); }
+inline float Rand(int* _rseed) { return IRand(_rseed) * (1.0f / 0xffffffff); }
+inline float SRand(int* _rseed) { return Rand(_rseed) * 2 - 1; }
+
 float Noise2d(int _x, int _y, int _rseed);
 float SmoothedNoise2d(int _x, int _y, int _rseed);
 float InterpolatedNoise2d(float _x, float _y, int _rseed);
@@ -1184,6 +1186,7 @@ public:
 
 	// TODO: enum directional
 
+	uint GetMaxDepth(void);
 
 protected:
 

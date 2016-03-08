@@ -51,6 +51,16 @@ public:
 	void SetCursorMode(CursorMode _mode);
 	const Vec2& GetCameraDelta(void) { return m_cameraDelta; }
 
+	void SetTitle(const char* _title, ...)
+	{
+		char _buff[256];
+		va_list _args;
+		va_start(_args, _title);
+		vsprintf(_buff, _title, _args);
+		va_end(_args);
+		SetWindowText(WindowHandle(), _buff);
+	}
+
 protected:
 	void _CursorToCenter(void);
 	LRESULT _HandleMsg(UINT _msg, WPARAM _wParam, LPARAM _lParam);

@@ -38,6 +38,9 @@ Node::Node(void) :
 	m_worldBBoxUpdated(true),
 	m_dbvtUpdated(true),
 	m_dbvtNodeInTree(false),
+	m_inheritPosition(true),
+	m_inheritRotation(true),
+	m_inheritScale(true),
 	m_lastUpdateFrame(0),
 	m_lastViewFrame(0),
 	m_sleepingThreshold(0.2f), // 200 ms = ~12 frames on 60 fps
@@ -182,7 +185,7 @@ Behavior* Node::GetBehavior(uint _class, uint _index)
 {
 	for (Behavior* i = m_behaviors; i; i = i->m_next)
 	{
-		if (i->IsClass(_class) && _index--)
+		if (i->IsClass(_class) && _index-- == 0)
 			return i;
 	}
 	return nullptr;

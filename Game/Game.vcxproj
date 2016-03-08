@@ -26,7 +26,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <WholeProgramOptimization>false</WholeProgramOptimization>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
     <PlatformToolset>v120_xp</PlatformToolset>
   </PropertyGroup>
@@ -46,6 +46,7 @@
     <IntDir>$(SolutionDir)Build\Temp\Game\$(Configuration)\</IntDir>
     <CustomBuildAfterTargets>
     </CustomBuildAfterTargets>
+    <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <OutDir>$(SolutionDir)Bin\$(Configuration)\</OutDir>
@@ -100,11 +101,12 @@
       <EnableEnhancedInstructionSet>NoExtensions</EnableEnhancedInstructionSet>
       <PreprocessToFile>false</PreprocessToFile>
       <AdditionalIncludeDirectories>..\ThirdParty\</AdditionalIncludeDirectories>
-      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <BufferSecurityCheck>true</BufferSecurityCheck>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <MinimalRebuild>false</MinimalRebuild>
-      <WholeProgramOptimization>false</WholeProgramOptimization>
+      <MinimalRebuild>true</MinimalRebuild>
+      <WholeProgramOptimization>true</WholeProgramOptimization>
       <DisableLanguageExtensions>false</DisableLanguageExtensions>
+      <OmitFramePointers>true</OmitFramePointers>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -120,10 +122,11 @@
       <GenerateMapFile>true</GenerateMapFile>
       <AdditionalLibraryDirectories>$(SolutionDir)Build\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <MinimumRequiredVersion>5.01</MinimumRequiredVersion>
-      <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
-      <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+      <ImageHasSafeExceptionHandlers>true</ImageHasSafeExceptionHandlers>
       <ShowProgress>LinkVerboseICF</ShowProgress>
-      <DataExecutionPrevention>false</DataExecutionPrevention>
+      <DataExecutionPrevention>true</DataExecutionPrevention>
+      <AssemblyDebug>true</AssemblyDebug>
     </Link>
     <CustomBuildStep>
       <Command>
