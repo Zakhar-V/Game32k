@@ -42,6 +42,7 @@ public:
 
 
 	VertexArrayPtr CreateVertexArray(BufferUsage _usage = BU_Static);
+	void Upload(VertexArray* _dst);
 
 protected:
 

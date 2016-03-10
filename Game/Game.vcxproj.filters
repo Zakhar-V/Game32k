@@ -40,6 +40,18 @@
     <ClCompile Include="Level.cpp">
       <Filter>Engine\Scene</Filter>
     </ClCompile>
+    <ClCompile Include="App.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Game.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Resources.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
+    <ClCompile Include="GameLogic.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Game">
@@ -71,9 +83,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Game.h">
-      <Filter>Game</Filter>
-    </ClInclude>
     <ClInclude Include="_temp.hpp">
       <Filter>Engine</Filter>
     </ClInclude>
@@ -115,6 +124,21 @@
     </ClInclude>
     <ClInclude Include="Level.hpp">
       <Filter>Engine\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="App.hpp">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game.hpp">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="GameLogic.hpp">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Resources.hpp">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="GameSettings.hpp">
+      <Filter>Game</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

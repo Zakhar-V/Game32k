@@ -660,9 +660,14 @@ void Model::SetMesh(Mesh* _mesh)
 {
 	m_mesh = _mesh;
 	if (m_mesh)
+	{
 		_CreateDbvtNode();
+		m_materialParams = m_mesh->GetMaterialParams();
+	}
 	else
+	{
 		_DeleteDbvtNode();
+	}
 }
 //----------------------------------------------------------------------------//
 void Model::GetRenderItems(Array<RenderItem>& _items)
@@ -670,12 +675,12 @@ void Model::GetRenderItems(Array<RenderItem>& _items)
 	if (m_mesh)
 	{
 		RenderItem _item;
+		m_mesh->GetItem(_item);
 		_item.node = this;
-		for (uint i = 0; i < m_mesh->GetPartCount(); ++i)
-		{
-			m_mesh->GetItem(i, _item);
-			_items.Push(_item);
-		}
+		if (m_material)
+			_item.material = m_material;
+
+		_items.Push(_item);
 	}
 }
 //----------------------------------------------------------------------------//
@@ -888,6 +893,11 @@ void Scene::Update(float _seconds)
 	}
 
 	//printf("active nodes: %d --> %d (%f) ", _active, m_numActiveNodes, m_activeNodes->m_activeTime);
+}
+//----------------------------------------------------------------------------//
+void Scene::GetNodes(Array<Node*>& _nodes, const Vec3& _center, float _radius, uint _typeMask, uint _tags)
+{
+	// TODO
 }
 //----------------------------------------------------------------------------//
 void Scene::_AddActiveNode(Node* _node)

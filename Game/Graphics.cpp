@@ -212,6 +212,7 @@ void DepthStencilState::_Bind(uint _ref)
 //----------------------------------------------------------------------------//
 Buffer::Buffer(BufferUsage _usage) :
 	m_usage(_usage),
+	m_used(0),
 	m_size(0),
 	m_handle(0)
 {
@@ -232,19 +233,27 @@ void Buffer::Realloc(uint _newSize, const void* _data)
 {
 	GL_DEBUG_POINT();
 
-	if (m_size != _newSize || _data)
+	if (!_newSize && _data)
+		_data = nullptr;
+
+	if (m_size < _newSize || (m_usage == BU_Static && m_size != _newSize))
 	{
 		glNamedBufferDataEXT(m_handle, _newSize, _data, m_usage);
 		m_size = _newSize;
 	}
+	else if (_data)
+	{
+		glNamedBufferSubDataEXT(m_handle, 0, _newSize, _data);
+	}
+	m_used = _newSize;
 }
 //----------------------------------------------------------------------------//
 uint8* Buffer::Map(LockMode _mode, uint _offset, int _size)
 {
 	GL_DEBUG_POINT();
-	ASSERT(_offset <= m_size);
+	ASSERT(_offset <= m_used);
 	if (_size < 0)
-		_size = m_size - _offset;
+		_size = m_used - _offset;
 	ASSERT((uint)(_offset + _size) <= m_size);
 
 	return (uint8*)glMapNamedBufferRangeEXT(m_handle, _offset, _size, _mode);
@@ -260,7 +269,7 @@ void Buffer::Unmap(void)
 void Buffer::Write(const void* _src, uint _offset, uint _size)
 {
 	GL_DEBUG_POINT();
-	ASSERT(_offset + _size <= m_size);
+	ASSERT(_offset + _size <= m_used);
 	ASSERT(_src || !_size);
 
 	glNamedBufferSubDataEXT(m_handle, _offset, _size, _src);
@@ -270,8 +279,8 @@ void Buffer::Copy(Buffer* _src, uint _srcOffset, uint _dstOffset, uint _size)
 {
 	GL_DEBUG_POINT();
 	ASSERT(_src != nullptr);
-	ASSERT(_dstOffset + _size <= m_size);
-	ASSERT(_srcOffset + _size <= _src->m_size);
+	ASSERT(_dstOffset + _size <= m_used);
+	ASSERT(_srcOffset + _size <= _src->m_used);
 
 	glNamedCopyBufferSubDataEXT(_src->m_handle, m_handle, _srcOffset, _dstOffset, _size);
 }
@@ -715,13 +724,13 @@ const g_shaderNames[] =
 	{ ST_Vertex, VS_SkinnedModel, "Generic-VS.glsl", SKINNED_BIT },
 	{ ST_Vertex, VS_Sprite, "Generic-VS.glsl", SPRITE_BIT },
 	{ ST_Vertex, VS_Particles, "Generic-VS.glsl", SPRITE_BIT | PARTICLES_BIT },
-	{ ST_Vertex, VS_Terrain, "Generic-VS.glsl", TERRAIN_BIT },
+	//{ ST_Vertex, VS_Terrain, "Generic-VS.glsl", TERRAIN_BIT },
 
 	{ ST_Geometry, GS_Sprite, "Quad-GS.glsl", SPRITE_BIT },
 	{ ST_Geometry, GS_Billboard, "Quad-GS.glsl", SPRITE_BIT | BILLBOARD_BIT },
 	{ ST_Geometry, GS_BillboardY, "Quad-GS.glsl", SPRITE_BIT | BILLBOARD_Y_BIT },
 	{ ST_Geometry, GS_Particles, "Quad-GS.glsl", SPRITE_BIT | PARTICLES_BIT },
-	{ ST_Geometry, GS_Terrain, "Quad-GS.glsl", SPRITE_BIT | TERRAIN_BIT },
+	//{ ST_Geometry, GS_Terrain, "Quad-GS.glsl", SPRITE_BIT | TERRAIN_BIT },
 
 	{ ST_Fragment, FS_Texture, "Generic-PS.glsl", TEXTURE_BIT },
 	{ ST_Fragment, FS_NoTexture, "Generic-PS.glsl", 0 },

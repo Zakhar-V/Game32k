@@ -240,11 +240,31 @@ void Geometry::CreateGridXZ(uint _numSectors, float _sectorSize)
 VertexArrayPtr Geometry::CreateVertexArray(BufferUsage _usage)
 {
 	VertexArrayPtr _va = new VertexArray(m_type, m_indices.Size() != 0, _usage);
-	if (m_vertices.Size())
+	Upload(_va);
+	/*if (m_vertices.Size())
 		_va->GetVertexBuffer()->Realloc(m_vertices.Size() * sizeof(Vertex), m_vertices.Ptr());
 	if (m_indices.Size())
-		_va->GetIndexBuffer()->Realloc(m_indices.Size() * sizeof(index_t), m_indices.Ptr());
+		_va->GetIndexBuffer()->Realloc(m_indices.Size() * sizeof(index_t), m_indices.Ptr());*/
 	return _va;
+}
+//----------------------------------------------------------------------------//
+void Geometry::Upload(VertexArray* _dst)
+{
+	ASSERT(_dst != nullptr);
+	ASSERT(_dst->GetVertexBuffer() != nullptr);
+
+	_dst->GetVertexBuffer()->Realloc(m_vertices.Size() * sizeof(Vertex), m_vertices.Ptr());
+
+	if (m_indices.Size())
+	{
+		if (!_dst->GetIndexBuffer())
+			_dst->SetIndexBuffer(new Buffer(_dst->GetVertexBuffer()->Usage()));
+		_dst->GetIndexBuffer()->Realloc(m_indices.Size() * sizeof(index_t), m_indices.Ptr());
+	}
+	else if (!m_indices.Size())
+	{
+		_dst->SetIndexBuffer(nullptr);
+	}
 }
 //----------------------------------------------------------------------------//
 

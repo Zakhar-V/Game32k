@@ -181,7 +181,7 @@ public:
 	Buffer(BufferUsage _usage = BU_Static);
 	~Buffer(void);
 	BufferUsage Usage(void) { return m_usage; }
-	uint Size(void) { return m_size; }
+	uint Size(void) { return m_used; }
 	uint Handle(void) { return m_handle; }
 	void Realloc(uint _newSize, const void* _data = nullptr);
 	uint8* Map(LockMode _mode, uint _offset = 0, int _size = -1);
@@ -193,6 +193,7 @@ protected:
 
 	BufferUsage m_usage;
 	uint m_size;
+	uint m_used;
 	uint m_handle;
 };
 
@@ -278,20 +279,24 @@ class VertexArray : public RefCounted
 {
 public:
 
-	VertexArray(PrimitiveType _type, bool _indexed, BufferUsage _usage = BU_Static);
+	VertexArray(PrimitiveType _type = PT_Points, bool _indexed = false, BufferUsage _usage = BU_Static);
 	~VertexArray(void);
 
+	void SetType(PrimitiveType _type) { m_type = _type; }
 	PrimitiveType GetType(void) { return m_type; }
 
+	void SetVertexBuffer(Buffer* _buffer) { m_vertexBuffer = _buffer; }
 	Buffer* GetVertexBuffer(void) { return m_vertexBuffer; }
 	uint GetVertexCount(void) { return m_vertexBuffer->Size() / sizeof(Vertex); }
 
+	void SetIndexBuffer(Buffer* _buffer) { m_indexBuffer = _buffer; }
 	Buffer* GetIndexBuffer(void) { return m_indexBuffer; }
 	uint GetIndexCount(void) { return m_indexBuffer ? (m_indexBuffer->Size() / sizeof(index_t)) : 0; }
 
+	bool IsIndexed(void) { return m_indexBuffer != nullptr; }
+
 	void Bind(void);
 	void Draw(uint _start, uint _count, uint _numInstances = 1);
-	
 
 protected:
 
@@ -474,13 +479,13 @@ enum ShaderID
 	VS_SkinnedModel,
 	VS_Sprite,
 	VS_Particles,
-	VS_Terrain,
+	//VS_Terrain,
 
 	GS_Sprite,
 	GS_Billboard,
 	GS_BillboardY,
 	GS_Particles,
-	GS_Terrain,
+	//GS_Terrain,
 
 	FS_Texture,
 	FS_NoTexture,

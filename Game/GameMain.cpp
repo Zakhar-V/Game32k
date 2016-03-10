@@ -17,518 +17,10 @@
 #include "Render.cpp"
 #include "Level.cpp"
 
-////////////////////////////////////////////////////////////////////////////////
-//----------------------------------------------------------------------------//
-//
-//----------------------------------------------------------------------------//
-////////////////////////////////////////////////////////////////////////////////
-
-inline double Time(void) // in seconds
-{
-	LARGE_INTEGER _f, _c;
-	QueryPerformanceFrequency(&_f);
-	QueryPerformanceCounter(&_c);
-	return (double)_c.QuadPart / (double)_f.QuadPart;
-}
-
-//----------------------------------------------------------------------------//
-//
-//----------------------------------------------------------------------------//
-
-class Player* gPlayer = nullptr;
-
-//----------------------------------------------------------------------------//
-//
-//----------------------------------------------------------------------------//
-
-class Character : public Entity
-{
-public:
-	OBJECT("Character");
-
-	Character(void) :
-		m_health(100)
-	{
-		m_minHeight = 2;
-	}
-	~Character(void)
-	{
-	}
-
-	virtual void Hit(float _hit)
-	{
-		m_health -= _hit;
-	}
-
-	float GetHealth(void) { return m_health; }
-
-protected:
-
-	void _LogicUpdate(const FrameInfo& _frame) override
-	{
-	}
-
-	void _PreUpdateImpl(const FrameInfo& _frame) override
-	{
-	}
-
-	void _UpdateImpl(const FrameInfo& _frame) override
-	{
-		Vec3 _pos = GetWorldPosition();
-		//_pos.y = Max<float>(_pos.y, m_scene->GetTerrainHeight(_pos.x, _pos.z) + m_minHeight);
-		_pos.y = m_scene->GetTerrainHeight(_pos.x, _pos.z) + m_minHeight;
-		SetWorldPosition(_pos);
-	}
-
-	void _PostUpdateImpl(const FrameInfo& _frame) override
-	{
-	}
-
-	float m_health;
-	float m_minHeight;
-};
-
-//----------------------------------------------------------------------------//
-//
-//----------------------------------------------------------------------------//
-
-struct Settings_t
-{
-	float invCameraH = 1;
-	float invCameraV = 1;
-	float mouseSens = 1.5;
-}
-gSettings;
-
-
-#define G_DRONE_HEIGHT 2.75f
-#define G_PLAYER_HEIGHT 1.75f
-#define G_PLAYER_HEIGHT_LOW 0.75f
-#define G_CHARACTER_VELOCITY 20000.f / 3600.f // 20 km/h
-#define G_PLAYER_VELOCITY 22000.f / 3600.f // 22 km/h 
-#define G_PLAYER_SPRINT_VELOCITY_MULTIPLIER 2.5f
-#define G_PLAYER_STEP_VELOCITY_MULTIPLIER 0.5f
-
-#define G_DRONE_SCAN_RADIUS 15
-#define G_DRON_ATTACK_RADIUS 5
-
-#define G_TERRAIN_RADIUS 500.0f
-
-class FirstPersonCameraController : public Behavior
-{
-public:
-	OBJECT("FirstPersonCameraController");
-
-	float m_yaw = 0;
-	float m_pitch = 0;
-
-	FirstPersonCameraController(void)
-	{
-
-	}
-
-	~FirstPersonCameraController(void)
-	{
-
-	}
-	void Update(const FrameInfo& _frame) override
-	{
-		Quat _r = m_node->GetLocalRotation();
-		Vec2 _rot = gDevice->GetCameraDelta() * Vec2(gSettings.invCameraH, gSettings.invCameraV) * gSettings.mouseSens * _frame.time;
-		if (_rot.x || _rot.y)
-		{
-			m_pitch = Clamp<float>(m_pitch + _rot.y, -90, 90);
-			m_yaw += _rot.x;
-
-			Quat _rx, _ry;
-			_rx.FromAxisAngle(VEC3_UNIT_X, m_pitch * RADIANS);
-			_ry.FromAxisAngle(VEC3_UNIT_Y, m_yaw * RADIANS);
-
-			Vec3 _dir = -VEC3_UNIT_Z * _r;
-
-			m_node->SetLocalRotation(_rx * _ry);
-		}
-	}
-
-protected:
-};
-
-class PlayerMovementController : public Behavior
-{
-public:
-	OBJECT("PlayerMovementController");
-
-	PlayerMovementController(void)
-	{
-	}
-
-	void Update(const FrameInfo& _frame) override
-	{
-		Vec3 _vec = 0;
-		if ((GetAsyncKeyState('W') & 0x8000) != 0)
-			_vec.z -= 1;
-		if ((GetAsyncKeyState('S') & 0x8000) != 0)
-			_vec.z += 1;
-
-		if ((GetAsyncKeyState('A') & 0x8000) != 0)
-			_vec.x -= 1;
-		if ((GetAsyncKeyState('D') & 0x8000) != 0)
-			_vec.x += 1;
-
-		if ((GetAsyncKeyState('Q') & 0x8000) != 0)
-			_vec.y -= 1;
-		if ((GetAsyncKeyState('E') & 0x8000) != 0)
-			_vec.y += 1;
-
-		// TODO
-
-		float _speed = 20000.f / 3600.f; // 20 km/h
-		if ((GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0)
-			_speed *= G_PLAYER_SPRINT_VELOCITY_MULTIPLIER;
-		if ((GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0)
-			_speed *= G_PLAYER_STEP_VELOCITY_MULTIPLIER;
-		_vec *= _speed;
-
-		Vec3 _dir = _vec * m_node->GetWorldRotation().Copy().Inverse();
-		_dir.y = 0; // no flying
-		Vec3 _pos = m_node->GetWorldPosition();
-		_pos += _dir * _frame.time;
-		m_node->SetWorldPosition(_pos);
-	}
-
-protected:
-
-};
-
-class Player : public Character
-{
-public:
-	OBJECT("Player");
-
-	Player(void)
-	{
-		gPlayer = this;
-
-		m_minHeight = G_PLAYER_HEIGHT;
-		m_camera = new Camera;
-		m_camera->SetParent(this);
-		//m_camera->SetLocalPosition({0, 0, 0});
-		m_camera->SetInheritRotation(false);
-		m_camera->AddBehavior(new FirstPersonCameraController);
-		AddBehavior(new PlayerMovementController);
-	}
-
-	~Player(void)
-	{
-	}
-
-protected:
-
-	void _SetSceneImpl(Scene* _scene) override
-	{
-		m_scene = _scene;
-		if (m_scene)
-			m_scene->SetActiveCamera(m_camera);
-	}
-
-	void _LogicUpdate(const FrameInfo& _frame) override
-	{
-		Character::_LogicUpdate(_frame);
-
-		if ((GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0)
-			m_minHeight = G_PLAYER_HEIGHT_LOW;
-		else
-			m_minHeight = G_PLAYER_HEIGHT;
-	}
-
-	void _PreUpdateImpl(const FrameInfo& _frame) override
-	{
-		Character::_PreUpdateImpl(_frame);
-	}
-
-	void _UpdateImpl(const FrameInfo& _frame) override
-	{
-		Character::_UpdateImpl(_frame);
-
-		Vec3 _dir = m_camera->GetWorldDirection();
-		_dir.y = 0; // no flying
-		SetWorldDirection(_dir);
-	}
-
-	void _PostUpdateImpl(const FrameInfo& _frame) override
-	{ 
-		Character::_PostUpdateImpl(_frame);
-
-	}
-
-	CameraPtr m_camera;
-};
-
-//----------------------------------------------------------------------------//
-//
-//----------------------------------------------------------------------------//
-
-
-class Follow : public Behavior
-{
-public:
-	OBJECT("Follow");
-
-	void SetTarget(Node* _target)
-	{
-		m_target = _target;
-	}
-	void SetDelay(float _delay)
-	{
-		m_delay = _delay;
-	}
-
-	void Update(const FrameInfo& _frame) override
-	{
-		if (!m_target)
-			return;
-
-		Vec3 _pos = m_node->GetWorldPosition();
-		Vec3 _targetPos = m_target->GetWorldPosition();
-
-		Vec3 _dir = (_targetPos) - _pos;
-
-		//_targetPos = (_pos + )
-		m_node->SetWorldPosition(_pos + (_dir / m_delay) * _frame.time);
-
-		//printf("target = %f %f %f\n", )
-	}
-
-protected:
-
-	float m_delay = 0;
-	Vec3 m_offset = 0;
-	Ref<Node> m_target;
-};
-
-//----------------------------------------------------------------------------//
-//
-//----------------------------------------------------------------------------//
-
-class Patrol : public Behavior
-{
-public:
-	OBJECT("Patrol");
-
-	void SetVelocity(float _v) { m_velocity = _v; }
-	void SetCoeff(float _c) { m_coeff = _c; }
-
-
-	void Update(const FrameInfo& _frame) override
-	{
-		Vec3 _dir, _pos = m_node->GetWorldPosition();
-
-		float _dist = _pos.Distance(0);
-		if (_dist > G_TERRAIN_RADIUS)
-			m_moveToCenter = true;
-		else if (_dist < G_TERRAIN_RADIUS * 0.8f)
-			m_moveToCenter = false;
-
-		if (m_moveToCenter)
-			_dir = (-_pos).Normalize();
-		else
-			_dir = Vec3(Cos(m_stage), 0, Sin(m_stage * 0.5f));
-
-		m_stage += _frame.time * m_coeff;
-		_pos += _dir * m_velocity * _frame.time;
-		m_node->SetWorldPosition(_pos);
-	}
-
-protected:
-
-	float m_stage = 0;
-	float m_velocity = 1;
-	float m_coeff = 1;
-	bool m_moveToCenter = false;
-};
-
-//----------------------------------------------------------------------------//
-//
-//----------------------------------------------------------------------------//
-
-
-
-class Drone : public Character
-{
-public:
-	OBJECT("Drone");
-
-	struct Resources
-	{
-		MeshPtr body;
-		MaterialPtr eyeBlue;
-		MaterialPtr eyeRed;
-	};
-
-	enum State
-	{
-		S_Initial,
-		S_Patrol,
-		S_Follow,
-		S_Attack,
-	};
-
-	Drone(Resources* _res, float _rand)
-	{
-		m_state = S_Initial;
-		m_rand = _rand;
-		m_health = 10;
-		m_minHeight = G_DRONE_HEIGHT;
-		m_time = _rand;
-		m_lastAttackTime = 0;
-		m_attackStage = 0;
-
-		_ChangeState(S_Patrol);
-
-
-		StaticModelPtr _mdl = new StaticModel;
-		_mdl->SetMesh(_res->body);
-		_mdl->SetParent(this);
-
-		m_sphere = new StaticModel;
-		m_sphere->SetMesh(_res->body); //_res->sphere
-		m_sphere->Disable();
-		m_sphere->SetParent(this);
-	}
-
-	~Drone(void)
-	{
-	}
-
-protected:
-
-	void _LogicUpdate(const FrameInfo& _frame) override
-	{
-		Character::_LogicUpdate(_frame);
-
-		Vec3 _playerPos = gPlayer->GetWorldPosition();
-		Vec3 _pos = GetWorldPosition();
-		float _dist = _pos.Distance(_playerPos);
-		m_time += _frame.time;
-
-		switch (m_state)
-		{
-		case S_Patrol:
-		{
-			if (_dist < G_DRONE_SCAN_RADIUS)
-				_ChangeState(S_Follow);
-		} break;
-		case S_Follow:
-		{
-			if (_dist > G_DRONE_SCAN_RADIUS)
-				_ChangeState(S_Patrol);
-		}break;
-		}
-
-#define G_DRONE_ATTACK_INTERVAL 1.f
-
-		m_attackStage += G_DRONE_ATTACK_INTERVAL * _frame.time;
-		m_attackStage = Clamp<float>(m_attackStage, 0, 1);
-
-		if (m_time - m_lastAttackTime > G_DRONE_ATTACK_INTERVAL)
-		{
-			m_lastAttackTime = m_time;
-			m_attackStage = 0;
-		}
-
-		//printf("statge %f\n", m_attackStage);
-
-		float _maxRadius = 0;
-
-		if (m_state == S_Patrol)
-		{
-			_maxRadius = G_DRONE_SCAN_RADIUS;
-		}
-		else
-		{
-			_maxRadius = G_DRON_ATTACK_RADIUS;
-			if (_dist < G_DRON_ATTACK_RADIUS)
-			{
-				if (m_attackStage == 0)
-				{
-					gPlayer->Hit(5);
-				}
-			}
-		}
-
-		float _radius = _maxRadius * m_attackStage;
-
-		if (_radius > 0)
-		{
-			m_sphere->Enable();
-			m_sphere->SetWorldScale(_radius);
-			//m_sphere->SetTransparency(1 - m_attackStage);
-		}
-		else
-		{
-			m_sphere->Disable();
-		}
-	}
-
-	void _PreUpdateImpl(const FrameInfo& _frame) override
-	{
-		Character::_PreUpdateImpl(_frame);
-	}
-
-	void _UpdateImpl(const FrameInfo& _frame) override
-	{
-		Character::_UpdateImpl(_frame);
-	}
-
-	void _PostUpdateImpl(const FrameInfo& _frame) override
-	{
-		Character::_PostUpdateImpl(_frame);
-	}
-
-	void _ChangeState(State _state)
-	{
-		if (m_state == _state)
-			return;
-
-		switch (m_state)
-		{
-		case S_Patrol:
-			RemoveBehavior(GetBehavior<Patrol>());
-			break;
-		case S_Follow:
-			RemoveBehavior(GetBehavior<Follow>());
-			break;
-		}
-
-		m_state = _state;
-
-		switch (m_state)
-		{
-		case S_Patrol:
-		{
-			Ptr<Patrol>	_patrol = new Patrol;
-			_patrol->SetVelocity(7);
-			_patrol->SetCoeff(0.1f + m_rand);
-			AddBehavior(_patrol);
-		} break;
-		case S_Follow:
-		{
-			Ptr<Follow>	_follow = new Follow;
-			_follow->SetTarget(gPlayer);
-			_follow->SetDelay(1);
-			AddBehavior(_follow);
-		}break;
-		}
-	}
-
-	State m_state;
-	float m_rand;
-	float m_time;
-	float m_lastAttackTime;
-	float m_attackStage;
-
-	ModelPtr m_sphere;
-};
+#include "Resources.cpp"
+#include "GameLogic.cpp"
+#include "Game.cpp"
+#include "App.cpp"
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -537,29 +29,33 @@ protected:
 //----------------------------------------------------------------------------//
 ////////////////////////////////////////////////////////////////////////////////
 
-//----------------------------------------------------------------------------//
-// Game
-//----------------------------------------------------------------------------//
-
-#define gGame Game::Get()
-
-class Game : public Singleton<Game>
-{
-public:
-
-protected:
-};
 
 //----------------------------------------------------------------------------//
-// App
+//
 //----------------------------------------------------------------------------//
 
-#define gApp Game::Get()
 
-class App : public Singleton<App>
-{
+//----------------------------------------------------------------------------//
+//
+//----------------------------------------------------------------------------//
 
-};
+
+
+
+
+
+//----------------------------------------------------------------------------//
+//
+//----------------------------------------------------------------------------//
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------//
+//
+//----------------------------------------------------------------------------//
+////////////////////////////////////////////////////////////////////////////////
+
 
 ////////////////////////////////////////////////////////////////////////////////
 //----------------------------------------------------------------------------//
@@ -586,8 +82,13 @@ void main()
 	new Device;
 	new Graphics;
 	new Renderer;
-	Scene* _scene = new Scene;
 
+	App _app;
+
+
+
+
+	Scene* _scene = new Scene;
 	{
 		ImagePtr _hmap = new Image;
 		_hmap->CreatePerlin(512, 0.05f);
@@ -608,11 +109,11 @@ void main()
 		GeometryPtr _geom = new Geometry;
 		_geom->CreateSphere(0.5f, 32, 16);
 		_res.body = new Mesh();
-		_res.body->CreateFromGeometry(_geom);
+		_res.body->SetGeometry(_geom);
 
 		int _rseed = 0;
 		Ptr<Drone> _drone;
-		for (uint i = 0; i < 500; ++i)
+		for (uint i = 0; i < 800; ++i)
 		{
 			_drone = new Drone(&_res, SRand(&_rseed));
 			_drone->SetLocalPosition({ SRand(&_rseed) * 450, 200, SRand(&_rseed) * 450 });
@@ -683,11 +184,11 @@ void main()
 			_frames = 0;
 		}
 
-		if (gPlayer->GetHealth() <= 0)
+		/*if (gPlayer->GetHealth() <= 0)
 		{
 			LOG("Game over");
 			break;
-		}
+		} */
 
 #if 1
 		{

@@ -16,6 +16,33 @@ class Camera;
 class Terrain;
 
 //----------------------------------------------------------------------------//
+// MaterialParams
+//----------------------------------------------------------------------------//
+
+struct MaterialParams
+{
+	void SetDiffuseColor(const Vec3& _color) { diffuse.Set(_color.x, _color.y, _color.z, diffuse.w); }
+	const Vec3& GetDiffuseColor(void) const { return *(const Vec3*)&diffuse; }
+	void SetSpecularColor(const Vec3& _color) { specular.Set(_color.x, _color.y, _color.z, specular.w); }
+	const Vec3& GetSpecularColor(void) const { return *(const Vec3*)&specular; }
+	void SetTransparency(float _transparency) { diffuse.w = _transparency; }
+	float GetTransparency(void) const { return diffuse.w; }
+	bool IsTranslucent(void) const { return diffuse.w < 1; }
+	void SetShininess(float _shininess) { specular.w = _shininess; }
+	float GetShininess(void) const { return specular.w; }
+	void SetEmission(float _emission) { params.x = _emission; }
+	float GetEmission(void) const { return params.x; }
+	void SetIntensity(float _intencity) { params.y = _intencity; }
+	float GetIntensity(void) const { return params.y; }
+
+	operator const Mat34& (void) const { return *(const Mat34*)&diffuse; }
+
+	Vec4 diffuse = { 0.5f, 0.5f, 0.5f, 1 };
+	Vec4 specular = { 1, 1, 1, 0.5f };
+	Vec4 params = { 0, 1, 0, 0 }; // emission, intensity
+};
+
+//----------------------------------------------------------------------------//
 // Material
 //----------------------------------------------------------------------------//
 
@@ -24,30 +51,21 @@ typedef Ptr<class Material> MaterialPtr;
 class Material : public RefCounted
 {
 public:
-
-	void SetColor(const Vec4& _color) { m_diffuse = _color; }
-	void SetSpecular(const Vec4& _specular) { m_diffuse = _specular; }
-	void SetEmissive(const Vec4& _emission) { m_emission = _emission; }
-	void SetIntensity(const Vec4& _intensity) { m_intensity = _intensity; }
-
-	bool IsTransparent(void) { return m_diffuse.a < 1; }
+	Material(void) { }
+	Material(const Material& _other) : m_shader(_other.m_shader), m_sampler(_other.m_sampler), m_texture(_other.m_texture) { }
 
 	void SetShader(ShaderID _shader) { m_shader = _shader; }
 	ShaderID GetShader(void) { return m_shader; }
-
+	void SetSampler(SamplerID _sampler) { m_sampler = _sampler; }
+	SamplerID GetSampler(void) { return m_sampler; }
 	void SetTexture(Texture* _texture) { m_texture = _texture; }
 	Texture* GetTexture(void) { return m_texture; }
-	//SamplerID GetSampler(void) { return m_sampler; }
-
-	const Mat44& GetParams(void) { return *(const Mat44*)&m_diffuse; }
+	MaterialPtr Clone(void) { return new Material(*this); }
 
 protected:
 
-	Vec4 m_diffuse;
-	Vec4 m_specular;
-	Vec4 m_emission;
-	Vec4 m_intensity;
-	ShaderID m_shader;
+	ShaderID m_shader = FS_NoTexture;
+	SamplerID m_sampler = 0;
 	TexturePtr m_texture;
 };
 
@@ -68,15 +86,6 @@ struct RenderItem
 // Mesh
 //----------------------------------------------------------------------------//
 
-struct MeshPart
-{
-	MeshPart(uint _start = 0, uint _count = 0, uint _material = 0) :
-		start(_start), count(_count), material(_material) {}
-	uint start = 0;
-	uint count = 0;
-	uint material = 0;
-};
-
 typedef Ptr<class Mesh> MeshPtr;
 
 class Mesh : public RefCounted
@@ -85,15 +94,6 @@ public:
 
 	Mesh(void) { }
 	~Mesh(void) { }
-
-	void CreateFromGeometry(Geometry* _geom)
-	{
-		ASSERT(_geom != nullptr);
-		SetGeometry(_geom);
-		SetPartCount(1);
-		uint _count = _geom->GetIndexCount();
-		SetPart(0, 0, _count ? _count: _geom->GetVertexCount());
-	}
 
 	void SetGeometry(Geometry* _geom)
 	{
@@ -112,33 +112,25 @@ public:
 
 	VertexArray* GetVertexArray(void) { return m_data; }
 	const AlignedBox& GetBBox(void) { return m_bbox; }
+	void SetMaterial(Material* _mtl) { m_material = _mtl; }
+	Material* GetMaterial(void) { return m_material; }
+	MaterialParams& GetMaterialParams(void) { return m_materialParams; }
 
-	void SetPartCount(uint _count) { m_parts.Resize(_count); }
-	uint GetPartCount(void) { return m_parts.Size(); }
-	void SetPart(uint _index, const MeshPart& _part) { m_parts[_index] = _part; }
-	void SetPart(uint _index, uint _start, uint _count, uint _material = 0) { SetPart(_index, {_start, _count, _material}); }
-	const MeshPart& GetPart(uint _index) { return m_parts[_index]; }
-
-	void SetMaterialCount(uint _count) { m_materials.Resize(_count); }
-	uint GetMaterialCount(void) { return m_materials.Size(); }
-	Material* GetMaterial(uint _index) { return _index < m_materials.Size() ? m_materials[_index] : nullptr; }
-
-	void GetItem(uint _index, RenderItem& _item)
+	void GetItem(RenderItem& _item)
 	{
-		ASSERT(_index < m_parts.Size());
-		const MeshPart& _part = m_parts[_index];
+		ASSERT(m_data != nullptr);
 		_item.data = m_data;
-		_item.material = GetMaterial(_part.material);
-		_item.start = _part.start;
-		_item.count = _part.count;
+		_item.material = m_material;
+		_item.start = 0;
+		_item.count = m_data->IsIndexed() ? m_data->GetIndexCount() : m_data->GetVertexCount();
 	}
 
 protected:
 
 	GeometryPtr m_geom;
 	VertexArrayPtr m_data;
-	Array<MeshPart> m_parts;
-	Array<MaterialPtr> m_materials;
+	MaterialPtr m_material;
+	MaterialParams m_materialParams;
 	AlignedBox m_bbox;
 };
 
@@ -171,19 +163,18 @@ public:
 
 	void Draw(Scene* _scene);
 
-//protected:
+protected:
 
-	/*RenderBuffer* m_primaryRenderBuffer;
-	RenderBuffer* m_primaryDepthStencilBuffer;
+	void _BindUniformBuffers(void);
+	void _SetupViewport(Camera* _cam);
+	void _GetVisibleObjects(Scene* _scene, const Frustum& _frustum);
+	void _SetupVertexShaders(uint _type);
+	void _FillGBuffer(void);
+	void _DrawBatchs(RenderItem* _items, uint _numItems, Shader* _fragmentShader);
+	//void _DrawSolid(void);
+	//void _DrawTransparent(void);
 
-	RenderBuffer* m_secondaryRenderBuffer;
-	RenderBuffer* m_secondaryDepthStencilBuffer;
-
-	// gbuffer
-	TexturePtr m_primaryRenderTexture;
-	TexturePtr m_primaryDepthStencilTexture;
-	TexturePtr m_auxDepth;
-	TexturePtr m_auxColor;*/
+	VertexArrayPtr m_fsQuad;
 
 	DepthStencilStateID m_depthStencilEnabled;
 	DepthStencilStateID m_depthStencilDisabled;
@@ -191,30 +182,41 @@ public:
 	RenderBuffer* m_colorBuffer;
 	RenderBuffer* m_depthStencilBuffer;
 
-
 	TexturePtr m_gBufferColorTexture;
-	TexturePtr m_gBufferNormalTexture; // 
+	TexturePtr m_gBufferNormalTexture;
+	TexturePtr m_gBufferMaterialTexture;
 	TexturePtr m_gBufferDepthTexture;
 
-
-
-	//Array<RenderableObject*> m_objects;
-	//Array<Light*> m_lights;
-
-	//RenderMeshPtr m_testCube;
-
 	BufferPtr m_cameraBuffer;
-	BufferPtr m_instanceBuffer;
-	BufferPtr m_materialBuffer;
+	UCamera m_cameraParams;
+	Frustum m_frustum;
+	Vec2i m_screenSize;
+
+	BufferPtr m_instanceMatBuffer;
+	UInstanceMat m_instanceMatStorage;
+
 	BufferPtr m_skinBuffer;
+	USkinMat m_skinMatStorage;
 
-	UMaterial m_materialStorage;
-	UInstancing m_instanceStorage;
-	USkinning m_skinStorage;
+	BufferPtr m_instanceMtlBuffer;
+	UInstanceMtl m_instanceMtlStorage;
+	//MaterialParams m_defaultMtlParams;
+	MaterialPtr m_defaultMtl;
 
+	BufferPtr m_rasterizerParamsBuffer;
+	URasterizerParams m_rasterizerParamsStorage;
+	
+	DbvtFrustumCallback m_dbvtFrustumCallback;
 	RenderContainer m_renderContainer;
+
 	Array<RenderItem> m_renderItems;
+	Array<RenderNode*> m_renderObjects;
+
 	Array<Light*> m_lights;
+	Array<RenderItem> m_staticModelItems;
+	Array<RenderItem> m_skinnedModelItems;
+	Array<RenderItem> m_skyItems;
+	Array<RenderItem> m_terrainItems;
 };
 
 //----------------------------------------------------------------------------//

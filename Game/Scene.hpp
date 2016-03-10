@@ -96,6 +96,9 @@ public:
 	const String& GetName(void) { return m_name; }
 	uint GetNameHash(void) { return m_nameHash; }
 
+	void SetTags(uint _tags) { m_tags = (uint16)_tags; }
+	uint GetTags(void) { return m_tags; }
+
 	//void SetEntity(Entity* _entity) { m_entity = _entity; }
 	//Entity* GetEntity(void) { return (m_parent && (m_parent->m_typeMask & NT_Entity)) ? static_cast<Entity*>(m_parent) : nullptr; }
 	void _SetEntity(Entity* _entity) { m_entity = _entity; }
@@ -380,6 +383,15 @@ public:
 	~RenderNode(void);
 
 	virtual void GetRenderItems(Array<RenderItem>& _items) { }
+
+	void SetMaterial(Material* _mtl) { m_material = _mtl; }
+	Material* GetMaterial(void) { return m_material; }
+	MaterialParams& GetMaterialParams(void) { return m_materialParams; }
+
+protected:
+
+	MaterialPtr m_material;
+	MaterialParams m_materialParams;
 };
 
 //----------------------------------------------------------------------------//
@@ -506,6 +518,7 @@ public:
 
 	void GetRenderItems(Array<RenderItem>& _items) override;
 
+protected:
 	void _GetWorldBBox(AlignedBox& _bbox) override;
 
 	friend class Scene;
@@ -577,10 +590,16 @@ public:
 	void SetActiveCamera(Camera* _camera) { m_activeCamera = _camera; }
 	Camera* GetActiveCamera(void) { return m_activeCamera; }
 
-	float GetTerrainHeight(float _x, float _z)
-	{
-		return m_terrain ? m_terrain->GetHeight(_x, _z) : 0;
-	}
+	float GetTerrainHeight(float _x, float _z) { return m_terrain ? m_terrain->GetHeight(_x, _z) : 0; }
+
+	void GetNodes(Array<Node*>& _nodes, const Vec3& _center, float _radius, uint _typeMask, uint _tags);
+
+
+	Terrain* GetTerrain(void) { return m_terrain; }
+	DirectionalLight* GetDirectionalLight(void) { return m_directionalLights; }
+	//SkyDome* GetSkyDome(void) { return m_sky; }
+
+	Entity* GetEntity(void) { return m_entities; }
 
 protected:
 	friend class Node;

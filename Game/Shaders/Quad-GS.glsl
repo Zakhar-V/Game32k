@@ -1,7 +1,7 @@
 layout(points) in;
 layout(triangle_strip, max_vertices = 4) out;
 
-void Vertex(in vec3 offset, in vec2 coord)
+void MakeVertex(in vec3 offset, in vec2 coord)
 {
 	OutInstanceID = InInstanceID[0];
 	OutWorldPos = vec4(InPos[0].xyz + offset, 1);
@@ -25,10 +25,10 @@ void main()
 	mat = NormMat * mat;
 #endif	
 
-	Vertex(mat * vec3(.5, .5, 0), vec2(1, 1)); // rb
-	Vertex(mat * vec3(.5, -.5, 0), vec2(1, 0)); // rt
-	Vertex(mat * vec3(-.5, .5, 0), vec2(0, 1)); // lb
-	Vertex(mat * vec3(-.5, -.5, 0), vec2(0, 0)); // lt
+	MakeVertex(mat * vec3(.5, .5, 0), vec2(1, 1)); // rb
+	MakeVertex(mat * vec3(.5, -.5, 0), vec2(1, 0)); // rt
+	MakeVertex(mat * vec3(-.5, .5, 0), vec2(0, 1)); // lb
+	MakeVertex(mat * vec3(-.5, -.5, 0), vec2(0, 0)); // lt
 
 	EndPrimitive();
 }

@@ -38,16 +38,20 @@
 #define MAX_INSTANCES 512
 #define MAX_BONES 64
 
+#define C_POLYGON_OFFSET 5e-4
+#define C_SILHOUETTE_OFFSET 5e-4
 
 // c++/glsl
 #ifdef GLSL
 #	define UBUFFER(Id, Name) layout(binding = Id, std140) uniform U##Name
 #	define USAMPLER(Id, T, Name) layout(binding = Id) uniform sampler##T Name
 #else
+#	define ivec2 Vec2i
 #	define vec2 Vec2
 #	define vec3 Vec3
 #	define vec4 Vec4
 #	define mat3 Mat34
+#	define mat3x4 Mat34
 #	define mat4 Mat44
 #	define UBUFFER(Id, Name) enum {U_##Name = Id}; struct U##Name
 #	define USAMPLER(Id, T, Name) enum {U_##Name = Id};
@@ -65,26 +69,39 @@ UBUFFER(1, Camera)
 	ROWMAJOR mat3 NormMat; // inverse(mat3(ViewMat))
 	vec4 CameraPos;
 	vec4 Depth;	// near, far, C=constant, FC = 1.0/log(far*C + 1)
+	ivec2 ScreenSize;
+	vec2 InvScreenSize;
 };
 
-UBUFFER(2, Instancing)
+UBUFFER(2, InstanceMat)
 {
 	ROWMAJOR mat4 WorldMat[MAX_INSTANCES];
 };
-UBUFFER(5, Material)
+UBUFFER(5, InstanceMtl)
 {
-	ROWMAJOR mat4 Material[MAX_INSTANCES];
+	ROWMAJOR mat3x4 InstanceMtl[MAX_INSTANCES];
 };
 
-UBUFFER(3, Skinning)
+UBUFFER(6, Material)
+{
+	ROWMAJOR mat3x4 Material;
+};
+
+UBUFFER(3, SkinMat)
 {
 	ROWMAJOR mat4 SkinMat[MAX_BONES];
 };
 
-UBUFFER(4, ClipPlane)
+UBUFFER(4, ClipPlane) // TODO: remove it
 {
 	vec4 ClipPlane[7];
 	int NumClipPlanes;
+};
+
+UBUFFER(7, RasterizerParams)
+{
+	float DepthBias; // default is 0 or 1e-5
+	float SilhouetteOffset;
 };
 
 USAMPLER(0, 2D, ColorMap);
@@ -167,7 +184,7 @@ IN_FLAT(12, int, InstanceID);
 IN(13, float, LogZ);
 OUT(0, vec4, Color);
 OUT(1, vec4, Normal);
-//OUT(2, vec4, Normal);
+OUT(2, vec4, Mtl);
 #endif
 
 #define UNIT_X vec3(1, 0, 0)
