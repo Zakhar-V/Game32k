@@ -11,12 +11,19 @@
 #define BILLBOARD_Y_BIT 0x10
 #define PARTICLES_BIT 0x20
 
-#define TERRAIN_BIT 0x40
+//#define TERRAIN_BIT 0x40
+#define FSQUAD_BIT 0x80
 
 
 // PS flags
 #define TEXTURE_BIT 0x1
+
 #define CEL_SHADE_BIT 0x2
+
+#define LIGHTING_BIT 0x4
+#define DIRECTIONAL_LIGHT_BIT 0x8
+#define SPOT_LIGHT_BIT 0x10
+#define POINT_LIGHT_BIT 0x20
 
 
 #ifdef GLSL
@@ -26,10 +33,18 @@
 #define BILLBOARD (FLAGS & BILLBOARD_BIT)
 #define BILLBOARD_Y (FLAGS & BILLBOARD_Y_BIT)
 #define PARTICLES (FLAGS & PARTICLES_BIT)
-#define TERRAIN (FLAGS & TERRAIN_BIT)
+//#define TERRAIN (FLAGS & TERRAIN_BIT)
+#define FSQUAD (FLAGS & FSQUAD_BIT)
 
 #define TEXTURE (FLAGS & TEXTURE_BIT)
+
 #define CEL_SHADE (FLAGS & CEL_SHADE_BIT)
+
+#define LIGHTING (FLAGS & LIGHTING_BIT)
+#define DIRECTIONAL_LIGHT (FLAGS & DIRECTIONAL_LIGHT_BIT)
+#define SPOT_LIGHT (FLAGS & SPOT_LIGHT_BIT)
+#define POINT_LIGHT (FLAGS & POINT_LIGHT_BIT)
+
 
 #endif
 
@@ -51,6 +66,7 @@
 #	define vec3 Vec3
 #	define vec4 Vec4
 #	define mat3 Mat34
+#	define mat2x4 Mat24
 #	define mat3x4 Mat34
 #	define mat4 Mat44
 #	define UBUFFER(Id, Name) enum {U_##Name = Id}; struct U##Name
@@ -79,12 +95,7 @@ UBUFFER(2, InstanceMat)
 };
 UBUFFER(5, InstanceMtl)
 {
-	ROWMAJOR mat3x4 InstanceMtl[MAX_INSTANCES];
-};
-
-UBUFFER(6, Material)
-{
-	ROWMAJOR mat3x4 Material;
+	mat2x4 InstanceMtl[MAX_INSTANCES];
 };
 
 UBUFFER(3, SkinMat)
@@ -104,8 +115,8 @@ UBUFFER(7, RasterizerParams)
 	float SilhouetteOffset;
 };
 
-USAMPLER(0, 2D, ColorMap);
-USAMPLER(1, 2D, HeightMap);
+//USAMPLER(0, 2D, ColorMap);
+//USAMPLER(1, 2D, HeightMap);
 
 
 #ifdef GLSL
@@ -184,7 +195,7 @@ IN_FLAT(12, int, InstanceID);
 IN(13, float, LogZ);
 OUT(0, vec4, Color);
 OUT(1, vec4, Normal);
-OUT(2, vec4, Mtl);
+OUT(2, vec4, Material);
 #endif
 
 #define UNIT_X vec3(1, 0, 0)

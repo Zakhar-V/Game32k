@@ -33,11 +33,17 @@ public:
 	// ComputeTangents
 	// Load
 	// Save
+	void ScaleTexCoord(const Vec2& _s)
+	{
+		for (uint i = 0; i < m_vertices.Size(); ++i)
+			m_vertices[i].SetTexCoord(m_vertices[i].GetTexCoord() * _s);
+	}
 	AlignedBox ComputeBBox(void);
 
 	void CreateCube(const Vec3& _size = 1, bool _smoothed = false) { CreateCube(AlignedBox().FromCenterExtends(VEC3_ZERO, _size * 0.5f), _smoothed); }
 	void CreateCube(const AlignedBox& _box, bool _smoothed = false);
 	void CreateSphere(float _radius = 1, int _segments = 16, int _rings = 8);
+	void CreateCylinder(float _radius = 1, float _height = 1, int _segments = 16);
 	void CreateGridXZ(uint _numSectors, float _sectorSize);
 
 

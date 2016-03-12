@@ -386,6 +386,7 @@ public:
 
 	void SetMaterial(Material* _mtl) { m_material = _mtl; }
 	Material* GetMaterial(void) { return m_material; }
+
 	MaterialParams& GetMaterialParams(void) { return m_materialParams; }
 
 protected:
@@ -494,6 +495,19 @@ class SkyDome : public RenderNode
 public:
 	OBJECT("SkyDome");
 
+	SkyDome(void);
+	~SkyDome(void);
+
+	void Create(float _radius);
+
+	void GetRenderItems(Array<RenderItem>& _items) override;
+
+protected:
+	friend class Scene;
+
+	VertexArrayPtr m_mesh;
+	SkyDome* m_prevSky;
+	SkyDome* m_nextSky;
 };
 
 //----------------------------------------------------------------------------//
@@ -514,7 +528,7 @@ public:
 
 	float GetHeight(float _x, float _z);
 
-	void Create(Image* _heightmap, float _yScale, float _xzScale, uint _numSectors);
+	void Create(Image* _heightmap, float _yScale, float _xzScale, uint _numSectors, const Vec2& _texcoordScale = 1);
 
 	void GetRenderItems(Array<RenderItem>& _items) override;
 
@@ -597,7 +611,7 @@ public:
 
 	Terrain* GetTerrain(void) { return m_terrain; }
 	DirectionalLight* GetDirectionalLight(void) { return m_directionalLights; }
-	//SkyDome* GetSkyDome(void) { return m_sky; }
+	SkyDome* GetSkyDome(void) { return m_sky; }
 
 	Entity* GetEntity(void) { return m_entities; }
 
@@ -630,11 +644,11 @@ protected:
 
 	DirectionalLight* m_directionalLights;
 	Terrain* m_terrain;
+	SkyDome* m_sky;
 	Vegetation* m_vegetation;
 
 	Entity* m_entities;
 
-	//SkyDome* m_sky;
 	//Wheater
 	//float m_waterHeight
 

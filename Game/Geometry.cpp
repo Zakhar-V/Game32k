@@ -40,7 +40,8 @@ void Geometry::Merge(const Vertex* _vertices, uint _numVertices, const index_t* 
 //----------------------------------------------------------------------------//
 void Geometry::Transform(const Mat44& _m)
 {
-	Mat44 _nm = _m.Copy().Transpose();
+	//Mat44 _nm = _m.Copy().Transpose();
+	Mat44 _nm = _m.Copy();
 	for (uint i = 0; i < m_vertices.Size(); ++i)
 	{
 		Vertex& _v = m_vertices[i];
@@ -180,6 +181,92 @@ void Geometry::CreateSphere(float _radius, int _segments, int _rings)
 				_idx++;
 			}
 		}
+	}
+}
+//----------------------------------------------------------------------------//
+void Geometry::CreateCylinder(float _radius, float _height, int _segments)
+{
+	Clear();
+	m_type = PT_Triangles;
+
+	float _x, _z, _y = _height * -0.5f;
+	float _invS = 1.0f / _segments;
+	float _sAngle = 2 * PI * _invS;
+
+	m_vertices.Resize((_segments) * 4 + 2);
+	m_indices.Resize((_segments + 1) * 12, 0);
+
+	Vertex* _v = m_vertices.Ptr();
+	index_t* _i = m_indices.Ptr();
+
+	Vec3 _n;
+	float _yn = -1;
+	int _idx0 = 0, _idx = 0;
+	for (uint j = 0; j < 2; ++j)
+	{
+		_v->position.Set(0, _y, 0);
+		_v->SetNormal({ 0, _yn, 0 });
+		// TODO: texcoord
+		++_v;
+		++_idx;
+
+		for (int i = 0; i < _segments; ++i)
+		{
+			SinCos(i * _sAngle, _x, _z);
+
+			_v->position.Set(_x * _radius, _y, _z * _radius);
+			_v->SetNormal({ 0, _yn, 0 });
+			// TODO: texcoord
+			++_v;
+
+			*_i++ = _idx0;
+			if (j == 1)
+			{
+				*_i++ = _idx;
+				*_i++ = (i + 1 == _segments) ? (_idx0 + 1) : (_idx + 1);
+			}
+			else
+			{
+				*_i++ = (i + 1 == _segments) ? (_idx0 + 1) : (_idx + 1);
+				*_i++ = _idx;
+			}
+			++_idx;
+		}
+		_idx0 = _idx;
+		_y += _height;
+		_yn += 2;
+	} 
+
+	_y = _height * -0.5f;
+	for (uint j = 0; j < 2; ++j)
+	{
+		for (int i = 0; i < _segments; ++i)
+		{
+			SinCos(i * _sAngle, _x, _z);
+
+			_v->position.Set(_x * _radius, _y, _z * _radius);
+			_v->SetNormal(_v->position.Copy().Normalize());
+			// TODO: texcoord
+			++_v;
+		}
+		_y += _height;
+	}
+
+	uint _lt, _lb, _rt, _rb;
+	for (int i = 0; i < _segments; ++i)
+	{
+		_lt = _idx0 + i;
+		_lb = _lt + _segments;
+		_rt = (i + 1 == _segments) ? (_idx0) : (_lt + 1);
+		_rb = (i + 1 == _segments) ? (_idx0 + _segments) : (_rt + _segments);
+
+		*_i++ = _rt;
+		*_i++ = _lb;
+		*_i++ = _lt; 
+
+		*_i++ = _rt;
+		*_i++ = _rb;
+		*_i++ = _lb;
 	}
 }
 //----------------------------------------------------------------------------//

@@ -479,6 +479,7 @@ enum ShaderID
 	VS_SkinnedModel,
 	VS_Sprite,
 	VS_Particles,
+	VS_FSQuad,
 	//VS_Terrain,
 
 	GS_Sprite,
@@ -489,6 +490,9 @@ enum ShaderID
 
 	FS_Texture,
 	FS_NoTexture,
+
+	FS_DirectionalLight,
+	FS_CelShade,
 };
 
 class Shader : public NonCopyable
@@ -537,6 +541,7 @@ public:
 	void SetDepthStencilBuffer(RenderBuffer* _target);
 	void SetRenderTargetTexture(uint _slot, Texture* _target, uint _z = 0);
 	void SetDepthStencilTargetTexture(Texture* _target, uint _z = 0);
+	void SetNumRenderTargets(uint _num);
 
 	void ResetTextures(void);
 	void SetTexture(uint _slot, Texture* _texture);

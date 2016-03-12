@@ -26,9 +26,6 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Shaders\Common.h">
-      <Filter>Assets\Shaders\old</Filter>
-    </ClInclude>
     <ClInclude Include="Shaders\Generic-VS.glsl">
       <Filter>Assets\Shaders</Filter>
     </ClInclude>
@@ -39,5 +36,8 @@
       <Filter>Assets\Shaders</Filter>
     </ClInclude>
     <ClInclude Include="Shaders\Postprocess.glsl" />
+    <ClInclude Include="Shaders\Common.h">
+      <Filter>Assets\Shaders</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

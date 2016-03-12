@@ -17,11 +17,25 @@
 #define G_PLAYER_STEP_VELOCITY_MULTIPLIER 0.5f
 
 #define G_DRONE_SCAN_RADIUS 15
-#define G_DRON_ATTACK_RADIUS 7.5f
-#define G_DRONE_ATTACK_INTERVAL 1.f
+#define G_DRON_ATTACK_RADIUS 10.5f
+#define G_DRONE_ATTACK_INTERVAL 3.f
 
 
 #define G_TERRAIN_RADIUS 500.0f
+
+#define G_TERRAIN_COLOR {0.3f, 0.3f, 0.3f}
+#define G_TERRAIN_SHININESS 0.4f
+
+#define G_DRONE_SPHERE_TRANSPARENCY 0.15f
+#define G_DRONE_EYE_INACTIVE_COLOR { 0.0f, 0.0f, 0.9f }
+#define G_DRONE_EYE_ACTIVE_COLOR { 0.9f, 0.0f, 0.0f }
+#define G_DRONE_EYE_EMISSION 0.7f
+
+#define G_DRONE_COLOR { 0.2f, 0.2f, 0.2f }
+#define G_DRONE_SHININESS 0.7f
+
+#define G_SKY_RADIUS 200.f
+#define G_SKY_COLOR { 0.0f, 0.0f, 0.1f }
 
 //----------------------------------------------------------------------------//
 // Settings

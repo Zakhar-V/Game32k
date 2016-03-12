@@ -729,6 +729,41 @@ void SkinnedModel::_GetWorldBBox(AlignedBox& _bbox)
 //----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
+// SkyDome
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
+SkyDome::SkyDome(void) :
+	m_prevSky(nullptr),
+	m_nextSky(nullptr)
+{
+	m_typeMask |= NT_SkyDome;
+}
+//----------------------------------------------------------------------------//
+SkyDome::~SkyDome(void)
+{
+}
+//----------------------------------------------------------------------------//
+void SkyDome::Create(float _radius)
+{
+	GeometryPtr _geom = new Geometry();
+	_geom->CreateSphere(_radius, 32, 16);
+	m_mesh = _geom->CreateVertexArray();
+}
+//----------------------------------------------------------------------------//
+void SkyDome::GetRenderItems(Array<RenderItem>& _items)
+{
+	RenderItem _item;
+	_item.node = this;
+	_item.data = m_mesh;
+	_item.material = m_material;
+	_item.start = 0;
+	_item.count = m_mesh->GetIndexCount();
+	_items.Push(_item);
+}
+//----------------------------------------------------------------------------//
+
+//----------------------------------------------------------------------------//
 // Terrain
 //----------------------------------------------------------------------------//
 
@@ -757,7 +792,7 @@ float Terrain::GetHeight(float _x, float _z)
 	return m_scale.y * m_heightmap->Sample({_point.x, _point.z}, ISF_Clamp | ISF_Sparse | ISF_Linear | ISF_Triangle, (float)m_numSectors).x;
 }
 //----------------------------------------------------------------------------//
-void Terrain::Create(Image* _heightmap, float _yScale, float _xzScale, uint _numSectors)
+void Terrain::Create(Image* _heightmap, float _yScale, float _xzScale, uint _numSectors, const Vec2& _texcoordScale)
 {
 	ASSERT(_heightmap != nullptr);
 	ASSERT(_numSectors > 0);
@@ -774,13 +809,17 @@ void Terrain::Create(Image* _heightmap, float _yScale, float _xzScale, uint _num
 	for (uint i = 0; i < _geom.GetVertexCount(); ++i)
 		_v[i].position.y = m_scale.y * (_heightmap->Sample(_v[i].GetTexCoord(), ISF_Clamp | ISF_Linear).x);
 	_geom.ComputeNormals();
+	_geom.ScaleTexCoord(_texcoordScale);
 	m_mesh = _geom.CreateVertexArray();
 	m_localBBox = _geom.ComputeBBox();
 
+	// temp
 	m_texture = new Texture(TT_2D, PF_RGB8, false);
 	m_texture->Realloc(_heightmap->Width(), _heightmap->Height());
 	m_texture->Write(_heightmap->Format(), _heightmap->Data());
 	m_texture->GenerateMipmap();
+	m_material = new Material;
+	m_material->SetTexture(m_texture); // temp
 
 	_CreateDbvtNode();
 }
@@ -790,7 +829,7 @@ void Terrain::GetRenderItems(Array<RenderItem>& _items)
 	RenderItem _item;
 	_item.node = this;
 	_item.data = m_mesh;
-	_item.material = nullptr; // todo
+	_item.material = m_material;
 	_item.start = 0;
 	_item.count = m_mesh->GetIndexCount();
 	_items.Push(_item);
@@ -833,6 +872,7 @@ Scene::Scene(void) :
 	m_numRootNodes(0),
 	m_directionalLights(nullptr),
 	m_terrain(nullptr),
+	m_sky(nullptr),
 	m_vegetation(nullptr),
 	m_entities(nullptr)
 {
@@ -942,6 +982,8 @@ void Scene::_AddNode(Node* _node)
 		Link(m_directionalLights, static_cast<DirectionalLight*>(_node), static_cast<DirectionalLight*>(_node)->m_prevLight);
 	else if (_node->GetTypeMask() & NT_Terrain)
 		Link(m_terrain, static_cast<Terrain*>(_node), static_cast<Terrain*>(_node)->m_prevTerrain);
+	else if (_node->GetTypeMask() & NT_SkyDome)
+		Link(m_sky, static_cast<SkyDome*>(_node), static_cast<SkyDome*>(_node)->m_prevSky);
 	else if (_node->GetTypeMask() & NT_Vegetation)
 		Link(m_vegetation, static_cast<Vegetation*>(_node), static_cast<Vegetation*>(_node)->m_prevVegetation);
 
@@ -972,6 +1014,8 @@ void Scene::_RemoveNode(Node* _node)
 		Unlink(m_directionalLights, static_cast<DirectionalLight*>(_node), static_cast<DirectionalLight*>(_node)->m_prevLight);
 	else if (_node->GetTypeMask() & NT_Terrain)
 		Unlink(m_terrain, static_cast<Terrain*>(_node), static_cast<Terrain*>(_node)->m_prevTerrain);
+	else if (_node->GetTypeMask() & NT_SkyDome)
+		Unlink(m_sky, static_cast<SkyDome*>(_node), static_cast<SkyDome*>(_node)->m_prevSky);
 	else if (_node->GetTypeMask() & NT_Vegetation)
 		Unlink(m_vegetation, static_cast<Vegetation*>(_node), static_cast<Vegetation*>(_node)->m_prevVegetation);
 

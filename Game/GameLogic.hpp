@@ -161,13 +161,6 @@ class Drone : public Character
 public:
 	OBJECT("Drone");
 
-	struct Resources
-	{
-		MeshPtr body;
-		MaterialPtr eyeBlue;
-		MaterialPtr eyeRed;
-	};
-
 	enum State
 	{
 		S_Initial,
@@ -176,7 +169,7 @@ public:
 		S_Attack,
 	};
 
-	Drone(Resources* _res, float _rand);
+	Drone(float _rand);
 	~Drone(void);
 
 protected:
@@ -193,7 +186,8 @@ protected:
 	float m_lastAttackTime;
 	float m_attackStage;
 
-	ModelPtr m_sphere;
+	StaticModelPtr m_eye;
+	StaticModelPtr m_sphere;
 };
 
 //----------------------------------------------------------------------------//

@@ -6,10 +6,10 @@ void main()
 
 #if SKINNED
 	OutWorldPos = InPos; // TODO:
-#elif !PARTICLES
-	OutWorldPos = WorldMat[gl_InstanceID] * vec4((InPos.xyz + InNormal * SilhouetteOffset), 1);
-#else
+#elif PARTICLES || FSQUAD
 	OutWorldPos = InPos;
+#else
+	OutWorldPos = WorldMat[gl_InstanceID] * vec4((InPos.xyz + InNormal * SilhouetteOffset), 1);
 #endif
 
 	OutColor = InColor;
@@ -24,6 +24,10 @@ void main()
 	// TODO: tangent, binormal
 #endif
 
-	gl_Position =  ViewProjMat * OutWorldPos;
+#if FSQUAD
+	gl_Position = OutWorldPos;
+#else
+	gl_Position = ViewProjMat * OutWorldPos;
+#endif
 	OutLogZ = gl_Position.w*Depth.z + 1;
 }  

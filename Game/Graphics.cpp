@@ -562,17 +562,23 @@ RenderBuffer::RenderBuffer(PixelFormat _format)	:
 	m_samples(0),
 	m_handle(0)
 {
+	GL_DEBUG_POINT();
+
 	glGenRenderbuffers(1, &m_handle);
 	glBindRenderbuffer(GL_RENDERBUFFER, m_handle);
 }
 //----------------------------------------------------------------------------//
 RenderBuffer::~RenderBuffer(void)
 {
+	GL_DEBUG_POINT();
+
 	glDeleteRenderbuffers(1, &m_handle);
 }
 //----------------------------------------------------------------------------//
 void RenderBuffer::Realloc(uint _width, uint _height, uint _samples)
 {
+	GL_DEBUG_POINT();
+
 	if (!_samples)
 		_samples = m_samples;
 	_samples = Clamp(_samples, 1u, 16u);
@@ -588,12 +594,13 @@ void RenderBuffer::Realloc(uint _width, uint _height, uint _samples)
 //----------------------------------------------------------------------------//
 void RenderBuffer::CopyToTexture(Texture* _texture, uint _z)
 {
+	GL_DEBUG_POINT();
 	ASSERT(_texture != nullptr);
 	ASSERT(_z < _texture->Depth());
 	ASSERT(m_format != PF_D24S8 || _texture->Format() == PF_D24S8);
 
 	uint _src = gGraphics->_SrcCopyFramebuffer();
-	uint _dst = gGraphics->_SrcCopyFramebuffer();
+	uint _dst = gGraphics->_DstCopyFramebuffer();
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, _dst);
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, _src);
 
@@ -603,13 +610,20 @@ void RenderBuffer::CopyToTexture(Texture* _texture, uint _z)
 		_buffers = GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT;
 		glNamedFramebufferRenderbufferEXT(_src, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_handle);
 		glNamedFramebufferRenderbufferEXT(_src, GL_STENCIL_ATTACHMENT, GL_RENDERBUFFER, m_handle);
-		_BindRenderTargetTexture(_dst, GL_DEPTH_ATTACHMENT, _texture, _z);
-		_BindRenderTargetTexture(_dst, GL_STENCIL_ATTACHMENT, _texture, _z);
 	}
 	else
 	{
 		_buffers = GL_COLOR_BUFFER_BIT;
 		glNamedFramebufferRenderbufferEXT(_src, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, m_handle);
+	}
+
+	if (_texture->Format() == PF_D24S8)
+	{
+		_BindRenderTargetTexture(_dst, GL_DEPTH_ATTACHMENT, _texture, _z);
+		_BindRenderTargetTexture(_dst, GL_STENCIL_ATTACHMENT, _texture, _z);
+	}
+	else
+	{
 		_BindRenderTargetTexture(_dst, GL_COLOR_ATTACHMENT0, _texture, _z);
 	}
 
@@ -621,11 +635,15 @@ void RenderBuffer::CopyToTexture(Texture* _texture, uint _z)
 //----------------------------------------------------------------------------//
 void RenderBuffer::_BindRenderTargetTexture(uint _framebuffer, uint _attachment, Texture* _texture, uint _z)
 {
+	GL_DEBUG_POINT();
+
 	if (_texture)
 	{
 		uint _target = _texture->Type() == TT_Cube ? GL_TEXTURE_CUBE_MAP_POSITIVE_X + _z : GLTextureType[_texture->Type()];
-		if (_texture->Type() == TT_Array || _texture->Type() == TT_3D)
+		if (_texture->Type() == TT_3D)
 			glNamedFramebufferTexture3DEXT(_framebuffer, _attachment, _target, _texture->Handle(), 0, _z);
+		else if(_texture->Type() == TT_Array)
+			glNamedFramebufferTextureLayerEXT(_framebuffer, _attachment, _texture->Handle(), 0, _z);
 		else
 			glNamedFramebufferTexture2DEXT(_framebuffer, _attachment, _target, _texture->Handle(), 0);
 	}
@@ -725,6 +743,8 @@ const g_shaderNames[] =
 	{ ST_Vertex, VS_Sprite, "Generic-VS.glsl", SPRITE_BIT },
 	{ ST_Vertex, VS_Particles, "Generic-VS.glsl", SPRITE_BIT | PARTICLES_BIT },
 	//{ ST_Vertex, VS_Terrain, "Generic-VS.glsl", TERRAIN_BIT },
+	{ ST_Vertex, VS_FSQuad, "Generic-VS.glsl", FSQUAD_BIT },
+
 
 	{ ST_Geometry, GS_Sprite, "Quad-GS.glsl", SPRITE_BIT },
 	{ ST_Geometry, GS_Billboard, "Quad-GS.glsl", SPRITE_BIT | BILLBOARD_BIT },
@@ -734,6 +754,9 @@ const g_shaderNames[] =
 
 	{ ST_Fragment, FS_Texture, "Generic-PS.glsl", TEXTURE_BIT },
 	{ ST_Fragment, FS_NoTexture, "Generic-PS.glsl", 0 },
+
+	{ ST_Fragment, FS_DirectionalLight, "Postprocess.glsl", DIRECTIONAL_LIGHT_BIT },
+	{ ST_Fragment, FS_CelShade, "Postprocess.glsl", CEL_SHADE_BIT },
 
 };
 //----------------------------------------------------------------------------//
@@ -994,6 +1017,7 @@ void Graphics::EndFrame(void)
 	g_DebugOutputEnabled = false;
 #endif
 
+	wglSwapIntervalEXT(1); // TODO: m_vsync
 	SwapBuffers(m_dc);
 
 #ifdef _DEBUG_OUTPUT
@@ -1141,6 +1165,22 @@ void Graphics::SetDepthStencilTargetTexture(Texture* _target, uint _z)
 	}
 }
 //----------------------------------------------------------------------------//
+void Graphics::SetNumRenderTargets(uint _num)
+{
+	GL_DEBUG_POINT();
+	ASSERT(_num <= MAX_RENDER_TARGETS);
+
+	static const uint _buffers[MAX_RENDER_TARGETS] = 
+	{
+		GL_COLOR_ATTACHMENT0,
+		GL_COLOR_ATTACHMENT1,
+		GL_COLOR_ATTACHMENT2,
+		GL_COLOR_ATTACHMENT3,
+	};
+
+	glFramebufferDrawBuffersEXT(m_framebuffer, _num, _buffers);
+}
+//----------------------------------------------------------------------------//
 void Graphics::ResetTextures(void)
 {
 	for (uint i = 0; i < MAX_TEXTURE_UNITS; ++i)
@@ -1158,6 +1198,8 @@ void Graphics::SetTexture(uint _slot, Texture* _texture)
 		if (_texture)
 			_target = GLTextureType[_texture->Type()], _handle = _texture->Handle();
 		glBindMultiTextureEXT(GL_TEXTURE0 + _slot, _target, _handle);
+		//glActiveTexture(GL_TEXTURE0 + _slot);
+		//glBindTexture(_target, _handle);
 		m_currentTextures[_slot] = _texture;
 	}
 }

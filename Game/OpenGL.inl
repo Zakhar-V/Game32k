@@ -1,3 +1,4 @@
+#pragma  once
 
 #define GL_FUNCDEF(R, N, ...) R (APIENTRY*N)(##__VA_ARGS__) = nullptr
 #ifdef _DEBUG
@@ -13,7 +14,7 @@
 //GL_FUNCDEF(void, glCopyTexSubImage3D, GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLint x, GLint y, GLsizei width, GLsizei height);
 
 // 1.3
-//GL_FUNCDEF(void, glActiveTexture, GLenum texture);
+GL_FUNCDEF(void, glActiveTexture, GLenum texture);
 //GL_FUNCDEF(void, glSampleCoverage, GLfloat value, GLboolean invert);
 //GL_FUNCDEF(void, glCompressedTexImage3D, GLenum target, GLint level, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth, GLint border, GLsizei imageSize, const void *data);
 //GL_FUNCDEF(void, glCompressedTexImage2D, GLenum target, GLint level, GLenum internalformat, GLsizei width, GLsizei height, GLint border, GLsizei imageSize, const void *data);
@@ -57,7 +58,7 @@ GL_FUNCDEF(void, glGenBuffers, GLsizei n, GLuint *buffers);
 
 // 2.0
 GL_FUNCDEF(void, glBlendEquationSeparate, GLenum modeRGB, GLenum modeAlpha);
-GL_FUNCDEF(void, glDrawBuffers, GLsizei n, const GLenum *bufs);
+//GL_FUNCDEF(void, glDrawBuffers, GLsizei n, const GLenum *bufs);
 GL_FUNCDEF(void, glStencilOpSeparate, GLenum face, GLenum sfail, GLenum dpfail, GLenum dppass);
 GL_FUNCDEF(void, glStencilFuncSeparate, GLenum face, GLenum func, GLint ref, GLuint mask);
 //GL_FUNCDEF(void, glStencilMaskSeparate, GLenum face, GLuint mask);
@@ -831,12 +832,12 @@ GL_FUNCDEF(void, glNamedFramebufferRenderbufferEXT, GLuint framebuffer, GLenum a
 GL_FUNCDEF(void, glGenerateTextureMipmapEXT, GLuint texture, GLenum target);
 //GL_FUNCDEF(void, glGenerateMultiTexMipmapEXT, GLenum texunit, GLenum target);
 //GL_FUNCDEF(void, glFramebufferDrawBufferEXT, GLuint framebuffer, GLenum mode);
-//GL_FUNCDEF(void, glFramebufferDrawBuffersEXT, GLuint framebuffer, GLsizei n, const GLenum *bufs);
+GL_FUNCDEF(void, glFramebufferDrawBuffersEXT, GLuint framebuffer, GLsizei n, const GLenum *bufs);
 //GL_FUNCDEF(void, glFramebufferReadBufferEXT, GLuint framebuffer, GLenum mode);
 //GL_FUNCDEF(void, glGetFramebufferParameterivEXT, GLuint framebuffer, GLenum pname, GLint *params);
 GL_FUNCDEF(void, glNamedCopyBufferSubDataEXT, GLuint readBuffer, GLuint writeBuffer, GLintptr readOffset, GLintptr writeOffset, GLsizeiptr size);
 GL_FUNCDEF(void, glNamedFramebufferTextureEXT, GLuint framebuffer, GLenum attachment, GLuint texture, GLint level);
-//GL_FUNCDEF(void, glNamedFramebufferTextureLayerEXT, GLuint framebuffer, GLenum attachment, GLuint texture, GLint level, GLint layer);
+GL_FUNCDEF(void, glNamedFramebufferTextureLayerEXT, GLuint framebuffer, GLenum attachment, GLuint texture, GLint level, GLint layer);
 //GL_FUNCDEF(void, glNamedFramebufferTextureFaceEXT, GLuint framebuffer, GLenum attachment, GLuint texture, GLint level, GLenum face);
 //GL_FUNCDEF(void, glTextureRenderbufferEXT, GLuint texture, GLenum target, GLuint renderbuffer);
 //GL_FUNCDEF(void, glMultiTexRenderbufferEXT, GLenum texunit, GLenum target, GLuint renderbuffer);
@@ -914,6 +915,7 @@ void LoadOpenGL(void)
 	// 1.2
 
 	// 1.3
+	GL_FUNCLOAD(glActiveTexture);
 
 	// 1.4
 	GL_FUNCLOAD(glBlendFuncSeparate);
@@ -926,7 +928,7 @@ void LoadOpenGL(void)
 
 	// 2.0
 	GL_FUNCLOAD(glBlendEquationSeparate);
-	GL_FUNCLOAD(glDrawBuffers);
+	//GL_FUNCLOAD(glDrawBuffers);
 	GL_FUNCLOAD(glStencilOpSeparate);
 	GL_FUNCLOAD(glStencilFuncSeparate);
 	//GL_FUNCLOAD(glStencilMaskSeparate);
@@ -1049,9 +1051,10 @@ void LoadOpenGL(void)
 	GL_FUNCLOAD(glNamedFramebufferTexture3DEXT);
 	GL_FUNCLOAD(glNamedFramebufferRenderbufferEXT);
 	GL_FUNCLOAD(glGenerateTextureMipmapEXT);
+	GL_FUNCLOAD(glFramebufferDrawBuffersEXT);
 	GL_FUNCLOAD(glNamedCopyBufferSubDataEXT);
 	GL_FUNCLOAD(glNamedFramebufferTextureEXT);
-	//GL_FUNCLOAD(glNamedFramebufferTextureLayerEXT);
+	GL_FUNCLOAD(glNamedFramebufferTextureLayerEXT);
 	GL_FUNCLOAD(glMapNamedBufferRangeEXT);
 	GL_FUNCLOAD(glTextureStorage2DEXT);
 	GL_FUNCLOAD(glTextureStorage3DEXT);

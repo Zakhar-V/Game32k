@@ -21,25 +21,25 @@ class Terrain;
 
 struct MaterialParams
 {
-	void SetDiffuseColor(const Vec3& _color) { diffuse.Set(_color.x, _color.y, _color.z, diffuse.w); }
-	const Vec3& GetDiffuseColor(void) const { return *(const Vec3*)&diffuse; }
-	void SetSpecularColor(const Vec3& _color) { specular.Set(_color.x, _color.y, _color.z, specular.w); }
-	const Vec3& GetSpecularColor(void) const { return *(const Vec3*)&specular; }
+	void SetColor(const Vec3& _color) { diffuse.Set(_color.x, _color.y, _color.z, diffuse.w); }
+	const Vec3& GetColor(void) const { return *(const Vec3*)&diffuse; }
+	//void SetSpecularColor(const Vec3& _color) { specular.Set(_color.x, _color.y, _color.z, specular.w); }
+	//const Vec3& GetSpecularColor(void) const { return *(const Vec3*)&specular; }
 	void SetTransparency(float _transparency) { diffuse.w = _transparency; }
 	float GetTransparency(void) const { return diffuse.w; }
 	bool IsTranslucent(void) const { return diffuse.w < 1; }
-	void SetShininess(float _shininess) { specular.w = _shininess; }
-	float GetShininess(void) const { return specular.w; }
-	void SetEmission(float _emission) { params.x = _emission; }
-	float GetEmission(void) const { return params.x; }
-	void SetIntensity(float _intencity) { params.y = _intencity; }
-	float GetIntensity(void) const { return params.y; }
+	void SetShininess(float _shininess) { params.x = _shininess; }
+	float GetShininess(void) const { return params.x; }
+	void SetEmission(float _emission) { params.y = _emission; }
+	float GetEmission(void) const { return params.y; }
+	//void SetIntensity(float _intencity) { params.z = _intencity; }
+	//float GetIntensity(void) const { return params.z; }
 
-	operator const Mat34& (void) const { return *(const Mat34*)&diffuse; }
+	operator const Mat24& (void) const { return *(const Mat24*)&diffuse; }
 
-	Vec4 diffuse = { 0.5f, 0.5f, 0.5f, 1 };
-	Vec4 specular = { 1, 1, 1, 0.5f };
-	Vec4 params = { 0, 1, 0, 0 }; // emission, intensity
+	Vec4 diffuse = { 1, 1, 1, 1 };
+	//Vec4 specular = { 1, 1, 1, 0.5f };
+	Vec4 params = { 0.5f, 0, 1, 0 }; // shininess, emission, intensity
 };
 
 //----------------------------------------------------------------------------//
@@ -178,14 +178,20 @@ protected:
 
 	DepthStencilStateID m_depthStencilEnabled;
 	DepthStencilStateID m_depthStencilDisabled;
+	DepthStencilStateID m_depthStencilTestOnly;
+	DepthStencilStateID m_depthStencilWriteOnly;
 
 	RenderBuffer* m_colorBuffer;
+	RenderBuffer* m_normalBuffer;
+	RenderBuffer* m_materialBuffer;
 	RenderBuffer* m_depthStencilBuffer;
 
 	TexturePtr m_gBufferColorTexture;
 	TexturePtr m_gBufferNormalTexture;
 	TexturePtr m_gBufferMaterialTexture;
 	TexturePtr m_gBufferDepthTexture;
+
+	SamplerID m_samplerEdgePoint;
 
 	BufferPtr m_cameraBuffer;
 	UCamera m_cameraParams;
@@ -200,8 +206,8 @@ protected:
 
 	BufferPtr m_instanceMtlBuffer;
 	UInstanceMtl m_instanceMtlStorage;
-	//MaterialParams m_defaultMtlParams;
 	MaterialPtr m_defaultMtl;
+	MaterialParams m_defaultMtlParams;
 
 	BufferPtr m_rasterizerParamsBuffer;
 	URasterizerParams m_rasterizerParamsStorage;
@@ -209,14 +215,13 @@ protected:
 	DbvtFrustumCallback m_dbvtFrustumCallback;
 	RenderContainer m_renderContainer;
 
-	Array<RenderItem> m_renderItems;
-	Array<RenderNode*> m_renderObjects;
+	//Array<RenderItem> m_renderItems;
+	//Array<RenderNode*> m_renderObjects;
 
 	Array<Light*> m_lights;
-	Array<RenderItem> m_staticModelItems;
-	Array<RenderItem> m_skinnedModelItems;
-	Array<RenderItem> m_skyItems;
-	Array<RenderItem> m_terrainItems;
+	Array<RenderItem> m_solidObjects;
+	Array<RenderItem> m_transparentObjects;
+	Array<RenderItem> m_tempObjects;
 };
 
 //----------------------------------------------------------------------------//

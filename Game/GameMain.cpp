@@ -83,11 +83,11 @@ void main()
 	new Graphics;
 	new Renderer;
 
-	App _app;
+	new App;
 
+	gApp->Run();
 
-
-
+#if 0
 	Scene* _scene = new Scene;
 	{
 		ImagePtr _hmap = new Image;
@@ -198,8 +198,10 @@ void main()
 		}
 #endif
 	}
-
 	delete _scene;
+#endif
+
+	delete gApp;
 	delete gRenderer;
 	delete gGraphics;
 	delete gDevice;

@@ -18,7 +18,8 @@ enum MeshResourceID
 	R_MESH_Sphere,
 	R_MESH_DroneBody,
 	R_MESH_DroneEye,
-	R_MESH_DroneEngine,
+	R_MESH_DroneEngine, // not used
+	R_MESH_Pilotless,
 	R_MESH_MaxCount,
 };
 
@@ -30,6 +31,7 @@ public:
 	~Resources(void);
 
 	Image* GetTerrainHeightmap(void) { return m_terrainHeightmap; }
+	Mesh* GetMesh(MeshResourceID _id) { return m_meshes[_id]; }
 
 protected:
 

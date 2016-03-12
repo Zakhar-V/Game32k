@@ -18,6 +18,7 @@ void Follow::Update(const FrameInfo& _frame)
 	Vec3 _targetPos = m_target->GetWorldPosition();
 	Vec3 _dir = _targetPos-_pos;
 	m_node->SetWorldPosition(_pos + (_dir / m_delay) * _frame.time);
+	m_node->SetWorldRotation(Quat().FromLookRotation(_dir));
 }
 //----------------------------------------------------------------------------//
 
@@ -44,6 +45,7 @@ void Patrol::Update(const FrameInfo& _frame)
 	m_stage += _frame.time * m_coeff;
 	_pos += _dir * m_velocity * _frame.time;
 	m_node->SetWorldPosition(_pos);
+	m_node->SetWorldRotation(Quat().FromLookRotation(_dir));
 }
 //----------------------------------------------------------------------------//
 
@@ -108,6 +110,8 @@ void PlayerMovementController::Update(const FrameInfo& _frame)
 	_dir.y = 0; // no flying
 	Vec3 _pos = m_node->GetWorldPosition();
 	_pos += _dir * _frame.time;
+	_pos.x = Clamp<float>(_pos.x, -G_TERRAIN_RADIUS, G_TERRAIN_RADIUS);
+	_pos.z = Clamp<float>(_pos.z, -G_TERRAIN_RADIUS, G_TERRAIN_RADIUS);
 	m_node->SetWorldPosition(_pos);
 }
 //----------------------------------------------------------------------------//
@@ -226,7 +230,7 @@ void Player::_PostUpdateImpl(const FrameInfo& _frame)
 //----------------------------------------------------------------------------//
 
 //----------------------------------------------------------------------------//
-Drone::Drone(Resources* _res, float _rand)
+Drone::Drone(float _rand)
 {
 	m_state = S_Initial;
 	m_rand = _rand;
@@ -237,13 +241,19 @@ Drone::Drone(Resources* _res, float _rand)
 	m_attackStage = 0;
 
 	StaticModelPtr _mdl = new StaticModel;
-	_mdl->SetMesh(_res->body);
+	_mdl->SetMesh(gResources->GetMesh(R_MESH_DroneBody));
 	_mdl->SetParent(this);
 	_mdl->_SetEntity(this);
 	_mdl->SetTags(ET_DRONE);
 
+	m_eye = new StaticModel;
+	m_eye->SetMesh(gResources->GetMesh(R_MESH_DroneEye));
+	m_eye->SetParent(_mdl);
+	m_eye->SetLocalPosition({0, 0, 0.4f});
+	m_eye->_SetEntity(this);
+
 	m_sphere = new StaticModel;
-	m_sphere->SetMesh(_res->body); //_res->sphere
+	m_sphere->SetMesh(gResources->GetMesh(R_MESH_Sphere));
 	m_sphere->Disable();
 	m_sphere->SetParent(this);
 	m_sphere->_SetEntity(this);
@@ -281,6 +291,7 @@ void Drone::_LogicUpdate(const FrameInfo& _frame)
 
 	m_attackStage += G_DRONE_ATTACK_INTERVAL * _frame.time;
 	m_attackStage = Clamp<float>(m_attackStage, 0, 1);
+	m_attackStage = (m_time - m_lastAttackTime) / G_DRONE_ATTACK_INTERVAL;
 
 	if (m_time - m_lastAttackTime > G_DRONE_ATTACK_INTERVAL)
 	{
@@ -314,7 +325,7 @@ void Drone::_LogicUpdate(const FrameInfo& _frame)
 	{
 		m_sphere->Enable();
 		m_sphere->SetWorldScale(_radius);
-		m_sphere->GetMaterialParams().SetTransparency(1 - m_attackStage);
+		m_sphere->GetMaterialParams().SetTransparency((1 - m_attackStage) * G_DRONE_SPHERE_TRANSPARENCY);
 	}
 	else
 	{
@@ -364,6 +375,10 @@ void Drone::_ChangeState(State _state)
 		_patrol->SetVelocity(7);
 		_patrol->SetCoeff(0.1f + m_rand);
 		AddBehavior(_patrol);
+
+		m_eye->GetMaterialParams().SetColor(G_DRONE_EYE_INACTIVE_COLOR);
+		m_sphere->GetMaterialParams().SetColor(G_DRONE_EYE_INACTIVE_COLOR);
+
 	} break;
 	case S_Follow:
 	{
@@ -371,6 +386,10 @@ void Drone::_ChangeState(State _state)
 		_follow->SetTarget(gPlayer);
 		_follow->SetDelay(1);
 		AddBehavior(_follow);
+
+		m_eye->GetMaterialParams().SetColor(G_DRONE_EYE_ACTIVE_COLOR);
+		m_sphere->GetMaterialParams().SetColor(G_DRONE_EYE_ACTIVE_COLOR);
+
 	}break;
 	}
 }
