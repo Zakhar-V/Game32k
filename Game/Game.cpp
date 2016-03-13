@@ -68,7 +68,7 @@ void Game::_CreateSky(void)
 void Game::_CreateSun(void)
 {
 	Ptr<DirectionalLight> _light = new DirectionalLight;
-	//_light->SetParams();
+	//_light->SetParams(...);
 	_light->SetScene(m_scene);
 }
 //----------------------------------------------------------------------------//

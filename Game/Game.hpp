@@ -27,7 +27,6 @@ public:
 	void Update(float _dt);
 	void Draw(void);
 
-
 protected:
 
 	void _CreateTerrain(void);

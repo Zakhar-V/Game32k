@@ -1,6 +1,5 @@
-#ifndef _ShaderCommon_h__
-#define _ShaderCommon_h__
-
+#ifndef _ShaderCommon_h_
+#define _ShaderCommon_h_
 
 // VS/GS flags
 #define INSTANCED_BIT 0x1
@@ -44,8 +43,6 @@
 #define DIRECTIONAL_LIGHT (FLAGS & DIRECTIONAL_LIGHT_BIT)
 #define SPOT_LIGHT (FLAGS & SPOT_LIGHT_BIT)
 #define POINT_LIGHT (FLAGS & POINT_LIGHT_BIT)
-
-
 #endif
 
 
@@ -115,10 +112,6 @@ UBUFFER(7, RasterizerParams)
 	float SilhouetteOffset;
 };
 
-//USAMPLER(0, sampler2D, ColorMap);
-//USAMPLER(1, sampler2D, HeightMap);
-
-
 #ifdef GLSL
 
 #define VARGS(A)  #A
@@ -147,7 +140,7 @@ UBUFFER(7, RasterizerParams)
 #define INOUT(S, T, N) IN(S, T, N); OUT(S, T, N)
 #define INOUT_FLAT(S, T, N) IN_FLAT(S, T, N); OUT_FLAT(S, T, N)
 
-#define _PerVertex gl_PerVertex { vec4 gl_Position; /*float gl_ClipDistance[];*/ }
+#define _PerVertex gl_PerVertex { vec4 gl_Position; }
 
 #if COMPILE_VS
 INOUT(0, vec4, Pos);
@@ -206,4 +199,4 @@ OUT(2, vec4, Material);
 
 #endif // GLSL
 
-#endif//_ShaderCommon_h__
+#endif//_ShaderCommon_h_

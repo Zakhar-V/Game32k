@@ -11,16 +11,10 @@ void main()
 	vec4 material = texture(MaterialMap, InTexCoord); // shininess, emission
 
 #if DIRECTIONAL_LIGHT
-	// restore depth
-	// restore position
-	// resore normal
 	vec4 light = vec4(color); // TODO
-	//OutColor = mix(light, color, material.y);
-	OutColor = color;
+	OutColor = mix(light, color, material.y);
 #elif CEL_SHADE
-	// edge detect
-	// do saturate normals
-	OutColor = color;
+	OutColor = color; // TODO
 #endif
 
 }

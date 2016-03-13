@@ -3,6 +3,10 @@
 #include "Game.hpp"
 #include "Resources.hpp"
 #include "Device.hpp"
+#include "File.hpp"
+#include "BuiltinData.hpp"
+
+#undef CharLower
 
 //----------------------------------------------------------------------------//
 // App
@@ -11,7 +15,62 @@
 //----------------------------------------------------------------------------//
 App::App(void)
 {
+	LOG("Startup ...");
+	LOG("Build %s", __DATE__);
 	LOG("Create App");
+
+
+	// load settings
+	{
+		RawData _data = LoadFile("Settings.txt");
+		_data.Push(0);
+		if (_data.Size() > 10)
+		{
+			LOG("Load settings");
+			const char* s = (const char*)_data.Ptr();
+			String _token;
+			float _val;
+			while (*s)
+			{
+				_token.Clear();
+				_val = 1;
+				while (*s && strchr(" \t\n\r", *s))
+					++s;
+				while (*s && ((*s >= 'a' && *s <= 'z') || (*s >= 'A' && *s <= 'Z') || strchr("_", *s)))
+					_token.Append(CharLower(*s++));
+				while (*s && strchr(" \t\n\r:=", *s))
+					++s;
+				if (!*s || !sscanf(s, "%f", &_val))
+					break;
+				while (*s && strchr(" \t\n\r+-.0123456789", *s))
+					++s;
+
+				LOG("%s = %f", _token.CStr(), _val);
+
+				if (_token == "cam_x")
+					gSettings->invCameraH = _val;
+				else if (_token == "cam_y")
+					gSettings->invCameraV = _val;
+				else if (_token == "mouse_sens")
+					gSettings->mouseSens = _val;
+				else if (_token == "cam_fov")
+					gSettings->cameraFov = _val;
+			}
+		}
+	}
+
+	CreateDirectory("Data", nullptr);
+	SetCurrentDirectory("Data");
+	bool _bdOutOfDate = ExtractBuiltinData();
+	/*if (_bdOutOfDate)
+	{
+		LOG("Generate resources ...");
+	}*/
+
+
+	new Device;
+	new Graphics;
+	new Renderer;
 	new	Resources;
 	new Game;
 }
@@ -19,8 +78,26 @@ App::App(void)
 App::~App(void)
 {
 	LOG("Destroy App");
+
+	{
+		LOG("Save settings");
+		SetCurrentDirectory("../");
+		char _buff[1024];
+		sprintf(_buff,
+			"cam_x %f\ncam_y %f\nmouse_sens %f\ncam_fov %f\n",
+			gSettings->invCameraH,
+			gSettings->invCameraV,
+			gSettings->mouseSens,
+			gSettings->cameraFov);
+
+		SaveFile("Settings.txt", _buff, strlen(_buff));
+	}
+
 	delete gGame;
 	delete gResources;
+	delete gRenderer;
+	delete gGraphics;
+	delete gDevice;
 }
 //----------------------------------------------------------------------------//
 void App::Run(void)
@@ -29,6 +106,8 @@ void App::Run(void)
 	float _dt = 0, _tt = 0, _pt = 0;
 	float _fps = 0;
 	int _frames = 0;
+	float _timeToQuit = 0;
+	int _status = 0;
 
 	bool _quit = false;
 
@@ -46,28 +125,12 @@ void App::Run(void)
 
 		_quit = GetAsyncKeyState(VK_ESCAPE) != 0;
 
-		//_scene->Update(_dt);
 		gGame->Update(_dt);
 
 		gGraphics->BeginFrame();
 		gGraphics->ClearFrameBuffers(FBT_Color | FBT_DepthStencil, _clearColor, 1, 0xff);
 
-		//glEnable(GL_DEPTH_TEST);
-		glEnable(GL_DEPTH_CLAMP);
-		//glDepthRange(-1, 1);
-
-		glEnable(GL_CULL_FACE);
-		glFrontFace(GL_CCW);
-		//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		//gRenderer->Draw(_scene);
 		gGame->Draw();
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-		//glDisable(GL_CULL_FACE);
-
-
-
-		gGraphics->SetShader(FS_NoTexture);
-
 
 		gGraphics->EndFrame();
 		Sleep(1);
@@ -86,20 +149,41 @@ void App::Run(void)
 			_frames = 0;
 		}
 
-		/*if (gPlayer->GetHealth() <= 0)
-		{
-		LOG("Game over");
-		break;
-		} */
+		float _dist = gPlayer->GetWorldPosition().Distance(gTargetPos);
+		float _health = gPlayer->GetHealth();
 
-#if 1
+		if (_status)
 		{
-			float _dist = gPlayer->GetWorldPosition().Distance(gTargetPos);
-			//AlignedBox _worldBB = _scene->GetDbvt()->Root()->box;
-			//gDevice->SetTitle("%f %f %f  %f %f %f", _worldBB.mn.x, _worldBB.mn.y, _worldBB.mn.z, _worldBB.mx.x, _worldBB.mx.y, _worldBB.mx.z);
-			gDevice->SetTitle("Health: %.1f, Distance: %.1f", gPlayer->GetHealth(), _dist);
+			if (_status > 0)
+			{
+				gDevice->SetTitle("MISSION COMPLETE", gPlayer->GetHealth(), _dist);
+			}
+			else
+			{
+				gDevice->SetTitle("MISSION FAIL", gPlayer->GetHealth(), _dist);
+			}
+
+			_timeToQuit -= _dt;
+			if (_timeToQuit <= 0)
+				_quit = true;
 		}
-#endif
+		else
+		{
+			gDevice->SetTitle("Health: %.1f, Distance: %.1f", gPlayer->GetHealth(), _dist);
+
+			if (_dist < 5.5f)
+			{
+				_status = 1;
+				LOG("Mission complete");
+			}
+			else if (_health <= 0)
+			{
+				_status = -1;
+				LOG("Mission fail");
+			}
+
+			_timeToQuit = 3;
+		}
 	}
 
 }

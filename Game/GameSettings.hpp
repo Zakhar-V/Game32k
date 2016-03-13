@@ -46,6 +46,7 @@ struct Settings : public Singleton<Settings>
 	float invCameraH = 1;
 	float invCameraV = 1;
 	float mouseSens = 1.5;
+	float cameraFov = 45.f;
 };
 
 //----------------------------------------------------------------------------//

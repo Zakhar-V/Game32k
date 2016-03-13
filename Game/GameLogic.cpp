@@ -178,6 +178,7 @@ Player::Player(void)
 {
 	m_minHeight = G_PLAYER_HEIGHT;
 	m_camera = new Camera;
+	m_camera->SetFov(gSettings->cameraFov * RADIANS);
 	m_camera->SetParent(this);
 	m_camera->SetInheritRotation(false);
 	m_camera->AddBehavior(new FirstPersonCameraController);

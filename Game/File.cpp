@@ -27,7 +27,14 @@ RawData LoadFile(const char* _name)
 //----------------------------------------------------------------------------//
 void SaveFile(const char* _name, const void* _data, uint _size)
 {
-	// TODO
+	FILE* _file = fopen(_name, "wb");
+	if (_file)
+	{
+		fwrite(_data, 1, _size, _file);
+		fclose(_file);
+	}
+	else
+		LOG("Couldn't save file \"%s\"", _name);
 }
 //----------------------------------------------------------------------------//
 
