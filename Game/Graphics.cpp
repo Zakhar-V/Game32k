@@ -454,8 +454,9 @@ void Texture::Realloc(uint _width, uint _height, uint _depth)
 	if(m_handle)
 		glDeleteTextures(1, &m_handle);
 	glGenTextures(1, &m_handle);
-	glBindMultiTextureEXT(GL_TEXTURE0 + MAX_TEXTURE_UNITS, _target, m_handle);
-
+	glActiveTexture(GL_TEXTURE0 + MAX_TEXTURE_UNITS);
+	glBindTexture(_target, m_handle);
+	//glBindMultiTextureEXT(GL_TEXTURE0 + MAX_TEXTURE_UNITS, _target, m_handle);
 
 	m_width = _width;
 	m_height = _height;
@@ -464,10 +465,28 @@ void Texture::Realloc(uint _width, uint _height, uint _depth)
 	uint _side = Max(m_width, m_height);
 	uint _lods = (m_mipmap && _side) ? Log2i(_side) + 1 : 1;
 	uint _iformat = GLPixelFormats[m_format].iformat;
+
 	if (m_type == TT_2D || m_type == TT_Cube)
 		glTextureStorage2DEXT(m_handle, _target, _lods, _iformat, m_width, m_height);
 	else
 		glTextureStorage3DEXT(m_handle, _target, _lods, _iformat, m_width, m_height, m_depth);
+
+	/*if (m_type == TT_2D)
+	{
+		glTextureImage2DEXT(m_handle, _target, 0, _iformat, m_width, m_height, 0, GL_RGBA, GL_FLOAT, nullptr);
+	}
+	else if (m_type == TT_Cube)
+	{
+		for (uint i = 0; i < 6; ++i)
+			glTextureImage2DEXT(m_handle, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, _iformat, m_width, m_height, 0, GL_RED, GL_FLOAT, nullptr);
+	}
+	else
+	{
+		glTextureImage3DEXT(m_handle, _target, 0, _iformat, m_width, m_height, m_depth, 0, GL_RED, GL_FLOAT, nullptr);
+	}
+
+	glTextureParameteriEXT(m_handle, _target, GL_TEXTURE_MAX_LOD, _lods + 1);
+	glGenerateTextureMipmapEXT(m_handle, _target);*/
 }
 //----------------------------------------------------------------------------//
 void Texture::Write(PixelFormat _format, const void* _src)
@@ -808,9 +827,6 @@ void Shader::_Init(ShaderType _type, const char* _common, const char* _src, uint
 
 	m_handle = glCreateShaderProgramv(GLShaderTypes[m_type], 1, &_srcp);
 
-	//if(!HasOpenGLExtension("GL_ARB_shading_language_420pack") && GLVersion < 42) // no explicit binding
-	//glUniformBlockBinding(m_handle, glGetUniformBlockIndex(m_handle, "UCamera"), U_Camera);
-	//glUniformBlockBinding(m_handle, glGetUniformBlockIndex(m_handle, "UInstanceMat"), U_InstanceMat);
 
 #ifdef _DEBUG_OUTPUT
 	int _length;
@@ -823,6 +839,16 @@ void Shader::_Init(ShaderType _type, const char* _common, const char* _src, uint
 		LOG("%s", *_log);
 	}
 #endif
+
+	// amd bugfix
+	//if(!HasOpenGLExtension("GL_ARB_shading_language_420pack") && GLVersion < 42) // no explicit binding
+	{
+	
+		//glUniformBlockBinding(m_handle, glGetUniformBlockIndex(m_handle, "UCamera"), U_Camera);
+		//glUniformBlockBinding(m_handle, glGetUniformBlockIndex(m_handle, "UInstanceMat"), U_InstanceMat);
+
+		//glProgramUniform1i(m_handle, glGetUniformLocation(m_handle, "ColorMap"), 0);
+	}
 
 	int _status;
 	glGetProgramiv(m_handle, GL_LINK_STATUS, &_status);
@@ -871,15 +897,16 @@ Graphics::Graphics(void)
 		PFNWGLCREATECONTEXTATTRIBSARBPROC _wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC)wglGetProcAddress("wglCreateContextAttribsARB");
 		_CHECK(_wglCreateContextAttribsARB, "OpenGL 3.x is not supported");
 
+		//int _flags = WGL_CONTEXT_CORE_PROFILE_BIT_ARB | WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB;
+		int _flags = WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB;
+#ifdef _DEBUG_OUTPUT
+		_flags |= WGL_CONTEXT_DEBUG_BIT_ARB;
+#endif
 		int _attribs[] =
 		{ 
 			WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
 			WGL_CONTEXT_MINOR_VERSION_ARB, 3,
-#ifdef _DEBUG_OUTPUT
-			WGL_CONTEXT_FLAGS_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB | WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB | WGL_CONTEXT_DEBUG_BIT_ARB,
-#else
-			WGL_CONTEXT_FLAGS_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB | WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB,
-#endif
+			WGL_CONTEXT_FLAGS_ARB, _flags,
 			0, 0
 		};
 
@@ -1197,9 +1224,9 @@ void Graphics::SetTexture(uint _slot, Texture* _texture)
 		uint _target = GL_TEXTURE_2D, _handle = 0;
 		if (_texture)
 			_target = GLTextureType[_texture->Type()], _handle = _texture->Handle();
-		glBindMultiTextureEXT(GL_TEXTURE0 + _slot, _target, _handle);
-		//glActiveTexture(GL_TEXTURE0 + _slot);
-		//glBindTexture(_target, _handle);
+		//glBindMultiTextureEXT(GL_TEXTURE0 + _slot, _target, _handle);
+		glActiveTexture(GL_TEXTURE0 + _slot);
+		glBindTexture(_target, _handle);
 		m_currentTextures[_slot] = _texture;
 	}
 }

@@ -1,4 +1,4 @@
-USAMPLER(0, 2D, ColorMap);
+USAMPLER(0, sampler2D, ColorMap);
 
 void main()
 {

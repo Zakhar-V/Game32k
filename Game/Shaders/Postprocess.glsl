@@ -1,7 +1,7 @@
-USAMPLER(0, 2D, ColorMap);
-USAMPLER(1, 2D, NormalMap);
-USAMPLER(2, 2D, MaterialMap);
-USAMPLER(3, 2D, DepthMap);
+USAMPLER(0, sampler2D, ColorMap);
+USAMPLER(1, sampler2D, NormalMap);
+USAMPLER(2, sampler2D, MaterialMap);
+USAMPLER(3, sampler2D, DepthMap);
 
 void main()
 {

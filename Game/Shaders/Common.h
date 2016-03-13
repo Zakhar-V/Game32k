@@ -59,7 +59,7 @@
 // c++/glsl
 #ifdef GLSL
 #	define UBUFFER(Id, Name) layout(binding = Id, std140) uniform U##Name
-#	define USAMPLER(Id, T, Name) layout(binding = Id) uniform sampler##T Name
+#	define USAMPLER(Id, T, Name) layout(binding = Id) uniform T Name
 #else
 #	define ivec2 Vec2i
 #	define vec2 Vec2
@@ -115,8 +115,8 @@ UBUFFER(7, RasterizerParams)
 	float SilhouetteOffset;
 };
 
-//USAMPLER(0, 2D, ColorMap);
-//USAMPLER(1, 2D, HeightMap);
+//USAMPLER(0, sampler2D, ColorMap);
+//USAMPLER(1, sampler2D, HeightMap);
 
 
 #ifdef GLSL
@@ -141,9 +141,11 @@ UBUFFER(7, RasterizerParams)
 
 #define _INOUT(S, IO, T, P, N) layout(location = S) IO T P##N
 #define IN(S, T, N) _INOUT(S, in, T, In, N) GS_IN_SUFFIX
-#define IN_FLAT(S, T, N) _INOUT(S, flat in, T, In, N) 
+#define IN_FLAT(S, T, N) _INOUT(S, flat in, T, In, N) GS_IN_SUFFIX 
+#define OUT_FLAT(S, T, N) _INOUT(S, flat out, T, Out, N) 
 #define OUT(S, T, N) _INOUT(S, out, T, Out, N)
 #define INOUT(S, T, N) IN(S, T, N); OUT(S, T, N)
+#define INOUT_FLAT(S, T, N) IN_FLAT(S, T, N); OUT_FLAT(S, T, N)
 
 #define _PerVertex gl_PerVertex { vec4 gl_Position; /*float gl_ClipDistance[];*/ }
 
@@ -160,7 +162,7 @@ INOUT(8, vec2, Size);
 INOUT(9, float, Rot);
 OUT(10, vec4, WorldPos);
 OUT(11, vec3, Binormal);
-OUT(12, int, InstanceID);
+OUT_FLAT(12, int, InstanceID);
 OUT(13, float, LogZ);
 out _PerVertex;
 #endif  
@@ -178,7 +180,7 @@ IN(8, vec2, Size);
 IN(9, float, Rot);
 INOUT(10, vec4, WorldPos);
 INOUT(11, vec3, Binormal);
-INOUT(12, int, InstanceID);
+INOUT_FLAT(12, int, InstanceID);
 OUT(13, float, LogZ);
 in _PerVertex gl_in[];
 out _PerVertex;

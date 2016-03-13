@@ -83,7 +83,7 @@ GL_FUNCDEF(void, glGetProgramInfoLog, GLuint program, GLsizei bufSize, GLsizei *
 //GL_FUNCDEF(void, glGetShaderiv, GLuint shader, GLenum pname, GLint *params);
 //GL_FUNCDEF(void, glGetShaderInfoLog, GLuint shader, GLsizei bufSize, GLsizei *length, GLchar *infoLog);
 //GL_FUNCDEF(void, glGetShaderSource, GLuint shader, GLsizei bufSize, GLsizei *length, GLchar *source);
-//GL_FUNCDEF(GLint, glGetUniformLocation, GLuint program, const GLchar *name);
+GL_FUNCDEF(GLint, glGetUniformLocation, GLuint program, const GLchar *name);
 //GL_FUNCDEF(void, glGetUniformfv, GLuint program, GLint location, GLfloat *params);
 //GL_FUNCDEF(void, glGetUniformiv, GLuint program, GLint location, GLint *params);
 //GL_FUNCDEF(void, glGetVertexAttribdv, GLuint index, GLenum pname, GLdouble *params);
@@ -381,7 +381,7 @@ GL_FUNCDEF(void, glGenProgramPipelines, GLsizei n, GLuint *pipelines);
 #ifdef _DEBUG_OUTPUT
 GL_FUNCDEF(void, glGetProgramPipelineiv, GLuint pipeline, GLenum pname, GLint *params);
 #endif
-//GL_FUNCDEF(void, glProgramUniform1i, GLuint program, GLint location, GLint v0);
+GL_FUNCDEF(void, glProgramUniform1i, GLuint program, GLint location, GLint v0);
 //GL_FUNCDEF(void, glProgramUniform1iv, GLuint program, GLint location, GLsizei count, const GLint *value);
 //GL_FUNCDEF(void, glProgramUniform1f, GLuint program, GLint location, GLfloat v0);
 //GL_FUNCDEF(void, glProgramUniform1fv, GLuint program, GLint location, GLsizei count, const GLfloat *value);
@@ -664,7 +664,7 @@ GL_FUNCDEF(void, glDebugMessageCallback, GLDEBUGPROC callback, const void *userP
 GL_FUNCDEF(void, glTextureParameteriEXT, GLuint texture, GLenum target, GLenum pname, GLint param);
 //GL_FUNCDEF(void, glTextureParameterivEXT, GLuint texture, GLenum target, GLenum pname, const GLint *params);
 //GL_FUNCDEF(void, glTextureImage1DEXT, GLuint texture, GLenum target, GLint level, GLint internalformat, GLsizei width, GLint border, GLenum format, GLenum type, const void *pixels);
-//GL_FUNCDEF(void, glTextureImage2DEXT, GLuint texture, GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, const void *pixels);
+GL_FUNCDEF(void, glTextureImage2DEXT, GLuint texture, GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, const void *pixels);
 //GL_FUNCDEF(void, glTextureSubImage1DEXT, GLuint texture, GLenum target, GLint level, GLint xoffset, GLsizei width, GLenum format, GLenum type, const void *pixels);
 GL_FUNCDEF(void, glTextureSubImage2DEXT, GLuint texture, GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const void *pixels);
 //GL_FUNCDEF(void, glCopyTextureImage1DEXT, GLuint texture, GLenum target, GLint level, GLenum internalformat, GLint x, GLint y, GLsizei width, GLint border);
@@ -676,7 +676,7 @@ GL_FUNCDEF(void, glGetTextureImageEXT, GLuint texture, GLenum target, GLint leve
 //GL_FUNCDEF(void, glGetTextureParameterivEXT, GLuint texture, GLenum target, GLenum pname, GLint *params);
 //GL_FUNCDEF(void, glGetTextureLevelParameterfvEXT, GLuint texture, GLenum target, GLint level, GLenum pname, GLfloat *params);
 //GL_FUNCDEF(void, glGetTextureLevelParameterivEXT, GLuint texture, GLenum target, GLint level, GLenum pname, GLint *params);
-//GL_FUNCDEF(void, glTextureImage3DEXT, GLuint texture, GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLsizei depth, GLint border, GLenum format, GLenum type, const void *pixels);
+GL_FUNCDEF(void, glTextureImage3DEXT, GLuint texture, GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLsizei depth, GLint border, GLenum format, GLenum type, const void *pixels);
 GL_FUNCDEF(void, glTextureSubImage3DEXT, GLuint texture, GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type, const void *pixels);
 //GL_FUNCDEF(void, glCopyTextureSubImage3DEXT, GLuint texture, GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLint x, GLint y, GLsizei width, GLsizei height);
 GL_FUNCDEF(void, glBindMultiTextureEXT, GLenum texunit, GLenum target, GLuint texture);
@@ -940,7 +940,7 @@ void LoadOpenGL(void)
 #ifdef _DEBUG_OUTPUT
 	GL_FUNCLOAD(glGetProgramInfoLog);
 #endif
-	//GL_FUNCLOAD(glGetUniformLocation);
+	GL_FUNCLOAD(glGetUniformLocation);
 
 	// 2.1
 
@@ -993,6 +993,7 @@ void LoadOpenGL(void)
 #ifdef _DEBUG_OUTPUT
 	GL_FUNCLOAD(glGetProgramPipelineiv);
 #endif
+	GL_FUNCLOAD(glProgramUniform1i);
 	//GL_FUNCLOAD(glProgramUniform1iv);
 	//GL_FUNCLOAD(glProgramUniform1fv);
 	//GL_FUNCLOAD(glProgramUniform2iv);
@@ -1029,10 +1030,10 @@ void LoadOpenGL(void)
 	// GL_EXT_direct_state_access
 	//GL_FUNCLOAD(glTextureParameterfEXT);
 	GL_FUNCLOAD(glTextureParameteriEXT);
-	//GL_FUNCLOAD(glTextureImage2DEXT);
+	GL_FUNCLOAD(glTextureImage2DEXT);
 	GL_FUNCLOAD(glTextureSubImage2DEXT);
 	GL_FUNCLOAD(glGetTextureImageEXT);
-	//GL_FUNCLOAD(glTextureImage3DEXT);
+	GL_FUNCLOAD(glTextureImage3DEXT);
 	GL_FUNCLOAD(glTextureSubImage3DEXT);
 	GL_FUNCLOAD(glBindMultiTextureEXT);
 	GL_FUNCLOAD(glCompressedTextureSubImage3DEXT);

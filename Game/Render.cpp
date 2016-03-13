@@ -172,6 +172,7 @@ Renderer::Renderer(void)
 		m_rasterizerParamsBuffer->Realloc(sizeof(URasterizerParams));
 		m_rasterizerParamsStorage.DepthBias = 0;
 		m_rasterizerParamsStorage.SilhouetteOffset = 0;
+		m_rasterizerParamsBuffer->Write(&m_rasterizerParamsStorage, 0, sizeof(m_rasterizerParamsStorage));
 	}
 
 	// dbvt callbacks
@@ -207,7 +208,6 @@ void Renderer::Draw(Scene* _scene)
 	glEnable(GL_DEPTH_CLAMP);
 
 	uint _msaa = 1;
-	//glEnable(GL_MULTISAMPLE);
 	m_depthStencilBuffer->Realloc(m_cameraParams.ScreenSize.x, m_cameraParams.ScreenSize.y, _msaa);
 	m_colorBuffer->Realloc(m_cameraParams.ScreenSize.x, m_cameraParams.ScreenSize.y, _msaa);
 	m_normalBuffer->Realloc(m_cameraParams.ScreenSize.x, m_cameraParams.ScreenSize.y, _msaa);
@@ -217,16 +217,19 @@ void Renderer::Draw(Scene* _scene)
 	m_gBufferColorTexture->Realloc(m_cameraParams.ScreenSize.x, m_cameraParams.ScreenSize.y);
 	m_gBufferNormalTexture->Realloc(m_cameraParams.ScreenSize.x, m_cameraParams.ScreenSize.y);
 	m_gBufferMaterialTexture->Realloc(m_cameraParams.ScreenSize.x, m_cameraParams.ScreenSize.y);
+	  
 
 	m_cameraBuffer->Write(&m_cameraParams, 0, sizeof(m_cameraParams));
 	gGraphics->SetDepthStencilState(m_depthStencilEnabled);
 
-	gGraphics->EnableRenderTargets(true);
+	gGraphics->EnableRenderTargets(false);
+
+	/*gGraphics->EnableRenderTargets(true);
 	gGraphics->SetDepthStencilBuffer(m_depthStencilBuffer);
 	gGraphics->SetRenderBuffer(0, m_colorBuffer);
 	gGraphics->SetRenderBuffer(1, m_normalBuffer);
 	gGraphics->SetRenderBuffer(2, m_materialBuffer);
-	gGraphics->SetNumRenderTargets(3);
+	gGraphics->SetNumRenderTargets(3);*/
 	gGraphics->ClearFrameBuffers(FBT_All, 0x7f7f9fff);
 
 	//gGraphics->SetRenderTargetTexture(0, m_gBufferColorTexture);
@@ -246,15 +249,15 @@ void Renderer::Draw(Scene* _scene)
 	//gGraphics->ClearFrameBuffers(FBT_All, 0x000000ff);
 
 	//
-	{
+	/*{
 		m_colorBuffer->CopyToTexture(m_gBufferColorTexture);
 		m_normalBuffer->CopyToTexture(m_gBufferNormalTexture);
 		m_materialBuffer->CopyToTexture(m_gBufferMaterialTexture);
 		m_depthStencilBuffer->CopyToTexture(m_gBufferDepthTexture);
-	}
+	}*/
 
 	// bind gbuffer textures
-	{
+	/*{
 		gGraphics->SetTexture(0, m_gBufferColorTexture);
 		gGraphics->SetSampler(0, m_samplerEdgePoint);
 		gGraphics->SetTexture(1, m_gBufferNormalTexture);
@@ -263,7 +266,7 @@ void Renderer::Draw(Scene* _scene)
 		gGraphics->SetSampler(2, m_samplerEdgePoint);
 		gGraphics->SetTexture(3, m_gBufferDepthTexture);
 		gGraphics->SetSampler(3, m_samplerEdgePoint);
-	}
+	}*/
 
 	/*{
 		gGraphics->SetDepthStencilState(m_depthStencilDisabled);
@@ -371,10 +374,10 @@ void Renderer::Draw(Scene* _scene)
 		glDisable(GL_BLEND);
 	}
 
-	gGraphics->EnableRenderTargets(false);
+	//gGraphics->EnableRenderTargets(false);
 
 	// copy to window
-	{
+	/*{
 		m_colorBuffer->CopyToTexture(m_gBufferColorTexture);
 		gGraphics->SetDepthStencilState(m_depthStencilDisabled);
 		gGraphics->SetShader(VS_FSQuad);
@@ -388,7 +391,7 @@ void Renderer::Draw(Scene* _scene)
 		m_fsQuad->Bind();
 		m_fsQuad->Draw(0, 6);
 		//glDisable(GL_BLEND);
-	}
+	}*/
 
 	// overlay (emissive and transparent objects)
 	/*{
