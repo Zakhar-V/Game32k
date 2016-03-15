@@ -1,4 +1,5 @@
 USAMPLER(0, sampler2D, ColorMap);
+//uniform sampler2D ColorMap;
 
 void main()
 {

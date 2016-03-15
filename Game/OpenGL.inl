@@ -9,8 +9,8 @@
 
 // 1.2
 //GL_FUNCDEF(void, glDrawRangeElements, GLenum mode, GLuint start, GLuint end, GLsizei count, GLenum type, const void *indices);
-//GL_FUNCDEF(void, glTexImage3D, GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLsizei depth, GLint border, GLenum format, GLenum type, const void *pixels);
-//GL_FUNCDEF(void, glTexSubImage3D, GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type, const void *pixels);
+GL_FUNCDEF(void, glTexImage3D, GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLsizei depth, GLint border, GLenum format, GLenum type, const void *pixels);
+GL_FUNCDEF(void, glTexSubImage3D, GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type, const void *pixels);
 //GL_FUNCDEF(void, glCopyTexSubImage3D, GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLint x, GLint y, GLsizei width, GLsizei height);
 
 // 1.3
@@ -238,7 +238,7 @@ GL_FUNCDEF(void, glGenFramebuffers, GLsizei n, GLuint *framebuffers);
 //GL_FUNCDEF(void, glFramebufferTexture3D, GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level, GLint zoffset);
 //GL_FUNCDEF(void, glFramebufferRenderbuffer, GLenum target, GLenum attachment, GLenum renderbuffertarget, GLuint renderbuffer);
 //GL_FUNCDEF(void, glGetFramebufferAttachmentParameteriv, GLenum target, GLenum attachment, GLenum pname, GLint *params);
-//GL_FUNCDEF(void, glGenerateMipmap, GLenum target);
+GL_FUNCDEF(void, glGenerateMipmap, GLenum target);
 GL_FUNCDEF(void, glBlitFramebuffer, GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1, GLint dstX0, GLint dstY0, GLint dstX1, GLint dstY1, GLbitfield mask, GLenum filter);
 //GL_FUNCDEF(void, glRenderbufferStorageMultisample, GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height);
 //GL_FUNCDEF(void, glFramebufferTextureLayer, GLenum target, GLenum attachment, GLuint texture, GLint level, GLint layer);
@@ -913,6 +913,8 @@ void LoadOpenGL(void)
 #endif
 
 	// 1.2
+	GL_FUNCLOAD(glTexImage3D);
+	GL_FUNCLOAD(glTexSubImage3D);
 
 	// 1.3
 	GL_FUNCLOAD(glActiveTexture);
@@ -954,6 +956,7 @@ void LoadOpenGL(void)
 	GL_FUNCLOAD(glBindFramebuffer);
 	GL_FUNCLOAD(glDeleteFramebuffers);
 	GL_FUNCLOAD(glGenFramebuffers);
+	GL_FUNCLOAD(glGenerateMipmap);
 	GL_FUNCLOAD(glBlitFramebuffer);
 	GL_FUNCLOAD(glBindVertexArray);
 	//GL_FUNCLOAD(glDeleteVertexArrays);

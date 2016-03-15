@@ -454,9 +454,9 @@ void Texture::Realloc(uint _width, uint _height, uint _depth)
 	if(m_handle)
 		glDeleteTextures(1, &m_handle);
 	glGenTextures(1, &m_handle);
-	glActiveTexture(GL_TEXTURE0 + MAX_TEXTURE_UNITS);
-	glBindTexture(_target, m_handle);
-	//glBindMultiTextureEXT(GL_TEXTURE0 + MAX_TEXTURE_UNITS, _target, m_handle);
+	//glActiveTexture(GL_TEXTURE0 + MAX_TEXTURE_UNITS);
+	//glBindTexture(_target, m_handle);
+	glBindMultiTextureEXT(GL_TEXTURE0 + MAX_TEXTURE_UNITS, _target, m_handle);
 
 	m_width = _width;
 	m_height = _height;
@@ -470,23 +470,27 @@ void Texture::Realloc(uint _width, uint _height, uint _depth)
 		glTextureStorage2DEXT(m_handle, _target, _lods, _iformat, m_width, m_height);
 	else
 		glTextureStorage3DEXT(m_handle, _target, _lods, _iformat, m_width, m_height, m_depth);
-
+	 
 	/*if (m_type == TT_2D)
 	{
 		glTextureImage2DEXT(m_handle, _target, 0, _iformat, m_width, m_height, 0, GL_RGBA, GL_FLOAT, nullptr);
+		//glTexImage2D(_target, 0, _iformat, m_width, m_height, 0, GLPixelFormats[m_format].format, GLPixelFormats[m_format].type, nullptr);
 	}
 	else if (m_type == TT_Cube)
 	{
 		for (uint i = 0; i < 6; ++i)
-			glTextureImage2DEXT(m_handle, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, _iformat, m_width, m_height, 0, GL_RED, GL_FLOAT, nullptr);
+			glTextureImage2DEXT(m_handle, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, _iformat, m_width, m_height, 0, GL_RGBA, GL_FLOAT, nullptr);
+			//glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, _iformat, m_width, m_height, 0, GL_RGBA, GL_FLOAT, nullptr);
 	}
 	else
 	{
-		glTextureImage3DEXT(m_handle, _target, 0, _iformat, m_width, m_height, m_depth, 0, GL_RED, GL_FLOAT, nullptr);
+		glTextureImage3DEXT(m_handle, _target, 0, _iformat, m_width, m_height, m_depth, 0, GL_RGBA, GL_FLOAT, nullptr);
+		//glTexImage3D(_target, 0, _iformat, m_width, m_height, m_depth, 0, GL_RGBA, GL_FLOAT, nullptr);
 	}
 
 	glTextureParameteriEXT(m_handle, _target, GL_TEXTURE_MAX_LOD, _lods + 1);
-	glGenerateTextureMipmapEXT(m_handle, _target);*/
+	//glGenerateTextureMipmapEXT(m_handle, _target);
+	glGenerateMipmap(_target);*/
 }
 //----------------------------------------------------------------------------//
 void Texture::Write(PixelFormat _format, const void* _src)
@@ -500,12 +504,16 @@ void Texture::Write(PixelFormat _format, const void* _src)
 	uint _bpi = _bpl * m_depth;
 	uint _target = GLTextureType[m_type];
 
+	glActiveTexture(GL_TEXTURE0 + MAX_TEXTURE_UNITS);
+	glBindTexture(_target, m_handle);
+
 	if (m_type == TT_2D)
 	{
 		if (_compressed)
 			glCompressedTextureSubImage2DEXT(m_handle, _target, 0, 0, 0, m_width, m_height, _pf.iformat, _bpi, _src);
 		else
 			glTextureSubImage2DEXT(m_handle, _target, 0, 0, 0, m_width, m_height, _pf.format, _pf.type, _src);
+			//glTexSubImage2D(_target, 0, 0, 0, m_width, m_height, _pf.format, _pf.type, _src);
 	}
 	else if (m_type == TT_3D || m_type == TT_Array)
 	{
@@ -805,18 +813,33 @@ void Shader::_Init(ShaderType _type, const char* _common, const char* _src, uint
 	m_flags = _flags;
 
 	char _header[256]; 
-	sprintf(_header, 
+	sprintf(_header,
 		"#version 330 core\n"
 		//"#extension GL_ARB_enhanced_layouts:enable\n"
 		"#extension GL_ARB_shading_language_420pack:enable\n"
 		"#extension GL_ARB_separate_shader_objects:enable\n"
-		"#define FLAGS 0x%08x\n"
 		"#define COMPILE_%s 1\n"
-		"#define GLSL 330\n",
-		_flags,
-		ShaderPrefix[m_type]);
+		"#define GLSL 330\n"
+		"#define FLAGS %d\n",
+		ShaderPrefix[m_type], 
+		_flags);
 
 	String _srcs = _header;
+
+	_srcs += "#define INSTANCED "; _srcs += (_flags & INSTANCED_BIT) ? ("1\n") : ("0\n");
+	_srcs += "#define SKINNED "; _srcs += (_flags & SKINNED_BIT) ? ("1\n") : ("0\n");
+	_srcs += "#define SPRITE "; _srcs += (_flags & SPRITE_BIT) ? ("1\n") : ("0\n");
+	_srcs += "#define BILLBOARD_Y "; _srcs += (_flags & BILLBOARD_Y_BIT) ? ("1\n") : ("0\n");
+	_srcs += "#define FSQUAD "; _srcs += (_flags & FSQUAD_BIT) ? ("1\n") : ("0\n");
+	_srcs += "#define TEXTURE "; _srcs += (_flags & TEXTURE_BIT) ? ("1\n") : ("0\n");
+	_srcs += "#define CEL_SHADE "; _srcs += (_flags & CEL_SHADE_BIT) ? ("1\n") : ("0\n");
+	_srcs += "#define LIGHTING "; _srcs += (_flags & LIGHTING_BIT) ? ("1\n") : ("0\n");
+	_srcs += "#define DIRECTIONAL_LIGHT "; _srcs += (_flags & DIRECTIONAL_LIGHT_BIT) ? ("1\n") : ("0\n");
+	_srcs += "#define SPOT_LIGHT "; _srcs += (_flags & SPOT_LIGHT_BIT) ? ("1\n") : ("0\n");
+	_srcs += "#define POINT_LIGHT "; _srcs += (_flags & POINT_LIGHT_BIT) ? ("1\n") : ("0\n");
+	_srcs += "#define INSTANCED "; _srcs += (_flags & INSTANCED_BIT) ? ("1\n") : ("0\n");
+	_srcs += "#define INSTANCED "; _srcs += (_flags & INSTANCED_BIT) ? ("1\n") : ("0\n");
+
 	_srcs += _common;
 	_srcs += "\n";
 	_srcs += "\n#line 1 1\n";
@@ -847,7 +870,12 @@ void Shader::_Init(ShaderType _type, const char* _common, const char* _src, uint
 		//glUniformBlockBinding(m_handle, glGetUniformBlockIndex(m_handle, "UCamera"), U_Camera);
 		//glUniformBlockBinding(m_handle, glGetUniformBlockIndex(m_handle, "UInstanceMat"), U_InstanceMat);
 
-		//glProgramUniform1i(m_handle, glGetUniformLocation(m_handle, "ColorMap"), 0);
+		/*int _loc = glGetUniformLocation(m_handle, "ColorMap");
+		if(_loc >= 0)
+		{
+			printf("ColorMap location: %d\n", _loc);
+			glProgramUniform1i(m_handle, _loc, 0);
+		}*/
 	}
 
 	int _status;
@@ -1224,9 +1252,9 @@ void Graphics::SetTexture(uint _slot, Texture* _texture)
 		uint _target = GL_TEXTURE_2D, _handle = 0;
 		if (_texture)
 			_target = GLTextureType[_texture->Type()], _handle = _texture->Handle();
-		//glBindMultiTextureEXT(GL_TEXTURE0 + _slot, _target, _handle);
-		glActiveTexture(GL_TEXTURE0 + _slot);
-		glBindTexture(_target, _handle);
+		glBindMultiTextureEXT(GL_TEXTURE0 + _slot, _target, _handle);
+		//glActiveTexture(GL_TEXTURE0 + _slot);
+		//glBindTexture(_target, _handle);
 		m_currentTextures[_slot] = _texture;
 	}
 }

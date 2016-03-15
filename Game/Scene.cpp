@@ -814,12 +814,13 @@ void Terrain::Create(Image* _heightmap, float _yScale, float _xzScale, uint _num
 	m_localBBox = _geom.ComputeBBox();
 
 	// temp
-	m_texture = new Texture(TT_2D, PF_RGB8, false);
+	m_texture = new Texture(TT_2D, PF_RGB8, true);
 	m_texture->Realloc(_heightmap->Width(), _heightmap->Height());
 	m_texture->Write(_heightmap->Format(), _heightmap->Data());
 	m_texture->GenerateMipmap();
 	m_material = new Material;
-	m_material->SetTexture(m_texture); // temp
+	m_material->SetTexture(m_texture);
+	m_material->SetSampler(gGraphics->AddSampler(Sampler::Desc(TW_Repeat, TF_Trilinear)));
 
 	_CreateDbvtNode();
 }
